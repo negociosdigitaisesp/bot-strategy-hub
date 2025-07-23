@@ -1384,6 +1384,199 @@ O bot utiliza sistema de martingale adaptativo e pausa por risco para proteção
     isFavorite: false,
     downloadUrl: 'https://drive.google.com/file/d/1FUH0Hf4rwVxhdt7L7M9o22pRn-uxON7v/view?usp=sharing',
     ranking: 0
+  },
+  {
+    id: 'scale-bot',
+    name: 'Scale Bot',
+    description: 'Bot especializado en estrategia de escalamiento progresivo para operaciones en índices sintéticos. Utiliza análisis de patrones de precio con sistema de entrada escalonada y gestión inteligente de riesgo. Ideal para traders que buscan un enfoque sistemático y controlado.',
+    strategy: 'Escalamiento Progresivo',
+    accuracy: 82.4,
+    operations: 1856,
+    imageUrl: '',
+    createdAt: '2024-12-19',
+    updatedAt: '2024-12-19',
+    version: '1.0.0',
+    author: 'Scale Trading Systems',
+    profitFactor: 2.1,
+    expectancy: 0.45,
+    drawdown: 19.8,
+    riskLevel: 6,
+    tradedAssets: ['R_100', 'R_75', 'R_50'],
+    code: `// Scale Bot - Estrategia de Escalamiento Progresivo
+function initialize() {
+    // Parámetros de la estrategia
+    this.baseStake = 0.35;           // Stake base
+    this.stopLoss = 15.0;            // Stop loss máximo
+    this.targetProfit = 8.0;         // Meta de ganancia
+    this.scaleMultiplier = 1.5;      // Multiplicador de escalamiento
+    this.maxScaleLevels = 4;         // Máximo de niveles de escalamiento
+    
+    // Indicadores técnicos
+    this.sma = SMA(10);              // Media móvil simple
+    this.ema = EMA(5);               // Media móvil exponencial
+    
+    // Variables de control
+    this.totalProfit = 0;
+    this.currentScaleLevel = 0;
+    this.lastTradeResult = null;
+    this.entryPrice = 0;
+    this.scalePositions = [];
+}
+
+function onTick(tick) {
+    // Verificar condiciones de parada
+    if (this.totalProfit <= -this.stopLoss || this.totalProfit >= this.targetProfit) {
+        this.stop("Meta alcanzada: " + this.totalProfit);
+        return;
+    }
+    
+    // Calcular indicadores
+    const smaValue = this.sma.calculate(tick.close);
+    const emaValue = this.ema.calculate(tick.close);
+    const currentPrice = tick.close;
+    
+    // Lógica de entrada inicial
+    if (this.scalePositions.length === 0) {
+        this.checkInitialEntry(tick, smaValue, emaValue);
+    } else {
+        // Verificar oportunidades de escalamiento
+        this.checkScaleEntry(tick);
+    }
+}
+
+function checkInitialEntry(tick, smaValue, emaValue) {
+    // Condiciones para entrada inicial
+    const bullishSignal = tick.close > smaValue && tick.close > emaValue && emaValue > smaValue;
+    const bearishSignal = tick.close < smaValue && tick.close < emaValue && emaValue < smaValue;
+    
+    if (bullishSignal) {
+        // Entrada CALL
+        this.executeScale("CALL", tick.close, this.baseStake);
+        this.entryPrice = tick.close;
+    } else if (bearishSignal) {
+        // Entrada PUT
+        this.executeScale("PUT", tick.close, this.baseStake);
+        this.entryPrice = tick.close;
+    }
+}
+
+function checkScaleEntry(tick) {
+    if (this.currentScaleLevel >= this.maxScaleLevels) {
+        return; // Máximo de niveles alcanzado
+    }
+    
+    const priceMovement = Math.abs(tick.close - this.entryPrice) / this.entryPrice;
+    
+    // Escalar si el precio se mueve contra nuestra posición
+    if (priceMovement > 0.001 * (this.currentScaleLevel + 1)) { // 0.1% por nivel
+        const lastPosition = this.scalePositions[this.scalePositions.length - 1];
+        const newStake = this.baseStake * Math.pow(this.scaleMultiplier, this.currentScaleLevel);
+        
+        // Escalar en la misma dirección
+        this.executeScale(lastPosition.direction, tick.close, newStake);
+    }
+}
+
+function executeScale(direction, price, stake) {
+    this.currentScaleLevel++;
+    
+    const position = {
+        level: this.currentScaleLevel,
+        direction: direction,
+        price: price,
+        stake: stake,
+        timestamp: Date.now()
+    };
+    
+    this.scalePositions.push(position);
+    
+    if (direction === "CALL") {
+        this.buyCall("R_100", stake, 5); // 5 ticks
+    } else {
+        this.buyPut("R_100", stake, 5); // 5 ticks
+    }
+    
+    console.log("Escalamiento nivel " + this.currentScaleLevel + ": " + direction + " con stake " + stake);
+}
+
+function onTradeResult(result) {
+    this.lastTradeResult = result;
+    this.totalProfit += result.profit;
+    
+    if (result.profit > 0) {
+        // Operación ganadora - resetear escalamiento
+        console.log("¡Operación ganadora! Reseteando escalamiento.");
+        this.resetScale();
+    } else {
+        // Operación perdedora - mantener escalamiento activo
+        console.log("Operación perdedora. Manteniendo estrategia de escalamiento.");
+    }
+    
+    console.log("Resultado: " + result.type + ", Ganancia: " + result.profit + ", Total: " + this.totalProfit);
+}
+
+function resetScale() {
+    // Resetear todas las variables de escalamiento
+    this.currentScaleLevel = 0;
+    this.scalePositions = [];
+    this.entryPrice = 0;
+}
+
+function calculateAverageEntry() {
+    if (this.scalePositions.length === 0) return 0;
+    
+    let totalValue = 0;
+    let totalStake = 0;
+    
+    for (const position of this.scalePositions) {
+        totalValue += position.price * position.stake;
+        totalStake += position.stake;
+    }
+    
+    return totalValue / totalStake;
+}`,
+    usageInstructions: `Accede a la plataforma
+Haz clic aquí para acceder a la plataforma Deriv
+@https://track.deriv.be/_XZsgLOqstMrrhBvO3lYd_WNd7ZgqdRLk/1/
+
+Inicia sesión en tu cuenta
+Inicia sesión en tu cuenta Deriv (Demo o Real).
+
+Importa el robot
+En el menú superior, haz clic en "Importar" (o "Load" en Binary Bot).
+
+Carga el archivo
+Localiza el archivo .xml del robot Scale Bot en tu computadora y cárgalo.
+
+Verifica la carga
+El robot aparecerá en el área de trabajo de la plataforma.
+
+Configura los parámetros
+Antes de iniciar, revisa y ajusta las configuraciones:
+• Stake Base: $0.35 USD
+• Stop Loss: $15.00 USD
+• Stop Win: $8.00 USD
+• Multiplicador de Escalamiento: 1.5
+• Máximo de Niveles: 4
+
+Estrategia de Escalamiento:
+El Scale Bot utiliza un enfoque progresivo donde:
+• Inicia con un stake base de $0.35
+• Escala posiciones cuando el mercado se mueve contra la posición inicial
+• Cada nivel de escalamiento aumenta el stake en 50%
+• Máximo de 4 niveles para controlar el riesgo
+• Reset automático después de operación ganadora
+
+Ejecuta el robot
+Haz clic en el botón "Ejecutar" (o "Run") para iniciar el robot.
+
+⚠️ IMPORTANTE: SIEMPRE PRUEBA EN CUENTA DEMO PRIMERO
+El Scale Bot utiliza estrategia de escalamiento que puede aumentar la exposición. Usa con gestión de riesgo adecuada.
+
+Enlace de descarga: https://drive.google.com/file/d/1cgABr7dHEa7YAkZzNJRBZZJZ3SSf_J2A/view?usp=sharing`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/1cgABr7dHEa7YAkZzNJRBZZJZ3SSf_J2A/view?usp=sharing',
+    ranking: 0
   }
 ];
 

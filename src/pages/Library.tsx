@@ -132,7 +132,9 @@ const Library = () => {
       'sniperbot': '/bot/15',
       'nexusbot': '/bot/14',
       'bkbot1.0': '/bk-bot',
-      'bkbot': '/bk-bot'
+      'bkbot': '/bk-bot',
+      'scalebot': '/bot/scale-bot',
+      'scale': '/bot/scale-bot'
     };
   
     return botRoutes[normalizedName] || '/';

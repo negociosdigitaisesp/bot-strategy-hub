@@ -44,7 +44,9 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       'sniperbot': { assertividade: 79.8, route: '/bot/15' },
       'nexusbot': { assertividade: 83.7, route: '/bot/14' },
       'bkbot1.0': { assertividade: 88.5, route: '/bk-bot' },
-      'bkbot': { assertividade: 88.5, route: '/bk-bot' }
+      'bkbot': { assertividade: 88.5, route: '/bk-bot' },
+      'scalebot': { assertividade: 89.2, route: '/bot/scale-bot' },
+      'scale': { assertividade: 89.2, route: '/bot/scale-bot' }
     };
     
     return botConfigs[normalizedName] || { assertividade: bot.assertividade_percentual, route: '/' };
@@ -178,6 +180,19 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
           </div>
           <div className="text-xs text-muted-foreground font-medium">Total de Operaciones</div>
         </div>
+
+        {/* Linha 3: Lucro Total (apenas para período de 1 hora) */}
+        {periodoSelecionado === '1 hour' && bot.lucro_total !== undefined && (
+          <div className="text-center p-3 bg-gradient-to-br from-yellow-500/5 to-yellow-500/10 rounded-lg border border-yellow-500/20">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <Award size={12} className="text-yellow-500" />
+              <span className={`text-lg font-bold ${bot.lucro_total >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                ${bot.lucro_total.toFixed(2)}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground font-medium">Lucro Total (1 Hora)</div>
+          </div>
+        )}
       </div>
       
       {/* Footer profissional */}
