@@ -181,16 +181,44 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
           <div className="text-xs text-muted-foreground font-medium">Total de Operaciones</div>
         </div>
 
-        {/* Linha 3: Lucro Total (apenas para período de 1 hora) */}
+        {/* Linha 3: Ganancia Total (apenas para período de 1 hora) - Design Minimalista */}
         {periodoSelecionado === '1 hour' && bot.lucro_total !== undefined && (
-          <div className="text-center p-3 bg-gradient-to-br from-yellow-500/5 to-yellow-500/10 rounded-lg border border-yellow-500/20">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Award size={12} className="text-yellow-500" />
-              <span className={`text-lg font-bold ${bot.lucro_total >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                ${bot.lucro_total.toFixed(2)}
-              </span>
+          <div className={`relative p-5 rounded-lg border transition-all duration-300 hover:shadow-md ${
+            bot.lucro_total >= 0 
+              ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40' 
+              : 'bg-red-50/80 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40'
+          }`}>
+            
+            {/* Conteúdo principal */}
+            <div className="text-center">
+              {/* Valor principal com sinal */}
+              <div className="mb-2">
+                <span className={`text-2xl font-bold tracking-tight ${
+                  bot.lucro_total >= 0 
+                    ? 'text-emerald-700 dark:text-emerald-300' 
+                    : 'text-red-700 dark:text-red-300'
+                }`}>
+                  {bot.lucro_total >= 0 ? '+' : '-'}${Math.abs(bot.lucro_total).toFixed(2)}
+                </span>
+              </div>
+              
+              {/* Título */}
+              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                Ganancia Total
+              </div>
+              
+              {/* Subtítulo */}
+              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                Última Hora
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground font-medium">Lucro Total (1 Hora)</div>
+            
+            {/* Indicador visual sutil */}
+            <div className={`absolute top-0 left-0 w-full h-0.5 rounded-t-lg ${
+              bot.lucro_total >= 0 
+                ? 'bg-emerald-400' 
+                : 'bg-red-400'
+            }`}></div>
           </div>
         )}
       </div>
