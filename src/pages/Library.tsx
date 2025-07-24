@@ -134,7 +134,9 @@ const Library = () => {
       'bkbot1.0': '/bk-bot',
       'bkbot': '/bk-bot',
       'scalebot': '/bot/scale-bot',
-      'scale': '/bot/scale-bot'
+      'scale': '/bot/scale-bot',
+      'alfabot': '/alfabot',
+      'alfa': '/alfabot'
     };
   
     return botRoutes[normalizedName] || '/';

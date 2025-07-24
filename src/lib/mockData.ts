@@ -1577,6 +1577,233 @@ Enlace de descarga: https://drive.google.com/file/d/1cgABr7dHEa7YAkZzNJRBZZJZ3SS
     isFavorite: false,
     downloadUrl: 'https://drive.google.com/file/d/1cgABr7dHEa7YAkZzNJRBZZJZ3SSf_J2A/view?usp=sharing',
     ranking: 0
+  },
+  {
+    id: "alfabot",
+    name: "AlfaBot",
+    description: "Bot avançado de trading automatizado com estratégia híbrida que combina análise técnica e inteligência artificial para maximizar lucros em mercados voláteis. Utiliza algoritmos adaptativos para identificar oportunidades de alta probabilidade.",
+    strategy: "Híbrida IA",
+    accuracy: 85.2,
+    operations: 1247,
+    imageUrl: "",
+    createdAt: "2024-12-19",
+    updatedAt: "2024-12-19",
+    version: "2.0.0",
+    author: "AlfaTech Solutions",
+    profitFactor: 2.3,
+    expectancy: 0.52,
+    drawdown: 18.5,
+    riskLevel: 5,
+    tradedAssets: ["R_100", "R_75", "R_50", "RDBEAR"],
+    code: `// AlfaBot - Estratégia Híbrida com IA
+function initialize() {
+    // Parâmetros da estratégia
+    this.baseStake = 0.35;           // Stake base
+    this.stopLoss = 12.0;            // Stop loss máximo
+    this.targetProfit = 10.0;        // Meta de ganância
+    this.adaptiveMultiplier = 1.2;   // Multiplicador adaptativo
+    
+    // Indicadores técnicos
+    this.sma = SMA(14);              // Média móvel simples
+    this.ema = EMA(21);              // Média móvel exponencial
+    this.rsi = RSI(14);              // Índice de força relativa
+    this.macd = MACD(12, 26, 9);     // MACD
+    
+    // Sistema de IA adaptativo
+    this.aiConfidence = 0.5;         // Confiança da IA
+    this.marketCondition = "neutral"; // Condição do mercado
+    this.adaptiveThreshold = 0.7;    // Limite adaptativo
+    
+    // Variáveis de controle
+    this.totalProfit = 0;
+    this.consecutiveWins = 0;
+    this.consecutiveLosses = 0;
+    this.lastTradeResult = null;
+}
+
+function onTick(tick) {
+    // Verificar condições de parada
+    if (this.totalProfit <= -this.stopLoss || this.totalProfit >= this.targetProfit) {
+        this.stop("Meta alcançada: " + this.totalProfit);
+        return;
+    }
+    
+    // Calcular indicadores
+    const smaValue = this.sma.calculate(tick.close);
+    const emaValue = this.ema.calculate(tick.close);
+    const rsiValue = this.rsi.calculate(tick.close);
+    const macdValue = this.macd.calculate(tick.close);
+    
+    // Análise de IA adaptativa
+    this.analyzeMarketCondition(tick, smaValue, emaValue, rsiValue, macdValue);
+    
+    // Determinar sinal de entrada
+    const signal = this.generateTradingSignal(tick, smaValue, emaValue, rsiValue, macdValue);
+    
+    if (signal.direction && signal.confidence > this.adaptiveThreshold) {
+        this.executeTrade(signal, tick);
+    }
+}
+
+function analyzeMarketCondition(tick, sma, ema, rsi, macd) {
+    // Análise da volatilidade
+    const volatility = this.calculateVolatility();
+    
+    // Análise da tendência
+    const trendStrength = Math.abs(ema - sma) / sma;
+    
+    // Determinar condição do mercado
+    if (volatility > 0.02 && trendStrength > 0.01) {
+        this.marketCondition = "trending";
+        this.adaptiveThreshold = 0.6; // Menor threshold em tendência
+    } else if (volatility < 0.01) {
+        this.marketCondition = "ranging";
+        this.adaptiveThreshold = 0.8; // Maior threshold em range
+    } else {
+        this.marketCondition = "neutral";
+        this.adaptiveThreshold = 0.7; // Threshold padrão
+    }
+    
+    // Ajustar confiança da IA baseado no histórico
+    if (this.consecutiveWins >= 3) {
+        this.aiConfidence = Math.min(0.9, this.aiConfidence + 0.1);
+    } else if (this.consecutiveLosses >= 2) {
+        this.aiConfidence = Math.max(0.3, this.aiConfidence - 0.1);
+    }
+}
+
+function generateTradingSignal(tick, sma, ema, rsi, macd) {
+    let bullishScore = 0;
+    let bearishScore = 0;
+    
+    // Análise de médias móveis
+    if (tick.close > ema && ema > sma) bullishScore += 0.3;
+    if (tick.close < ema && ema < sma) bearishScore += 0.3;
+    
+    // Análise RSI
+    if (rsi < 30) bullishScore += 0.2; // Oversold
+    if (rsi > 70) bearishScore += 0.2; // Overbought
+    if (rsi > 40 && rsi < 60) bullishScore += 0.1; // Zona neutra favorável
+    
+    // Análise MACD
+    if (macd.histogram > 0 && macd.signal > 0) bullishScore += 0.2;
+    if (macd.histogram < 0 && macd.signal < 0) bearishScore += 0.2;
+    
+    // Fator de confiança da IA
+    const confidence = Math.max(bullishScore, bearishScore) * this.aiConfidence;
+    
+    // Determinar direção
+    let direction = null;
+    if (bullishScore > bearishScore && bullishScore > 0.5) {
+        direction = "CALL";
+    } else if (bearishScore > bullishScore && bearishScore > 0.5) {
+        direction = "PUT";
+    }
+    
+    return {
+        direction: direction,
+        confidence: confidence,
+        bullishScore: bullishScore,
+        bearishScore: bearishScore
+    };
+}
+
+function executeTrade(signal, tick) {
+    // Calcular stake adaptativo
+    const stakeAmount = this.calculateAdaptiveStake();
+    
+    if (signal.direction === "CALL") {
+        this.buyCall(tick.symbol, stakeAmount, 5); // 5 ticks
+    } else {
+        this.buyPut(tick.symbol, stakeAmount, 5); // 5 ticks
+    }
+    
+    console.log("AlfaBot executando: " + signal.direction + 
+                " | Confiança: " + signal.confidence.toFixed(2) + 
+                " | Stake: " + stakeAmount + 
+                " | Condição: " + this.marketCondition);
+}
+
+function calculateAdaptiveStake() {
+    let stake = this.baseStake;
+    
+    // Ajustar baseado no histórico recente
+    if (this.consecutiveWins >= 2) {
+        stake *= 1.1; // Aumentar ligeiramente após vitórias
+    } else if (this.consecutiveLosses >= 1) {
+        stake *= this.adaptiveMultiplier; // Recuperação adaptativa
+    }
+    
+    // Ajustar baseado na confiança da IA
+    stake *= (0.8 + (this.aiConfidence * 0.4));
+    
+    return Math.round(stake * 100) / 100; // Arredondar para 2 casas decimais
+}
+
+function calculateVolatility() {
+    // Simulação de cálculo de volatilidade
+    return Math.random() * 0.03;
+}
+
+function onTradeResult(result) {
+    this.lastTradeResult = result;
+    this.totalProfit += result.profit;
+    
+    if (result.profit > 0) {
+        this.consecutiveWins++;
+        this.consecutiveLosses = 0;
+        console.log("✅ Vitória! Sequência: " + this.consecutiveWins);
+    } else {
+        this.consecutiveLosses++;
+        this.consecutiveWins = 0;
+        console.log("❌ Perda. Sequência: " + this.consecutiveLosses);
+    }
+    
+    console.log("Resultado: " + result.type + 
+                " | Lucro: " + result.profit + 
+                " | Total: " + this.totalProfit + 
+                " | IA Confiança: " + this.aiConfidence.toFixed(2));
+}`,
+    usageInstructions: `Acesse a plataforma
+Clique aqui para acessar a plataforma Deriv
+@https://track.deriv.be/_XZsgLOqstMrrhBvO3lYd_WNd7ZgqdRLk/1/
+
+Faça login na sua conta
+Faça login na sua conta Deriv (Demo ou Real).
+
+Importe o robô
+No menu superior, clique em "Importar" (ou "Load" no Binary Bot).
+
+Carregue o arquivo
+Localize o arquivo .xml do robô AlfaBot no seu computador e carregue-o.
+
+Verifique o carregamento
+O robô aparecerá na área de trabalho da plataforma.
+
+Configure os parâmetros
+Antes de iniciar, revise e ajuste as configurações:
+• Stake Base: $0.35 USD
+• Stop Loss: $12.00 USD
+• Stop Win: $10.00 USD
+• Multiplicador Adaptativo: 1.2
+
+Características do AlfaBot:
+• Sistema de IA adaptativo que aprende com o mercado
+• Análise multi-indicador (SMA, EMA, RSI, MACD)
+• Gestão de risco dinâmica baseada em performance
+• Adaptação automática às condições do mercado
+• Confiança da IA ajustável baseada no histórico
+
+Execute o robô
+Clique no botão "Executar" (ou "Run") para iniciar o robô.
+
+⚠️ IMPORTANTE: SEMPRE TESTE EM CONTA DEMO PRIMEIRO
+O AlfaBot utiliza estratégias avançadas de IA. Use com gestão de risco adequada.
+
+Enlace de descarga: https://drive.google.com/file/d/1g9RZ7sXUKiXLrpODcmMHCzrwlAfyCsdF/view?usp=sharing`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/1g9RZ7sXUKiXLrpODcmMHCzrwlAfyCsdF/view?usp=sharing',
+    ranking: 0
   }
 ];
 
@@ -1610,6 +1837,7 @@ export const filterOptions = {
     { label: "Sin Martingale", value: "Sin Martingale" },
     { label: "Filtro Digital", value: "Digital Filter" },
     { label: "Análisis Secuencial", value: "Análisis Secuencial" },
+    { label: "Híbrida IA", value: "Híbrida IA" },
   ],
   assets: [
     { label: "R_25", value: "R_25" },

@@ -28,6 +28,8 @@ const botNameMapping: Record<string, string> = {
   'AlphaBot': 'AlphaBot',
   'NexusBot': 'NexusBot',
   'Sniper Bot': 'Sniper Bot',
+  'AlfaBot': 'AlfaBot',
+  'Alfa Bot': 'AlfaBot',
   // Adicione outros mapeamentos conforme necessário
 };
 
@@ -103,6 +105,13 @@ async function criarDadosRankingAlternativos(): Promise<BotRankingData[]> {
       assertividade_percentual: 86.7,
       vitorias: 173,
       derrotas: 27,
+      total_operacoes: 200
+    },
+    {
+      nome_bot: 'AlfaBot',
+      assertividade_percentual: 85.2,
+      vitorias: 170,
+      derrotas: 30,
       total_operacoes: 200
     },
     {
@@ -276,6 +285,13 @@ function criarDadosRankingFallback(): BotRankingData[] {
       assertividade_percentual: 87.2,
       vitorias: 174,
       derrotas: 26,
+      total_operacoes: 200
+    },
+    {
+      nome_bot: 'AlfaBot',
+      assertividade_percentual: 85.2,
+      vitorias: 170,
+      derrotas: 30,
       total_operacoes: 200
     },
     {

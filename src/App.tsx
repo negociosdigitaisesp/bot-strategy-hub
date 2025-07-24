@@ -22,6 +22,7 @@ import BotsApalancamiento from "./pages/BotsApalancamiento";
 import Factor50XPage from "./pages/Factor50XPage";
 import BKBot from "./pages/BKBot";
 import RiskManagement from "./pages/RiskManagement";
+import AlfaBot from "./pages/AlfaBot";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -143,6 +144,15 @@ const App = () => {
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <BKBot />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/alfabot" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <AlfaBot />
                       </main>
                     </>
                   } />
