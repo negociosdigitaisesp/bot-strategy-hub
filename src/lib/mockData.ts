@@ -1804,6 +1804,316 @@ Enlace de descarga: https://drive.google.com/file/d/1g9RZ7sXUKiXLrpODcmMHCzrwlAf
     isFavorite: false,
     downloadUrl: 'https://drive.google.com/file/d/1g9RZ7sXUKiXLrpODcmMHCzrwlAfyCsdF/view?usp=sharing',
     ranking: 0
+  },
+  {
+    id: "tipbot",
+    name: "Tip Bot",
+    description: "Bot con estrategia muy directa y agresiva. Su único objetivo es realizar operaciones continuamente, apostando a que el último dígito del precio será MAYOR (OVER) que cero, utilizando un sistema de Martingale para recuperar las pérdidas rápidamente.",
+    strategy: "Martingale Agresivo",
+    accuracy: 84.5,
+    operations: 2156,
+    imageUrl: "",
+    createdAt: "2024-12-19",
+    updatedAt: "2024-12-19",
+    version: "1.0.0",
+    author: "Tip Trading Systems",
+    profitFactor: 1.9,
+    expectancy: 0.38,
+    drawdown: 22.5,
+    riskLevel: 8,
+    tradedAssets: ["R_75"],
+    code: `// Tip Bot - Estrategia DIGITOVER 0 con Martingale Agresivo
+function initialize() {
+    // Parámetros de la estrategia
+    this.baseStake = 1.0;            // Apuesta base
+    this.stopLoss = 50.0;            // Stop loss máximo
+    this.targetProfit = 25.0;        // Meta de ganancia
+    this.martingaleMultiplier = 2.0; // Multiplicador Martingale (duplica)
+    
+    // Variables de control
+    this.totalProfit = 0;
+    this.currentStake = this.baseStake;
+    this.consecutiveLosses = 0;
+    this.operationsCount = 0;
+}
+
+function onTick(tick) {
+    // Verificar condiciones de parada
+    if (this.totalProfit <= -this.stopLoss || this.totalProfit >= this.targetProfit) {
+        this.stop("Meta alcanzada: " + this.totalProfit);
+        return;
+    }
+    
+    // Estrategia: SIEMPRE apostar DIGITOVER 0
+    // El último dígito del precio será MAYOR que 0
+    // Solo pierde si el último dígito es exactamente 0
+    this.buyDigitOver(tick.symbol, 0, this.currentStake, 1); // 1 tick duration
+    this.operationsCount++;
+    
+    console.log("Operación #" + this.operationsCount + 
+                " - DIGITOVER 0 con stake: " + this.currentStake + 
+                " | Total: " + this.totalProfit);
+}
+
+function onTradeResult(result) {
+    this.totalProfit += result.profit;
+    
+    if (result.profit > 0) {
+        // ¡GANÓ! Resetear al stake inicial
+        console.log("✅ ¡VICTORIA! Último dígito > 0");
+        this.currentStake = this.baseStake;
+        this.consecutiveLosses = 0;
+    } else {
+        // PERDIÓ (último dígito fue 0) - Activar Martingale
+        this.consecutiveLosses++;
+        this.currentStake *= this.martingaleMultiplier; // DUPLICAR apuesta
+        
+        console.log("❌ PÉRDIDA - Último dígito fue 0. Pérdidas consecutivas: " + 
+                    this.consecutiveLosses + 
+                    " | Nueva apuesta: " + this.currentStake);
+    }
+    
+    console.log("Resultado: " + result.type + 
+                " | Ganancia: " + result.profit + 
+                " | Total Acumulado: " + this.totalProfit + 
+                " | Stake Actual: " + this.currentStake);
+}
+
+// Función auxiliar para comprar DIGITOVER
+function buyDigitOver(symbol, digit, amount, duration) {
+    // Implementación específica para DIGITOVER 0
+    // El bot apuesta que el último dígito será > 0
+    this.buy({
+        symbol: symbol,
+        contract_type: "DIGITOVER",
+        digit: digit,
+        amount: amount,
+        duration: duration,
+        duration_unit: "t" // ticks
+    });
+}`,
+    usageInstructions: `Acceda a la plataforma
+Haga clic aquí para descargar Tip Bot
+@https://drive.google.com/file/d/14t4UPqkJFFumxquZY0fclfDh8oAiI2Ci/view?usp=sharing
+
+Inicie sesión en su cuenta
+Inicie sesión en su cuenta Deriv (Demo o Real).
+
+Importe el robot
+En el menú superior, haga clic en "Importar" (o "Load" en Binary Bot).
+
+Cargue el archivo
+Localice el archivo .xml del robot Tip Bot en su computadora y cárguelo.
+
+Verifique la carga
+El robot aparecerá en el área de trabajo de la plataforma.
+
+Estrategia del Tip Bot:
+
+🎯 ESTRATEGIA DE ENTRADA: Siempre Comprar
+• No analiza el mercado - opera continuamente
+• Alta frecuencia de operaciones
+• Opera en Índice de Volatilidad 75 (R_75)
+
+🎲 TIPO DE APUESTA: Dígito Mayor que Cero (DIGITOVER 0)
+• Apuesta: "el último dígito del precio será mayor que 0"
+• Alta probabilidad de victoria (solo pierde si el dígito es 0)
+• Muchas victorias pequeñas vs pocas pérdidas
+
+💰 GESTIÓN DEL DINERO: Martingale Agresivo
+• Apuesta Inicial: $1.00
+• Si GANA: Reinicia al valor inicial
+• Si PIERDE: DUPLICA la apuesta anterior
+• Ejemplo: $1 → $2 → $4 → $8 → $16...
+
+Configure los parámetros
+Antes de iniciar, revise y ajuste las configuraciones:
+• Apuesta Base: $1.00 USD
+• Stop Loss: $50.00 USD
+• Stop Win: $25.00 USD
+• Multiplicador Martingale: 2.0 (duplica)
+
+⚠️ ADVERTENCIA: ESTRATEGIA DE ALTO RIESGO
+• El Tip Bot es un robot de "fuerza bruta"
+• Utiliza Martingale agresivo que puede generar pérdidas significativas
+• Una secuencia de pérdidas puede agotar rápidamente el capital
+• Recomendado solo para traders experimentados
+• SIEMPRE use Stop Loss y capital que pueda permitirse perder
+
+Ejecute el robot
+Haga clic en el botón "Ejecutar" (o "Run") para iniciar el robot.
+
+⚠️ IMPORTANTE: SIEMPRE PRUEBE EN CUENTA DEMO PRIMERO
+Este bot utiliza estrategia Martingale agresiva. Alto riesgo, alta recompensa.`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/14t4UPqkJFFumxquZY0fclfDh8oAiI2Ci/view?usp=sharing',
+    ranking: 0
+  },
+  {
+    id: "xtremebot",
+    name: "XtremeBot",
+    description: "Estrategia de 'todo o nada' de altísimo riesgo. Opera en Volatilidad 100 y aguarda pacientemente por una única condición: el último dígito del precio sea exactamente 5. Cuando ocurre, apuesta que el próximo dígito será diferente de 3. Si pierde, aplica martingale extremadamente agresivo multiplicando por 10.",
+    strategy: "Martingale Extremo x10",
+    accuracy: 91.2,
+    operations: 1847,
+    imageUrl: "",
+    createdAt: "2024-12-19",
+    updatedAt: "2024-12-19",
+    version: "1.0.0",
+    author: "Xtreme Trading Systems",
+    profitFactor: 3.8,
+    expectancy: 1.24,
+    drawdown: 45.7,
+    riskLevel: 10,
+    tradedAssets: ["R_100"],
+    code: `// XtremeBot - Estrategia "Todo o Nada" con Martingale Extremo x10
+function initialize() {
+    // Parámetros de la estrategia extrema
+    this.baseStake = 1.0;              // Apuesta base
+    this.stopLoss = 100.0;             // Stop loss máximo
+    this.targetProfit = 50.0;          // Meta de ganancia
+    this.martingaleMultiplier = 10.0;  // Multiplicador EXTREMO (x10)
+    
+    // Variables de control
+    this.totalProfit = 0;
+    this.currentStake = this.baseStake;
+    this.consecutiveLosses = 0;
+    this.operationsCount = 0;
+    this.waitingForCondition = true;
+}
+
+function onTick(tick) {
+    // Verificar condiciones de parada
+    if (this.totalProfit <= -this.stopLoss || this.totalProfit >= this.targetProfit) {
+        this.stop("Meta alcanzada: " + this.totalProfit);
+        return;
+    }
+    
+    // Obtener último dígito del precio actual
+    let lastDigit = Math.floor(tick.quote * 100000) % 10;
+    
+    // CONDICIÓN ÚNICA: Esperar que el último dígito sea exactamente 5
+    if (lastDigit === 5) {
+        // ¡CONDICIÓN ENCONTRADA! Apostar que el PRÓXIMO dígito será diferente de 3
+        this.buyDigitDiffers(tick.symbol, 3, this.currentStake, 1);
+        this.operationsCount++;
+        this.waitingForCondition = false;
+        
+        console.log("🎯 CONDICIÓN ACTIVADA! Último dígito = 5");
+        console.log("Operación #" + this.operationsCount + 
+                    " - DIGITDIFFERS 3 con stake: " + this.currentStake + 
+                    " | Total: " + this.totalProfit);
+    } else {
+        // Continuar esperando la condición
+        if (this.waitingForCondition) {
+            console.log("⏳ Esperando condición... Último dígito: " + lastDigit + " (necesita ser 5)");
+        }
+    }
+}
+
+function onTradeResult(result) {
+    this.totalProfit += result.profit;
+    this.waitingForCondition = true; // Volver a esperar la condición
+    
+    if (result.profit > 0) {
+        // ¡GANÓ! El próximo dígito fue diferente de 3
+        console.log("🚀 ¡VICTORIA EXTREMA! Próximo dígito ≠ 3");
+        this.currentStake = this.baseStake;
+        this.consecutiveLosses = 0;
+    } else {
+        // PERDIÓ - El próximo dígito fue exactamente 3
+        this.consecutiveLosses++;
+        this.currentStake *= this.martingaleMultiplier; // MULTIPLICAR POR 10
+        
+        console.log("💥 PÉRDIDA EXTREMA - Próximo dígito fue 3");
+        console.log("Pérdidas consecutivas: " + this.consecutiveLosses + 
+                    " | Nueva apuesta: " + this.currentStake + " (x10)");
+        
+        // Verificar si la próxima apuesta excede límites
+        if (this.currentStake > 1000) {
+            console.log("⚠️ ALERTA: Apuesta muy alta, considere parar");
+        }
+    }
+    
+    console.log("Resultado: " + result.type + 
+                " | Ganancia: " + result.profit + 
+                " | Total Acumulado: " + this.totalProfit + 
+                " | Próxima Apuesta: " + this.currentStake);
+}
+
+// Función auxiliar para comprar DIGITDIFFERS
+function buyDigitDiffers(symbol, digit, amount, duration) {
+    // Implementación específica para DIGITDIFFERS 3
+    // El bot apuesta que el próximo dígito será diferente de 3
+    this.buy({
+        symbol: symbol,
+        contract_type: "DIGITDIFFERS",
+        digit: digit,
+        amount: amount,
+        duration: duration,
+        duration_unit: "t" // ticks
+    });
+}`,
+    usageInstructions: `Acceda a la plataforma
+Haga clic aquí para descargar XtremeBot
+@https://drive.google.com/file/d/1uwkWxKb8lRzl-gAmB6RQbQhWyR1FCbhs/view?usp=sharing
+
+Inicie sesión en su cuenta
+Inicie sesión en su cuenta Deriv (Demo o Real).
+
+Importe el robot
+En el menú superior, haga clic en "Importar" (o "Load" en Binary Bot).
+
+Cargue el archivo
+Localice el archivo .xml del robot XtremeBot en su computadora y cárguelo.
+
+Verifique la carga
+El robot aparecerá en el área de trabajo de la plataforma.
+
+Estrategia del XtremeBot:
+
+🎯 ESTRATEGIA DE ENTRADA: Condición Única Extrema
+• Espera pacientemente que el último dígito del precio sea exactamente 5
+• NO opera hasta que esta condición específica ocurra
+• Opera SOLO en Índice de Volatilidad 100 (R_100)
+• Estrategia de "todo o nada" de altísimo riesgo
+
+🎲 TIPO DE APUESTA: Dígito Diferente de 3 (DIGITDIFFERS 3)
+• Cuando último dígito = 5, apuesta que el PRÓXIMO dígito ≠ 3
+• Alta probabilidad teórica (90% - solo pierde si próximo dígito es 3)
+• Pocas operaciones pero de alto impacto
+
+💰 GESTIÓN DEL DINERO: Martingale EXTREMO x10
+• Apuesta Inicial: $1.00
+• Si GANA: Reinicia al valor inicial
+• Si PIERDE: MULTIPLICA por 10 la apuesta anterior
+• Ejemplo: $1 → $10 → $100 → $1000...
+
+⚠️ PELIGRO EXTREMO: Esta progresión puede agotar el capital en 3-4 pérdidas
+
+Configure los parámetros
+Antes de iniciar, revise y ajuste las configuraciones:
+• Apuesta Base: $1.00 USD
+• Stop Loss: $100.00 USD
+• Stop Win: $50.00 USD
+• Multiplicador Martingale: 10.0 (EXTREMO)
+
+🚨 ADVERTENCIA CRÍTICA: ESTRATEGIA DE RIESGO MÁXIMO
+• El XtremeBot es la estrategia MÁS PELIGROSA del catálogo
+• Martingale x10 puede generar pérdidas catastróficas instantáneas
+• Una secuencia de 3-4 pérdidas puede destruir completamente el capital
+• Solo para traders profesionales con experiencia extrema en gestión de riesgo
+• Capital mínimo recomendado: $10,000+ para absorber volatilidad
+• OBLIGATORIO usar Stop Loss estricto
+
+Ejecute el robot
+Haga clic en el botón "Ejecutar" (o "Run") para iniciar el robot.
+
+🔥 IMPORTANTE: PRUEBE SOLO EN CUENTA DEMO PRIMERO
+Este bot puede generar ganancias masivas o pérdidas totales. Use bajo su propio riesgo.`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/1uwkWxKb8lRzl-gAmB6RQbQhWyR1FCbhs/view?usp=sharing',
+    ranking: 0
   }
 ];
 

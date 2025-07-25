@@ -48,7 +48,11 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       'scalebot': { assertividade: 89.2, route: '/bot/scale-bot' },
       'scale': { assertividade: 89.2, route: '/bot/scale-bot' },
       'alfabot': { assertividade: 85.2, route: '/alfabot' },
-      'alfa': { assertividade: 85.2, route: '/alfabot' }
+      'alfa': { assertividade: 85.2, route: '/alfabot' },
+      'tipbot': { assertividade: 84.5, route: '/tipbot' },
+      'tip': { assertividade: 84.5, route: '/tipbot' },
+      'xtremebot': { assertividade: 91.2, route: '/xtremebot' },
+      'xtreme': { assertividade: 91.2, route: '/xtremebot' }
     };
     
     return botConfigs[normalizedName] || { assertividade: bot.assertividade_percentual, route: '/' };

@@ -23,6 +23,8 @@ import Factor50XPage from "./pages/Factor50XPage";
 import BKBot from "./pages/BKBot";
 import RiskManagement from "./pages/RiskManagement";
 import AlfaBot from "./pages/AlfaBot";
+import TipBot from "./pages/TipBot";
+import XtremeBot from "./pages/XtremeBot";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -153,6 +155,24 @@ const App = () => {
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <AlfaBot />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/tipbot" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <TipBot />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/xtremebot" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <XtremeBot />
                       </main>
                     </>
                   } />
