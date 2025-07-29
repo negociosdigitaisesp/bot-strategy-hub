@@ -25,6 +25,9 @@ import RiskManagement from "./pages/RiskManagement";
 import AlfaBot from "./pages/AlfaBot";
 import TipBot from "./pages/TipBot";
 import XtremeBot from "./pages/XtremeBot";
+import GoldBot from "./pages/XtremBot";
+import TurboGanancia from "./pages/TurboGanancia";
+import GoldBotAntiRepeticion from "./pages/GoldBotAntiRepeticion";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -173,6 +176,33 @@ const App = () => {
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <XtremeBot />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/xtrembot" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <GoldBot />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/turbo-ganancia" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <TurboGanancia />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/gold-bot" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <GoldBotAntiRepeticion />
                       </main>
                     </>
                   } />

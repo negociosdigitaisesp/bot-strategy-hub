@@ -52,7 +52,13 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       'tipbot': { assertividade: 84.5, route: '/tipbot' },
       'tip': { assertividade: 84.5, route: '/tipbot' },
       'xtremebot': { assertividade: 91.2, route: '/xtremebot' },
-      'xtreme': { assertividade: 91.2, route: '/xtremebot' }
+      'xtreme': { assertividade: 91.2, route: '/xtremebot' },
+      'goldbot': { assertividade: 91.2, route: '/gold-bot' },
+      'gold': { assertividade: 91.2, route: '/gold-bot' },
+      'gold bot': { assertividade: 91.2, route: '/gold-bot' },
+      'turboganancia': { assertividade: 92.3, route: '/turbo-ganancia' },
+      'turbo': { assertividade: 92.3, route: '/turbo-ganancia' },
+      'turbo ganancia': { assertividade: 92.3, route: '/turbo-ganancia' }
     };
     
     return botConfigs[normalizedName] || { assertividade: bot.assertividade_percentual, route: '/' };

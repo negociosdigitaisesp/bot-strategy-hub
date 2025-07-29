@@ -1752,11 +1752,11 @@ function onTradeResult(result) {
     if (result.profit > 0) {
         this.consecutiveWins++;
         this.consecutiveLosses = 0;
-        console.log("✅ Vitória! Sequência: " + this.consecutiveWins);
+        console.log("Vitoria! Sequencia: " + this.consecutiveWins);
     } else {
         this.consecutiveLosses++;
         this.consecutiveWins = 0;
-        console.log("❌ Perda. Sequência: " + this.consecutiveLosses);
+        console.log("Perda. Sequencia: " + this.consecutiveLosses);
     }
     
     console.log("Resultado: " + result.type + 
@@ -1860,7 +1860,7 @@ function onTradeResult(result) {
     
     if (result.profit > 0) {
         // ¡GANÓ! Resetear al stake inicial
-        console.log("✅ ¡VICTORIA! Último dígito > 0");
+        console.log("VICTORIA! Ultimo digito > 0");
         this.currentStake = this.baseStake;
         this.consecutiveLosses = 0;
     } else {
@@ -1868,7 +1868,7 @@ function onTradeResult(result) {
         this.consecutiveLosses++;
         this.currentStake *= this.martingaleMultiplier; // DUPLICAR apuesta
         
-        console.log("❌ PÉRDIDA - Último dígito fue 0. Pérdidas consecutivas: " + 
+        console.log("PERDIDA - Ultimo digito fue 0. Perdidas consecutivas: " + 
                     this.consecutiveLosses + 
                     " | Nueva apuesta: " + this.currentStake);
     }
@@ -1999,7 +1999,7 @@ function onTick(tick) {
         this.operationsCount++;
         this.waitingForCondition = false;
         
-        console.log("🎯 CONDICIÓN ACTIVADA! Último dígito = 5");
+        console.log("CONDICION ACTIVADA! Ultimo digito = 5");
         console.log("Operación #" + this.operationsCount + 
                     " - DIGITDIFFERS 3 con stake: " + this.currentStake + 
                     " | Total: " + this.totalProfit);
@@ -2017,7 +2017,7 @@ function onTradeResult(result) {
     
     if (result.profit > 0) {
         // ¡GANÓ! El próximo dígito fue diferente de 3
-        console.log("🚀 ¡VICTORIA EXTREMA! Próximo dígito ≠ 3");
+        console.log("VICTORIA EXTREMA! Proximo digito != 3");
         this.currentStake = this.baseStake;
         this.consecutiveLosses = 0;
     } else {
@@ -2025,13 +2025,13 @@ function onTradeResult(result) {
         this.consecutiveLosses++;
         this.currentStake *= this.martingaleMultiplier; // MULTIPLICAR POR 10
         
-        console.log("💥 PÉRDIDA EXTREMA - Próximo dígito fue 3");
+        console.log("PERDIDA EXTREMA - Proximo digito fue 3");
         console.log("Pérdidas consecutivas: " + this.consecutiveLosses + 
                     " | Nueva apuesta: " + this.currentStake + " (x10)");
         
         // Verificar si la próxima apuesta excede límites
         if (this.currentStake > 1000) {
-            console.log("⚠️ ALERTA: Apuesta muy alta, considere parar");
+            console.log("ALERTA: Apuesta muy alta, considere parar");
         }
     }
     
@@ -2113,6 +2113,271 @@ Haga clic en el botón "Ejecutar" (o "Run") para iniciar el robot.
 Este bot puede generar ganancias masivas o pérdidas totales. Use bajo su propio riesgo.`,
     isFavorite: false,
     downloadUrl: 'https://drive.google.com/file/d/1uwkWxKb8lRzl-gAmB6RQbQhWyR1FCbhs/view?usp=sharing',
+    ranking: 0
+  },
+  {
+    id: 'goldbot',
+    name: 'GoldBot',
+    description: 'Bot agresivo anti-repetición con sistema Martingale de duplicación para maximizar ganancias en secuencias no repetitivas.',
+    strategy: 'Anti-Repetición Agresiva',
+    accuracy: 88.5,
+    operations: 2847,
+    imageUrl: '/placeholder.svg',
+    createdAt: '2024-01-15',
+    updatedAt: '2024-01-20',
+    version: '2.1',
+    author: 'Trading Team',
+    profitFactor: 2.8,
+    expectancy: 0.65,
+    drawdown: 18.2,
+    riskLevel: 'Alto',
+    tradedAssets: ['R_100', 'R_75', 'R_50'],
+    code: `// GoldBot - Estrategia Anti-Repetición Agresiva
+class GoldBot {
+  constructor() {
+    this.baseStake = 1;
+    this.currentStake = this.baseStake;
+    this.lastDigits = [];
+    this.maxHistory = 5;
+    this.multiplier = 2;
+    this.maxStake = 100;
+    this.consecutiveLosses = 0;
+    this.maxConsecutiveLosses = 6;
+  }
+
+  initialize() {
+    console.log('GoldBot iniciado - Estrategia Anti-Repetición');
+    this.resetToBase();
+  }
+
+  onTick(tick) {
+    const lastDigit = tick.quote % 10;
+    this.lastDigits.push(lastDigit);
+    
+    if (this.lastDigits.length > this.maxHistory) {
+      this.lastDigits.shift();
+    }
+
+    if (this.lastDigits.length >= 3) {
+      const signal = this.analyzePattern();
+      if (signal) {
+        this.executeTrade(signal);
+      }
+    }
+  }
+
+  analyzePattern() {
+    if (this.lastDigits.length < 3) return null;
+    
+    const recent = this.lastDigits.slice(-3);
+    const [a, b, c] = recent;
+    
+    // Detectar patrones de repetición
+    if (a === b && b === c) {
+      // Tres iguales consecutivos - apostar contra repetición
+      return { direction: 'DIFFERS', confidence: 0.85 };
+    }
+    
+    if (a === b || b === c) {
+      // Dos iguales - apostar contra repetición
+      return { direction: 'DIFFERS', confidence: 0.70 };
+    }
+    
+    // Patrón alternante
+    if (this.lastDigits.length >= 4) {
+      const pattern = this.lastDigits.slice(-4);
+      if (pattern[0] === pattern[2] && pattern[1] === pattern[3]) {
+        return { direction: 'DIFFERS', confidence: 0.75 };
+      }
+    }
+    
+    return null;
+  }
+
+  executeTrade(signal) {
+    if (this.consecutiveLosses >= this.maxConsecutiveLosses) {
+      console.log('Máximo de pérdidas consecutivas alcanzado. Pausando.');
+      return;
+    }
+
+    const stake = this.calculateStake();
+    
+    // Ejecutar operación
+    Bot.purchase({
+      contract_type: signal.direction,
+      duration: 1,
+      duration_unit: 't',
+      stake: stake,
+      symbol: 'R_100'
+    });
+    
+    console.log('GoldBot: ' + signal.direction + ' - Stake: ' + stake + ' - Confianza: ' + signal.confidence);
+  }
+
+  calculateStake() {
+    if (this.consecutiveLosses === 0) {
+      return this.baseStake;
+    }
+    
+    // Sistema Martingale de duplicación
+    const newStake = this.baseStake * Math.pow(this.multiplier, this.consecutiveLosses);
+    return Math.min(newStake, this.maxStake);
+  }
+
+  onTradeResult(result) {
+    if (result.is_sold) {
+      const profit = result.sell_price - result.buy_price;
+      
+      if (profit > 0) {
+        console.log('Ganancia: $' + profit.toFixed(2));
+        this.consecutiveLosses = 0;
+        this.resetToBase();
+      } else {
+        console.log('Perdida: $' + Math.abs(profit).toFixed(2));
+        this.consecutiveLosses++;
+        this.currentStake = this.calculateStake();
+      }
+      
+      console.log('Perdidas consecutivas: ' + this.consecutiveLosses);
+    }
+  }
+
+  resetToBase() {
+    this.currentStake = this.baseStake;
+  }
+}`,
+    usageInstructions: `Configuración Recomendada:
+• Capital mínimo: $500
+• Stake base: $1-2
+• Activo: Volatility 100 (R_100)
+• Duración: 1 tick
+• Stop Loss: 6 pérdidas consecutivas
+
+Instrucciones de Uso:
+1. Configurar el stake base según su capital
+2. Activar en Volatility 100 para mejor rendimiento
+3. El bot analiza patrones de repetición en los últimos dígitos
+4. Aplica Martingale x2 después de cada pérdida
+5. Se resetea automáticamente después de cada ganancia
+
+⚠️ ADVERTENCIA: Estrategia de riesgo medio-alto
+• El sistema Martingale puede generar stakes elevados
+• Usar stop loss estricto para proteger el capital
+• Monitorear constantemente las operaciones
+• Recomendado para traders con experiencia en gestión de riesgo`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/1889BbrgIa2l4610JJMmM1zGVZmGr14ES/view?usp=sharing',
+    ranking: 0
+  },
+  {
+    id: 'turbo-ganancia',
+    name: 'Turbo Ganancia',
+    description: 'Bot analista de datos ultrarrápido que apuesta en la continuidad del comportamiento reciente de paridad/imparidad en Volatility 75 Index.',
+    strategy: 'Análisis Estadístico',
+    accuracy: 92.3,
+    operations: 2847,
+    imageUrl: '',
+    createdAt: '2024-12-15',
+    updatedAt: '2024-12-15',
+    version: '1.0',
+    author: 'Equipo Turbo Analytics',
+    profitFactor: 2.8,
+    expectancy: 45.2,
+    drawdown: 8.7,
+    riskLevel: 4,
+    tradedAssets: ['Volatility 75 Index'],
+    code: `// Estrategia Turbo Ganancia - Análisis de Paridad/Imparidad
+function initialize() {
+    this.lastDigits = [];
+    this.baseStake = 1.0;
+    this.currentStake = this.baseStake;
+    this.consecutiveLosses = 0;
+    this.martingaleFactor = 2.1;
+    this.patienceMode = true;
+}
+
+function onTick(tick) {
+    const lastDigit = getLastDigit(tick.close);
+    this.lastDigits.push(lastDigit);
+    
+    if (this.lastDigits.length > 5) {
+        this.lastDigits.shift();
+    }
+    
+    if (this.lastDigits.length === 5) {
+        const prediction = analyzeMarketMood();
+        placeBet(prediction);
+    }
+}
+
+function analyzeMarketMood() {
+    let evenCount = 0;
+    let oddCount = 0;
+    
+    this.lastDigits.forEach(digit => {
+        if (digit % 2 === 0) evenCount++;
+        else oddCount++;
+    });
+    
+    if (evenCount > oddCount) return 'DIGITEVEN';
+    if (oddCount > evenCount) return 'DIGITODD';
+    
+    // En caso de empate, apostar al que tenga mayor %
+    return Math.random() > 0.5 ? 'DIGITEVEN' : 'DIGITODD';
+}
+
+function onTradeResult(result) {
+    if (result === 'win') {
+        console.log('Ganancia! Reseteo a stake inicial');
+        this.currentStake = this.baseStake;
+        this.consecutiveLosses = 0;
+        this.patienceMode = true;
+    } else {
+        this.consecutiveLosses++;
+        
+        if (this.patienceMode && this.consecutiveLosses === 1) {
+            console.log('Primera pérdida - manteniendo paciencia');
+            // No aplicar martingale aún
+        } else {
+            console.log('Activando martingale agresivo');
+            this.currentStake *= this.martingaleFactor;
+            this.patienceMode = false;
+        }
+    }
+}`,
+    usageInstructions: `Configuración para Turbo Ganancia:
+
+🎯 ACTIVO RECOMENDADO:
+• Volatility 75 Index (exclusivamente)
+• Timeframe: 1 tick
+• Tipo de contrato: DIGITEVEN/DIGITODD
+
+⚡ CONFIGURACIÓN INICIAL:
+• Stake inicial: $1.00
+• Factor Martingale: 2.1x
+• Modo paciencia: Activado
+• Análisis: Últimos 5 dígitos
+
+📊 ESTRATEGIA:
+1. Analiza paridad/imparidad de últimos 5 dígitos
+2. Apuesta en la tendencia mayoritaria
+3. Aplica paciencia en primera pérdida
+4. Martingale agresivo desde segunda pérdida consecutiva
+5. Reset automático tras cada ganancia
+
+🚀 CARACTERÍSTICAS:
+• Operación 24/7 sin límites
+• Análisis estadístico ultrarrápido
+• Gestión de riesgo inteligente
+• Registro completo de operaciones
+
+⚠️ ADVERTENCIA: Estrategia de riesgo alto
+• Martingale agresivo puede generar stakes elevados
+• Monitoreo constante recomendado
+• Capital suficiente para secuencias de pérdidas
+• Solo para traders experimentados`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/1example-turbo-ganancia-link/view?usp=sharing',
     ranking: 0
   }
 ];

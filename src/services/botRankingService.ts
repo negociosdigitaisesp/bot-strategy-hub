@@ -110,6 +110,13 @@ async function criarDadosRankingAlternativos(): Promise<BotRankingData[]> {
       total_operacoes: 200
     },
     {
+      nome_bot: 'GoldBot',
+      assertividade_percentual: 88.5,
+      vitorias: 2520,
+      derrotas: 327,
+      total_operacoes: 2847
+    },
+    {
       nome_bot: 'AlfaBot',
       assertividade_percentual: 85.2,
       vitorias: 170,
