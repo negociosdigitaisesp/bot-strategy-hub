@@ -256,6 +256,22 @@ const TipBot = () => {
                 
                 <div className="border-t pt-4">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
+                    ¿Buscas análisis estadístico avanzado?
+                  </p>
+                  <Button 
+                    onClick={() => navigate('/turbo-ganancia')}
+                    variant="outline"
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20 mb-3"
+                    size="sm"
+                  >
+                    <TrendingUp size={14} className="mr-2" />
+                    Ver Turbo Ganancia (Análisis Estadístico)
+                  </Button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
+                    Turbo Ganancia es un analista de datos ultrarrápido que apuesta en la continuidad del comportamiento reciente de paridad/imparidad en Volatility 75 Index. Utiliza martingale inteligente solo después de dos pérdidas consecutivas.
+                  </p>
+                  
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 text-center">
                     ¿Buscas algo más extremo?
                   </p>
                   <Button 

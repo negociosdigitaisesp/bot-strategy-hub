@@ -28,6 +28,7 @@ import XtremeBot from "./pages/XtremeBot";
 import GoldBot from "./pages/XtremBot";
 import TurboGanancia from "./pages/TurboGanancia";
 import GoldBotAntiRepeticion from "./pages/GoldBotAntiRepeticion";
+import BotDelApalancamiento from "./pages/BotDelApalancamiento";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -198,11 +199,20 @@ const App = () => {
                     </>
                   } />
                   
-                  <Route path="/gold-bot" element={
+                  <Route path="/goldbot-antirepeticion" element={
                     <>
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <GoldBotAntiRepeticion />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/bot-del-apalancamiento" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <BotDelApalancamiento />
                       </main>
                     </>
                   } />

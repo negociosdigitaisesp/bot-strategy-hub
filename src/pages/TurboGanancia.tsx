@@ -9,7 +9,7 @@ const TurboGanancia = () => {
   const navigate = useNavigate();
 
   const handleDownload = () => {
-    window.open('https://drive.google.com/file/d/1uwkWxKb8lRzl-gAmB6RQbQhWyR1FCbhs/view?usp=sharing', '_blank');
+    window.open('https://drive.google.com/file/d/1YbtyTiqawJ5DVc4Stj9rV2cHEt3Rv83l/view?usp=sharing', '_blank');
   };
 
   const handleBack = () => {

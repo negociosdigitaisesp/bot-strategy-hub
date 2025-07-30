@@ -2379,6 +2379,134 @@ function onTradeResult(result) {
     isFavorite: false,
     downloadUrl: 'https://drive.google.com/file/d/1example-turbo-ganancia-link/view?usp=sharing',
     ranking: 0
+  },
+  {
+    id: 'bot-del-apalancamiento',
+    name: 'Bot del Apalancamiento',
+    description: 'Bot avanzado con sistema de apalancamiento dual y previsión adaptativa para maximizar ganancias.',
+    strategy: 'Previsión Adaptativa + Martingale + Apalancamiento',
+    accuracy: 89.7,
+    operations: 2847,
+    imageUrl: '/bot-images/bot-apalancamiento.jpg',
+    createdAt: '2024-01-15',
+    updatedAt: '2024-01-15',
+    version: '2.1',
+    author: 'MillionBots Team',
+    profitFactor: 2.8,
+    expectancy: 0.67,
+    maxDrawdown: 18.5,
+    riskLevel: 'Alto',
+    tradedAssets: ['Volatility 75 Index', 'Volatility 100 Index'],
+    strategyCode: `// Bot del Apalancamiento v2.1
+// Sistema de Previsión Adaptativa con Apalancamiento Dual
+
+function init() {
+    // Configuración inicial
+    this.baseStake = 1.0;
+    this.currentStake = this.baseStake;
+    this.lossCounter = 0;
+    this.tradesCounter = 0;
+    this.tradesNo = 100;
+    this.tradingOption = 0; // 0 = Acumulación, 1 = Apalancamiento
+    this.maxLosses = 6;
+    this.martingaleFactor = 2.1;
+    
+    console.log('Bot del Apalancamiento iniciado - Modo Acumulación');
+}
+
+function onTick(tick) {
+    // Verificar cambio de modo cada 100 operaciones
+    if (this.tradesCounter >= this.tradesNo) {
+        this.tradingOption = this.tradingOption === 0 ? 1 : 0;
+        this.tradesCounter = 0;
+        
+        const mode = this.tradingOption === 0 ? 'Acumulación' : 'Apalancamiento';
+        console.log('Cambiando a modo: ' + mode);
+    }
+    
+    // Determinar predicción según el modo
+    let prediction;
+    if (this.tradingOption === 0) {
+        // Modo Acumulación - Estrategia conservadora
+        prediction = this.lossCounter === 0 ? 'UNDER_9' : 'UNDER_5';
+    } else {
+        // Modo Apalancamiento - Estrategia agresiva
+        prediction = this.lossCounter === 0 ? 'OVER_0' : 'OVER_5';
+    }
+    
+    // Ejecutar operación
+    this.placeTrade(prediction, this.currentStake);
+    this.tradesCounter++;
+}
+
+function onTradeResult(result) {
+    if (result === 'win') {
+        console.log('Ganancia! Reseteo completo');
+        this.currentStake = this.baseStake;
+        this.lossCounter = 0;
+    } else {
+        this.lossCounter++;
+        console.log('Pérdida #' + this.lossCounter);
+        
+        // Sistema de seguridad - Reset tras 6 pérdidas
+        if (this.lossCounter >= this.maxLosses) {
+            console.log('Reset de seguridad activado');
+            this.currentStake = this.baseStake;
+            this.lossCounter = 0;
+        } else {
+            // Aplicar Martingale
+            this.currentStake *= this.martingaleFactor;
+            console.log('Nuevo stake: $' + this.currentStake.toFixed(2));
+        }
+    }
+}`,
+    usageInstructions: `Configuración para Bot del Apalancamiento:
+
+🎯 ACTIVO RECOMENDADO:
+• Volatility 75 Index (principal)
+• Volatility 100 Index (alternativo)
+• Timeframe: 1 tick
+• Contratos: UNDER/OVER
+
+⚡ CONFIGURACIÓN INICIAL:
+• Stake inicial: $1.00
+• Factor Martingale: 2.1x
+• Límite de pérdidas: 6 consecutivas
+• Ciclo de operaciones: 100 trades
+
+📊 ESTRATEGIA DUAL:
+
+🔹 MODO ACUMULACIÓN (100 operaciones):
+• Tras ganancia: UNDER 9 (90% probabilidad)
+• Tras pérdida: UNDER 5 (50% probabilidad)
+• Objetivo: Acumular capital seguro
+
+🔹 MODO APALANCAMIENTO (100 operaciones):
+• Tras ganancia: OVER 0 (90% probabilidad, alto retorno)
+• Tras pérdida: OVER 5 (40% probabilidad, retorno máximo)
+• Objetivo: Crecimiento exponencial
+
+🛡️ SISTEMA DE SEGURIDAD:
+• Reset automático tras 6 pérdidas consecutivas
+• Alternancia automática entre modos
+• Martingale controlado con factor 2.1x
+• Monitoreo continuo de drawdown
+
+🚀 CARACTERÍSTICAS:
+• Previsión adaptativa según pérdidas
+• Apalancamiento inteligente en dos fases
+• Gestión de riesgo avanzada
+• Operación 24/7 automatizada
+
+⚠️ ADVERTENCIA IMPORTANTE:
+• Estrategia de ALTO RIESGO
+• Capital mínimo recomendado: $1,000
+• Martingale agresivo puede generar stakes elevados
+• Solo para traders con experiencia en apalancamiento
+• Monitoreo constante obligatorio`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/15CKip4R6gzhuV050eGMpnINjI6NsTlxS/view?usp=sharing',
+    ranking: 0
   }
 ];
 
