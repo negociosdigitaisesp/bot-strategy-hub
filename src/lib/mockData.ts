@@ -2507,6 +2507,130 @@ function onTradeResult(result) {
     isFavorite: false,
     downloadUrl: 'https://drive.google.com/file/d/15CKip4R6gzhuV050eGMpnINjI6NsTlxS/view?usp=sharing',
     ranking: 0
+  },
+  {
+    id: 'vip-boster',
+    name: 'Vip Boster',
+    description: 'Bot especializado en operaciones alternadas con filtro condicional y sistema de recuperación Martingale Dividido.',
+    strategy: 'Operación Alternada + Filtro Condicional + Martingale Dividido',
+    accuracy: 88.4,
+    operations: 3156,
+    imageUrl: '/bot-images/vip-boster.jpg',
+    createdAt: '2024-01-20',
+    updatedAt: '2024-01-20',
+    version: '1.8',
+    author: 'MillionBots Team',
+    profitFactor: 2.6,
+    expectancy: 0.58,
+    maxDrawdown: 16.2,
+    riskLevel: 'Medio-Alto',
+    tradedAssets: ['Volatility 75 Index', 'Volatility 100 Index'],
+    strategyCode: `// Vip Boster v1.8
+// Sistema de Operación Alternada con Filtro Condicional
+
+function init() {
+    // Variables principales
+    this.winStake = 1.0;
+    this.currentStake = this.winStake;
+    this.nextTrade = 'OVER2'; // Alternancia: OVER2 o UNDER8
+    this.totalLost = 0;
+    this.martingaleSplit = 2; // División para recuperación
+    this.isWaitingForTrigger = true;
+    
+    console.log('Vip Boster iniciado - Esperando gatillo condicional');
+}
+
+function onTick(tick) {
+    const lastDigit = tick.quote % 10;
+    
+    // Verificar gatillo condicional
+    if (this.isWaitingForTrigger) {
+        let shouldEnter = false;
+        
+        if (this.nextTrade === 'OVER2' && lastDigit === 7) {
+            shouldEnter = true;
+        } else if (this.nextTrade === 'UNDER8' && lastDigit === 2) {
+            shouldEnter = true;
+        }
+        
+        if (shouldEnter) {
+            placeBet(this.nextTrade, this.currentStake);
+            this.isWaitingForTrigger = false;
+            console.log('Entrada activada - Dígito gatillo: ' + lastDigit);
+        }
+    }
+}
+
+function onTradeResult(result) {
+    if (result === 'win') {
+        console.log('Victoria! Reseteo a stake inicial');
+        this.currentStake = this.winStake;
+        this.totalLost = 0;
+    } else {
+        console.log('Pérdida - Aplicando Martingale Dividido');
+        this.totalLost += this.currentStake;
+        
+        // Fórmula Martingale Dividido
+        const recoveryAmount = (this.totalLost * 100) / 35;
+        this.currentStake = recoveryAmount / this.martingaleSplit;
+        
+        console.log('Próxima apuesta: $' + this.currentStake.toFixed(2));
+    }
+    
+    // Alternar operación independientemente del resultado
+    this.nextTrade = this.nextTrade === 'OVER2' ? 'UNDER8' : 'OVER2';
+    this.isWaitingForTrigger = true;
+    
+    console.log('Próxima operación: ' + this.nextTrade);
+}`,
+    usageInstructions: `Configuración para Vip Boster:
+
+🎯 ACTIVO RECOMENDADO:
+• Volatility 75 Index (principal)
+• Volatility 100 Index (alternativo)
+• Timeframe: 1 tick
+• Tipo de contrato: OVER/UNDER
+
+⚡ CONFIGURACIÓN INICIAL:
+• Stake inicial: $1.00
+• Martingale Split: 2 (dividir recuperación)
+• Factor de recuperación: 100/35 (~2.85)
+• Modo alternado: OVER2 ↔ UNDER8
+
+📊 ESTRATEGIA TRIPLE:
+1. OPERACIÓN ALTERNADA:
+   • Over 2 (70% probabilidad teórica)
+   • Under 8 (80% probabilidad teórica)
+   • Alternancia automática independiente del resultado
+
+2. FILTRO CONDICIONAL:
+   • Over 2: Solo entra si último dígito = 7
+   • Under 8: Solo entra si último dígito = 2
+   • Timing optimizado para reversión
+
+3. MARTINGALE DIVIDIDO:
+   • Recupera pérdidas en 2 operaciones
+   • Reduce riesgo vs Martingale clásico
+   • Fórmula: (Total Perdido × 2.85) ÷ 2
+
+🚀 CARACTERÍSTICAS:
+• Operación selectiva con gatillos
+• Recuperación distribuida en 2 trades
+• Alternancia fija Over/Under
+• Gestión de riesgo optimizada
+
+⚠️ CAPITAL RECOMENDADO:
+• Mínimo: $500
+• Recomendado: $1,000
+• Óptimo: $2,000+
+
+⚠️ ADVERTENCIA:
+• Requiere 2 victorias consecutivas para recuperación completa
+• Monitoreo recomendado durante secuencias de pérdidas
+• Estrategia de riesgo medio-alto`,
+    isFavorite: false,
+    downloadUrl: 'https://drive.google.com/file/d/1ZbsGyk_JTJV-quDQxue7x3NEQ90L_0e1/view?usp=sharing',
+    ranking: 0
   }
 ];
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Target, BarChart3, Activity, Award, Shield, Zap, Download } from 'lucide-react';
+import { Bot, Target, BarChart3, Activity, Award, Shield, Zap, Download, Flame } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface BotStats {
@@ -62,7 +62,11 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       'botdelapalancamiento': { assertividade: 89.7, route: '/bot-del-apalancamiento' },
       'botapalancamiento': { assertividade: 89.7, route: '/bot-del-apalancamiento' },
       'apalancamiento': { assertividade: 89.7, route: '/bot-del-apalancamiento' },
-      'bot del apalancamiento': { assertividade: 89.7, route: '/bot-del-apalancamiento' }
+      'bot del apalancamiento': { assertividade: 89.7, route: '/bot-del-apalancamiento' },
+      'vipboster': { assertividade: 88.4, route: '/vip-boster' },
+      'vip': { assertividade: 88.4, route: '/vip-boster' },
+      'boster': { assertividade: 88.4, route: '/vip-boster' },
+      'vip boster': { assertividade: 88.4, route: '/vip-boster' }
     };
     
     return botConfigs[normalizedName] || { assertividade: bot.assertividade_percentual, route: '/' };
@@ -108,11 +112,27 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getProgressColor(assertividade)}`}></div>
       
       {/* Badge de certificação */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
+      <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+        {/* Badge especial para Vip Boster */}
+        {bot.nome_bot.toLowerCase().includes('vip') && bot.nome_bot.toLowerCase().includes('boster') && (
+          <div className="relative group">
+            {/* Glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur-md opacity-60 animate-pulse"></div>
+            {/* Main badge */}
+            <div className="relative bg-gradient-to-r from-orange-500/95 to-red-500/95 backdrop-blur-lg border border-orange-400/50 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl">
+              <Flame size={12} className="text-yellow-200 drop-shadow-sm animate-bounce" />
+              <span className="tracking-wide whitespace-nowrap drop-shadow-sm">MEJOR DEL DÍA</span>
+            </div>
+            {/* Subtitle badge */}
+            <div className="mt-1 bg-gradient-to-r from-amber-500/90 to-orange-500/90 backdrop-blur-lg border border-amber-400/40 text-white text-[9px] font-bold px-2 py-0.5 rounded-full text-center shadow-md">
+              <span className="tracking-wider drop-shadow-sm">APALANCAMIENTO</span>
+            </div>
+          </div>
+        )}
         {assertividade >= 90 && (
-          <div className="bg-yellow-500/10 backdrop-blur-sm border border-yellow-500/20 text-yellow-500 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-            <Shield size={10} />
-            Pro
+          <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 backdrop-blur-sm border border-yellow-500/30 text-yellow-600 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all duration-300 hover:scale-105">
+            <Shield size={11} className="drop-shadow-sm" />
+            <span className="tracking-wide">Pro</span>
           </div>
         )}
       </div>

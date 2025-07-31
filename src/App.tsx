@@ -29,6 +29,7 @@ import GoldBot from "./pages/XtremBot";
 import TurboGanancia from "./pages/TurboGanancia";
 import GoldBotAntiRepeticion from "./pages/GoldBotAntiRepeticion";
 import BotDelApalancamiento from "./pages/BotDelApalancamiento";
+import VipBoster from "./pages/VipBoster";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -195,6 +196,15 @@ const App = () => {
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <TurboGanancia />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/vip-boster" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <VipBoster />
                       </main>
                     </>
                   } />
