@@ -181,7 +181,7 @@ export async function obterEstatisticasBots(): Promise<BotStats[]> {
 function criarDadosFallback(): BotStats[] {
   return [
     {
-      nome_bot: 'Factor50X_Conservador',
+      nome_bot: 'Factor50X',
       lucro_total: 1.70,
       total_operacoes: 14,
       vitorias: 10,
@@ -209,6 +209,26 @@ function criarDadosFallback(): BotStats[] {
       taxa_vitoria: 90.79,
       maior_lucro: 0.07,
       maior_perda: -1.00
+    },
+    {
+      nome_bot: 'Vip Boster',
+      lucro_total: 45.80,
+      total_operacoes: 520,
+      vitorias: 460,
+      derrotas: 60,
+      taxa_vitoria: 88.4,
+      maior_lucro: 3.50,
+      maior_perda: -1.20
+    },
+    {
+      nome_bot: 'Apalancamiento',
+      lucro_total: 28.75,
+      total_operacoes: 320,
+      vitorias: 260,
+      derrotas: 60,
+      taxa_vitoria: 81.2,
+      maior_lucro: 2.80,
+      maior_perda: -1.10
     },
     {
       nome_bot: 'Bot_Apalancamiento',
@@ -260,8 +280,10 @@ export function mapearBotParaLibrary(botStats: BotStats, index: number) {
   // Mapear nomes dos bots para nomes limpos
   const nomeMapping: { [key: string]: string } = {
     'BK_BOT_1.0': 'BK Bot',
-    'Factor50X_Conservador': 'Factor 50X Conservador',
+    'Factor50X_Conservador': 'Factor 50X',
     'BotAI_2.0': 'Bot AI 2.0',
+    'Vip Boster': 'Vip Boster',
+    'Apalancamiento': 'Apalancamiento',
     'Bot_Apalancamiento': 'Bot Apalancamiento',
     'Wolf_Bot_2.0': 'Wolf Bot 2.0',
     'Sniper_Bot_Martingale': 'Sniper Bot Martingale',
@@ -279,6 +301,7 @@ export function mapearBotParaLibrary(botStats: BotStats, index: number) {
   else if (nomeOriginal.includes('Wolf')) estrategia = 'Seguidor de Tendência';
   else if (nomeOriginal.includes('Quantum')) estrategia = 'Quantum Trading';
   else if (nomeOriginal.includes('Apalancamiento')) estrategia = 'Alavancagem';
+  else if (nomeOriginal.includes('Vip') && nomeOriginal.includes('Boster')) estrategia = 'Operação Alternada + Alavancagem';
 
   // Determinar nível de risco
   let nivelRisco = 'Médio';

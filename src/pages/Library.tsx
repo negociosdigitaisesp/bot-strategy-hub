@@ -55,7 +55,8 @@ const Library = () => {
   // Estados para filtros avançados
   const [advancedFilters, setAdvancedFilters] = useState({
     showMostAssertive: false,    // Más Asertivos (>80%)
-    showMostProfitable: false    // Más Lucrativos (mayor lucro y positivos)
+    showMostProfitable: false,   // Más Lucrativos (mayor lucro y positivos)
+    showTopApalancamiento: false // Top Apalancamiento (bots com badges TOP 01 e TOP 02)
   });
   
   // Novos estados para controle de exibição
@@ -198,8 +199,24 @@ const Library = () => {
       if (advancedFilters.showMostProfitable && bot.lucro_total !== undefined) {
         matchesMostProfitable = bot.lucro_total > 0;
       }
+      
+      // Filtro Top Apalancamiento - bots com tarja de alavancagem
+      let matchesTopApalancamiento = true;
+      if (advancedFilters.showTopApalancamiento) {
+        const botName = bot.nome_bot.toLowerCase();
+        // Verifica se é Vip Boster (TOP 01 APALANCAMIENTO)
+        const isVipBoster = botName.includes('vip') && botName.includes('boster');
+        // Verifica se é Factor 50X (TOP 02 APALANCAMIENTO)
+        const isFactor50X = botName.includes('factor') && botName.includes('50x');
+        // Verifica se é Bot del Apalancamiento, Apalancamiento 100X ou Apalancamiento
+        const isApalancamientoBot = (botName.includes('bot') && botName.includes('apalancamiento')) || 
+                                   (botName.includes('apalancamiento') && botName.includes('100x')) ||
+                                   (botName.includes('apalancamiento') && !botName.includes('bot') && !botName.includes('100x'));
+        
+        matchesTopApalancamiento = isVipBoster || isFactor50X || isApalancamientoBot;
+      }
 
-      return matchesSearch && matchesPerformance && matchesMostAssertive && matchesMostProfitable;
+      return matchesSearch && matchesPerformance && matchesMostAssertive && matchesMostProfitable && matchesTopApalancamiento;
     });
 
     // Ordenação
@@ -478,7 +495,7 @@ const Library = () => {
 
             {/* Filtros Básicos - Siempre Visibles */}
             <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 p-6 mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {/* Buscar por Nombre */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -569,6 +586,30 @@ const Library = () => {
                     <span className="text-sm font-medium">Positivos</span>
                   </button>
                 </div>
+
+                {/* Filtro Elite: Top Apalancamiento */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                    🔥
+                    Top Apalancamiento
+                  </label>
+                  <button
+                    onClick={() => setAdvancedFilters(prev => ({
+                      ...prev,
+                      showTopApalancamiento: !prev.showTopApalancamiento
+                    }))}
+                    className={`w-full px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
+                      advancedFilters.showTopApalancamiento 
+                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-600 shadow-lg shadow-orange-500/10' 
+                        : 'bg-background border-border hover:border-orange-500/20 hover:bg-orange-500/5 text-muted-foreground hover:text-orange-600'
+                    }`}
+                  >
+                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                      advancedFilters.showTopApalancamiento ? 'bg-orange-500' : 'bg-muted-foreground/30'
+                    }`}></div>
+                    <span className="text-sm font-medium">TOP 01 & 02</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -578,7 +619,8 @@ const Library = () => {
                 onClick={() => {
                   setAdvancedFilters({
                     showMostAssertive: false,
-                    showMostProfitable: false
+                    showMostProfitable: false,
+                    showTopApalancamiento: false
                   });
                   setSearchTerm('');
                   setPerformanceFilter('all');

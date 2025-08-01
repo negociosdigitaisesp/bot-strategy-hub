@@ -111,40 +111,58 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       {/* Borda superior com gradiente baseado na performance */}
       <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getProgressColor(assertividade)}`}></div>
       
-      {/* Badge de certificação */}
-      <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
-        {/* Badge especial para Vip Boster */}
+      {/* Badges de certificação - Posicionadas no topo sem sobreposição */}
+      <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1 justify-end z-30 mb-2">
+        {/* Badge especial para Vip Boster - TOP 01 */}
         {bot.nome_bot.toLowerCase().includes('vip') && bot.nome_bot.toLowerCase().includes('boster') && (
-          <div className="relative group">
-            {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur-md opacity-60 animate-pulse"></div>
-            {/* Main badge */}
-            <div className="relative bg-gradient-to-r from-orange-500/95 to-red-500/95 backdrop-blur-lg border border-orange-400/50 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl">
-              <Flame size={12} className="text-yellow-200 drop-shadow-sm animate-bounce" />
-              <span className="tracking-wide whitespace-nowrap drop-shadow-sm">MEJOR DEL DÍA</span>
-            </div>
-            {/* Subtitle badge */}
-            <div className="mt-1 bg-gradient-to-r from-amber-500/90 to-orange-500/90 backdrop-blur-lg border border-amber-400/40 text-white text-[9px] font-bold px-2 py-0.5 rounded-full text-center shadow-md">
-              <span className="tracking-wider drop-shadow-sm">APALANCAMIENTO</span>
-            </div>
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">🔥 TOP 01</span>
           </div>
         )}
+        {/* Badge especial para Factor 50X - TOP 02 */}
+        {(bot.nome_bot.toLowerCase().includes('factor') && bot.nome_bot.toLowerCase().includes('50x')) && (
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">⚡ TOP 02</span>
+          </div>
+        )}
+        {/* Badge especial para Bot del Apalancamiento - TOP 03 */}
+        {bot.nome_bot.toLowerCase().includes('bot') && bot.nome_bot.toLowerCase().includes('apalancamiento') && 
+         !bot.nome_bot.toLowerCase().includes('100x') && (
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">🚀 TOP 03</span>
+          </div>
+        )}
+        {/* Badge especial para Apalancamiento */}
+        {bot.nome_bot.toLowerCase().includes('apalancamiento') && 
+         !bot.nome_bot.toLowerCase().includes('bot') && 
+         !bot.nome_bot.toLowerCase().includes('100x') && (
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">⚡ APALANCAMIENTO</span>
+          </div>
+        )}
+        {/* Badge especial para Apalancamiento 100X */}
+        {bot.nome_bot.toLowerCase().includes('apalancamiento') && bot.nome_bot.toLowerCase().includes('100x') && (
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">💥 100X</span>
+          </div>
+        )}
+        {/* Badge PRO */}
         {assertividade >= 90 && (
-          <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 backdrop-blur-sm border border-yellow-500/30 text-yellow-600 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all duration-300 hover:scale-105">
-            <Shield size={11} className="drop-shadow-sm" />
-            <span className="tracking-wide">Pro</span>
+          <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-md px-2 py-1 border border-emerald-400 shadow-md flex items-center gap-1">
+            <Shield size={9} />
+            <span className="text-[10px] font-bold tracking-wide leading-none">PRO</span>
           </div>
         )}
       </div>
       
-      {/* Cabeçalho do card */}
-      <div className="mb-6">
+      {/* Cabeçalho do card - Com espaçamento para badges */}
+      <div className="mb-6 mt-8">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
             <Bot className="text-primary" size={24} />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-card-foreground mb-1">{bot.nome_bot.replace(/_/g, ' ')}</h3>
+            <h3 className="text-lg font-bold text-card-foreground mb-1 pr-2">{bot.nome_bot.replace(/_/g, ' ')}</h3>
           </div>
         </div>
         
