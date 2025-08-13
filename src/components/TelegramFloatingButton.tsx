@@ -21,11 +21,7 @@ const TelegramFloatingButton = () => {
     <>
       {/* Floating Button Container */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
-        {/* Explanatory Text */}
-        <div className="mb-3 bg-white dark:bg-gray-800 text-gray-800 dark:text-white px-2 py-1.5 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 text-xs font-medium max-w-44 text-center">
-          📱 <span className="text-blue-600 dark:text-blue-400 font-semibold">Recibe Notificaciones</span>
-          <div className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">de los Mejores Robots</div>
-        </div>
+
         
         {/* Floating Button */}
         <button
