@@ -20,9 +20,10 @@ interface BotPerformanceCardProps {
   bot: BotStats;
   index?: number;
   periodoSelecionado?: string;
+  showBestOfWeekBadge?: boolean;
 }
 
-const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps) => {
+const BotPerformanceCard = ({ bot, periodoSelecionado, showBestOfWeekBadge = false }: BotPerformanceCardProps) => {
   const navigate = useNavigate();
   
   // Configuração de assertividades específicas por bot
@@ -113,14 +114,31 @@ const BotPerformanceCard = ({ bot, periodoSelecionado }: BotPerformanceCardProps
       
       {/* Badges de certificação - Posicionadas no topo sem sobreposição */}
       <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1 justify-end z-30 mb-2">
+        {/* Badges especiais para Mejores Bots del la Semana */}
+        {showBestOfWeekBadge && bot.nome_bot.toLowerCase().includes('factor') && bot.nome_bot.toLowerCase().includes('50x') && (
+          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-md px-2 py-1 border border-yellow-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">🏆 #1 SEMANA</span>
+          </div>
+        )}
+        {showBestOfWeekBadge && bot.nome_bot.toLowerCase().includes('vip') && bot.nome_bot.toLowerCase().includes('boster') && (
+          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-md px-2 py-1 border border-yellow-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">🥈 #2 SEMANA</span>
+          </div>
+        )}
+        {showBestOfWeekBadge && bot.nome_bot.toLowerCase().includes('quantum') && bot.nome_bot.toLowerCase().includes('bot') && (
+          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-md px-2 py-1 border border-yellow-400 shadow-md animate-pulse flex items-center gap-1">
+            <span className="text-[10px] font-bold tracking-wide uppercase leading-none">🥉 #3 SEMANA</span>
+          </div>
+        )}
+        
         {/* Badge especial para Vip Boster - TOP 01 */}
-        {bot.nome_bot.toLowerCase().includes('vip') && bot.nome_bot.toLowerCase().includes('boster') && (
+        {!showBestOfWeekBadge && bot.nome_bot.toLowerCase().includes('vip') && bot.nome_bot.toLowerCase().includes('boster') && (
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
             <span className="text-[10px] font-bold tracking-wide uppercase leading-none">🔥 TOP 01</span>
           </div>
         )}
         {/* Badge especial para Factor 50X - TOP 02 */}
-        {(bot.nome_bot.toLowerCase().includes('factor') && bot.nome_bot.toLowerCase().includes('50x')) && (
+        {!showBestOfWeekBadge && (bot.nome_bot.toLowerCase().includes('factor') && bot.nome_bot.toLowerCase().includes('50x')) && (
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md px-2 py-1 border border-orange-400 shadow-md animate-pulse flex items-center gap-1">
             <span className="text-[10px] font-bold tracking-wide uppercase leading-none">⚡ TOP 02</span>
           </div>

@@ -15,6 +15,7 @@ import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import DerivCallback from "./pages/DerivCallback";
+import TelegramFloatingButton from "./components/TelegramFloatingButton";
 
 import PendingApprovalPage from "./pages/PendingApprovalPage";
 import VerificandoAcessoPage from "./pages/VerificandoAcessoPage";
@@ -234,6 +235,7 @@ const App = () => {
                 <Route path="/PaginaBloqueada" element={<PaginaBloqueada />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              <TelegramFloatingButton />
             </div>
           </AuthProvider>
         </TooltipProvider>

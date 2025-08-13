@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import BotPerformanceCard from '../components/BotPerformanceCard';
 import SkeletonCard from '../components/SkeletonCard';
-import TimeFilterControls from '../components/TimeFilterControls';
+import EnhancedFilterControls from '../components/EnhancedFilterControls';
 import LoadingState from '../components/LoadingState';
 import { 
   Search, 
@@ -56,7 +56,8 @@ const Library = () => {
   const [advancedFilters, setAdvancedFilters] = useState({
     showMostAssertive: false,    // Más Asertivos (>80%)
     showMostProfitable: false,   // Más Lucrativos (mayor lucro y positivos)
-    showTopApalancamiento: false // Top Apalancamiento (bots com badges TOP 01 e TOP 02)
+    showTopApalancamiento: false, // Top Apalancamiento (bots com badges TOP 01 e TOP 02)
+    showBestOfWeek: false        // Mejores Bots del la Semana
   });
   
   // Novos estados para controle de exibição
@@ -215,8 +216,19 @@ const Library = () => {
         
         matchesTopApalancamiento = isVipBoster || isFactor50X || isApalancamientoBot;
       }
+      
+      // Filtro Mejores Bots del la Semana
+      let matchesBestOfWeek = true;
+      if (advancedFilters.showBestOfWeek) {
+        const botName = bot.nome_bot.toLowerCase();
+        const isFactor50X = botName.includes('factor') && botName.includes('50x');
+        const isVipBoster = botName.includes('vip') && botName.includes('boster');
+        const isQuantumBot = botName.includes('quantum') && botName.includes('bot');
+        
+        matchesBestOfWeek = isFactor50X || isVipBoster || isQuantumBot;
+      }
 
-      return matchesSearch && matchesPerformance && matchesMostAssertive && matchesMostProfitable && matchesTopApalancamiento;
+      return matchesSearch && matchesPerformance && matchesMostAssertive && matchesMostProfitable && matchesTopApalancamiento && matchesBestOfWeek;
     });
 
     // Ordenação
@@ -467,13 +479,17 @@ const Library = () => {
         </div>
       </section>
       
-      {/* Controles de filtro por período */}
+      {/* Controles de filtro aprimorados */}
       <section className="mb-8">
         <div className="flex justify-center">
-          <TimeFilterControls 
+          <EnhancedFilterControls 
             periodoAtual={periodoSelecionado} 
             onPeriodoChange={handlePeriodChange}
             showResults={showResults}
+            showBestOfWeek={advancedFilters.showBestOfWeek}
+            showTopApalancamiento={advancedFilters.showTopApalancamiento}
+            onBestOfWeekChange={(value) => setAdvancedFilters(prev => ({ ...prev, showBestOfWeek: value }))}
+            onTopApalancamientoChange={(value) => setAdvancedFilters(prev => ({ ...prev, showTopApalancamiento: value }))}
           />
         </div>
       </section>
@@ -587,29 +603,7 @@ const Library = () => {
                   </button>
                 </div>
 
-                {/* Filtro Elite: Top Apalancamiento */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                    🔥
-                    Top Apalancamiento
-                  </label>
-                  <button
-                    onClick={() => setAdvancedFilters(prev => ({
-                      ...prev,
-                      showTopApalancamiento: !prev.showTopApalancamiento
-                    }))}
-                    className={`w-full px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
-                      advancedFilters.showTopApalancamiento 
-                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-600 shadow-lg shadow-orange-500/10' 
-                        : 'bg-background border-border hover:border-orange-500/20 hover:bg-orange-500/5 text-muted-foreground hover:text-orange-600'
-                    }`}
-                  >
-                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      advancedFilters.showTopApalancamiento ? 'bg-orange-500' : 'bg-muted-foreground/30'
-                    }`}></div>
-                    <span className="text-sm font-medium">TOP 01 & 02</span>
-                  </button>
-                </div>
+
               </div>
             </div>
 
@@ -620,7 +614,8 @@ const Library = () => {
                   setAdvancedFilters({
                     showMostAssertive: false,
                     showMostProfitable: false,
-                    showTopApalancamiento: false
+                    showTopApalancamiento: false,
+                    showBestOfWeek: false
                   });
                   setSearchTerm('');
                   setPerformanceFilter('all');
@@ -691,6 +686,7 @@ const Library = () => {
                   bot={bot} 
                   index={index} 
                   periodoSelecionado={periodoSelecionado}
+                  showBestOfWeekBadge={advancedFilters.showBestOfWeek}
                 />
               ))}
             </div>
