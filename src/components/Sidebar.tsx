@@ -92,13 +92,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
       badge: null,
       description: 'Trading avanzado'
     },
-    { 
-      name: 'Analítica', 
-      icon: <ChartLine size={20} />, 
-      path: '/analytics',
-      badge: null,
-      description: 'Métricas y estadísticas'
-    },
+
     { 
       name: 'Mejores Horarios', 
       icon: <Clock size={20} />, 

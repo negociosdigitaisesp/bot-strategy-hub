@@ -65,10 +65,103 @@ const Library = () => {
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [isLoadingTransition, setIsLoadingTransition] = useState(false);
   
+  // Estado para filtro de tempo real
+  const [realTimeFilter, setRealTimeFilter] = useState<'none' | '5min'>('none');
+  
+  // Estado para dados em tempo real
+  const [realTimeData, setRealTimeData] = useState<any[]>([]);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+  
+  // Função centralizada para buscar dados em tempo real
+  const fetchRealTimeData = async () => {
+    try {
+      setLoading(true);
+      const currentTime = new Date();
+      setLastUpdateTime(currentTime);
+      
+      console.log('[TEMPO REAL] Buscando dados dos últimos 5 minutos...');
+      
+      // Obter timestamp de 5 minutos atrás no formato ISO
+      const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      
+      // Usar a nova função que aceita timestamp do cliente
+      const { data: realTimeStats, error } = await supabase
+        .rpc('calcular_estatisticas_desde_timestamp', { timestamp_inicio: cincoMinutosAtras });
+      
+      if (error) {
+        console.error('Erro ao buscar dados em tempo real:', error);
+        setError(`Erro ao carregar dados em tempo real: ${error.message}`);
+        setLoading(false);
+        return;
+      }
+      
+      if (realTimeStats && realTimeStats.length > 0) {
+        // Mapear os dados reais dos últimos 5 minutos
+        const mappedRealTimeData = realTimeStats.map(bot => ({
+          nome_bot: bot.nome_bot,
+          total_operacoes: bot.total_operacoes,
+          vitorias: bot.vitorias,
+          derrotas: bot.derrotas,
+          assertividade_percentual: bot.assertividade_percentual,
+          lucro_total: bot.lucro_total,
+          // Métricas adicionais em tempo real
+          assertividade_tempo_real: bot.assertividade_percentual,
+          operacoes_recentes: bot.total_operacoes,
+          vitorias_recentes: bot.vitorias,
+          lucro_recente: bot.lucro_total,
+          last_signal_time: currentTime,
+          is_real_time: true
+        }));
+        
+        setRealTimeData(mappedRealTimeData);
+        setStats(mappedRealTimeData); // Definir como dados principais
+        console.log(`[TEMPO REAL] ${mappedRealTimeData.length} bots com dados em tempo real`);
+      } else {
+        console.log('[TEMPO REAL] Nenhum dado encontrado para tempo real');
+        setRealTimeData([]);
+        setStats([]);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Erro ao buscar dados em tempo real:', error);
+      setError(`Problema de conexão detectado: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
+  // Função para lidar com mudança do filtro de tempo real
+  const handleRealTimeFilterChange = (filter: string) => {
+    if (filter === '5min') {
+      // Ativar filtro de tempo real e desativar filtros de período
+      setRealTimeFilter('5min');
+      setPeriodoSelecionado(''); // Limpar período selecionado
+      setShowResults(true); // Mostrar resultados imediatamente
+      
+      console.log('[TEMPO REAL] Ativando filtro de dados em tempo real');
+      
+      // Executar busca imediatamente
+      fetchRealTimeData();
+    } else {
+      // Desativar filtro de tempo real
+      setRealTimeFilter('none');
+      setRealTimeData([]);
+      setLastUpdateTime(null);
+      setStats([]); // Limpar dados
+      setShowResults(false); // Voltar ao estado inicial
+      setIsFirstLoad(true); // Permitir nova seleção
+      setPeriodoSelecionado('24 hours'); // Definir período padrão
+    }
+  };
+  
   // Função para lidar com a mudança de período
   const handlePeriodChange = (periodo: string) => {
     // Se for a primeira seleção ou uma mudança de período
     if (isFirstLoad || periodoSelecionado !== periodo) {
+      // Desativar filtro de tempo real quando selecionar período normal
+      setRealTimeFilter('none');
+      setRealTimeData([]);
+      setLastUpdateTime(null);
+      
       setPeriodoSelecionado(periodo);
       setIsLoadingTransition(true);
       
@@ -85,21 +178,42 @@ const Library = () => {
     }
   };
   
+  // useEffect para gerenciar dados em tempo real
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (realTimeFilter === '5min') {
+      // Configurar intervalo para atualizar dados a cada 30 segundos
+      const intervalTime = 30 * 1000; // 30 segundos para dados mais atualizados
+      interval = setInterval(fetchRealTimeData, intervalTime);
+      
+      // Executar busca imediatamente
+      fetchRealTimeData();
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [realTimeFilter]);
+  
   // useEffect principal - ÚNICA FONTE DE DADOS
   useEffect(() => {
     // Só buscar dados se não for a primeira carga (após seleção do usuário)
     if (!isFirstLoad) {
+      // Blindar a chamada RPC com período vazio
+      if (!periodoSelecionado) return;
+      
       const fetchFilteredStats = async () => {
         setLoading(true);
         setError(null);
-  
+
         console.log(`[DIAGNÓSTICO] Chamando RPC com período: '${periodoSelecionado}'`);
-  
+
         const { data, error: rpcError } = await supabase.rpc(
           'calcular_estatisticas_por_periodo',
           { periodo: periodoSelecionado }
         );
-  
+
         if (rpcError) {
           console.error("[DIAGNÓSTICO] Erro na chamada RPC:", rpcError);
           setError("Não foi possível carregar os dados. Verifique o console para detalhes técnicos.");
@@ -168,7 +282,16 @@ const Library = () => {
   
   // Lógica de filtros e ordenação com useMemo para performance
   const filteredAndSortedStats = useMemo(() => {
-    let filtered = stats.filter(bot => {
+    // Decidir qual array de dados usar
+    let dataToFilter = [];
+    
+    if (realTimeFilter === '5min') {
+      dataToFilter = realTimeData;
+    } else {
+      dataToFilter = stats;
+    }
+    
+    let filtered = dataToFilter.filter(bot => {
       // Filtro de busca
       const matchesSearch = bot.nome_bot.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -272,7 +395,7 @@ const Library = () => {
     });
 
     return filtered;
-  }, [stats, searchTerm, performanceFilter, sortBy, sortOrder, advancedFilters]);
+  }, [stats, realTimeData, realTimeFilter, searchTerm, performanceFilter, sortBy, sortOrder, advancedFilters]);
 
   // Estatísticas calculadas
   const localStats = useMemo(() => {
@@ -490,6 +613,8 @@ const Library = () => {
             showTopApalancamiento={advancedFilters.showTopApalancamiento}
             onBestOfWeekChange={(value) => setAdvancedFilters(prev => ({ ...prev, showBestOfWeek: value }))}
             onTopApalancamientoChange={(value) => setAdvancedFilters(prev => ({ ...prev, showTopApalancamiento: value }))}
+            realTimeFilter={realTimeFilter}
+            onRealTimeFilterChange={handleRealTimeFilterChange}
           />
         </div>
       </section>
@@ -659,6 +784,33 @@ const Library = () => {
         </section>
       )}
 
+      {/* Indicador de Resultado del Ahora */}
+      {showResults && !isLoadingTransition && realTimeFilter !== 'none' && (
+        <section className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="max-w-6xl mx-auto">
+            <div className="bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-green-500/10 border border-green-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-green-600 font-semibold text-sm">⚡ RESULTADO DEL AHORA ACTIVO</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Actualizando cada 5 minutos
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Zap size={16} className="text-green-500 animate-pulse" />
+                  <span className="text-xs font-medium text-green-600">
+                    Datos en Tiempo Real
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Container dos cards - Design profissional com cores nativas */}
       {showResults && !isLoadingTransition && (
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -687,6 +839,19 @@ const Library = () => {
                   index={index} 
                   periodoSelecionado={periodoSelecionado}
                   showBestOfWeekBadge={advancedFilters.showBestOfWeek}
+                  isRealTime={realTimeFilter !== 'none'}
+                  realTimeMetrics={realTimeFilter !== 'none' ? {
+                    assertividade_tempo_real: bot.assertividade_tempo_real,
+                    momentum_score: bot.momentum_score,
+                    volatility_index: bot.volatility_index,
+                    risk_reward_ratio: bot.risk_reward_ratio,
+                    drawdown_atual: bot.drawdown_atual,
+                    sharpe_ratio: bot.sharpe_ratio,
+                    win_streak: bot.win_streak,
+                    signal_strength: bot.signal_strength,
+                    market_correlation: bot.market_correlation,
+                    last_signal_time: bot.last_signal_time
+                  } : undefined}
                 />
               ))}
             </div>

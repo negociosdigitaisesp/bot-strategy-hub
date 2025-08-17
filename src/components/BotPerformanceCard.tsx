@@ -54,9 +54,9 @@ const BotPerformanceCard = ({ bot, periodoSelecionado, showBestOfWeekBadge = fal
       'tip': { assertividade: 84.5, route: '/tipbot' },
       'xtremebot': { assertividade: 91.2, route: '/xtremebot' },
       'xtreme': { assertividade: 91.2, route: '/xtremebot' },
-      'goldbot': { assertividade: 91.2, route: '/gold-bot' },
-      'gold': { assertividade: 91.2, route: '/gold-bot' },
-      'gold bot': { assertividade: 91.2, route: '/gold-bot' },
+      'goldbot': { assertividade: 91.2, route: '/xtrembot' },
+      'gold': { assertividade: 91.2, route: '/xtrembot' },
+      'gold bot': { assertividade: 91.2, route: '/xtrembot' },
       'turboganancia': { assertividade: 92.3, route: '/turbo-ganancia' },
       'turbo': { assertividade: 92.3, route: '/turbo-ganancia' },
       'turbo ganancia': { assertividade: 92.3, route: '/turbo-ganancia' },
@@ -272,16 +272,10 @@ const BotPerformanceCard = ({ bot, periodoSelecionado, showBestOfWeekBadge = fal
         </div>
         
         {/* Métricas adicionais */}
-        <div className="grid grid-cols-2 gap-3 text-xs mb-4">
+        <div className="grid grid-cols-1 gap-3 text-xs mb-4">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Win Rate:</span>
             <span className="font-semibold text-foreground">{((vitorias / totalOperacoes) * 100).toFixed(1)}%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Resultado:</span>
-            <span className="font-semibold text-emerald-500">
-              {totalOperacoes > 100 ? 'Sin Martingale' : totalOperacoes > 50 ? 'Media' : 'Básica'}
-            </span>
           </div>
         </div>
         

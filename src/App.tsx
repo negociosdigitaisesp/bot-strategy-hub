@@ -9,7 +9,7 @@ import BotDetail from "./pages/BotDetail";
 import NotFound from "./pages/NotFound";
 import InstallationTutorial from "./pages/InstallationTutorial";
 import BestHours from "./pages/BestHours";
-import Analytics from "./pages/Analytics";
+
 import Library from "./pages/Library";
 import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
@@ -102,15 +102,7 @@ const App = () => {
                     </>
                   } />
                   
-                  <Route path="/analytics" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <Analytics />
-                      </main>
-                    </>
-                  } />
-                  
+
                   <Route path="/settings" element={
                     <>
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
