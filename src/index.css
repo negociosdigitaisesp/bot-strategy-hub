@@ -51,7 +51,7 @@
 @layer base {
   * {
     @apply border-border;
-    scroll-behavior: smooth;
+    /* scroll-behavior: smooth; - REMOVIDO para evitar scroll automático indesejado */
   }
   
   body {
@@ -290,4 +290,17 @@
   background: hsl(var(--primary));
   transform: scale(1.1);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Remover ou comentar esta linha se existir */
+/* * { scroll-behavior: smooth; } */
+
+/* Ou ser mais específico */
+html {
+  scroll-behavior: auto;
+}
+
+/* Aplicar smooth scroll apenas onde necessário */
+.smooth-scroll {
+  scroll-behavior: smooth;
 }

@@ -13,3 +13,7 @@ if (!rootElement) {
 // Use the createRoot API instead of ReactDOM.render
 const root = createRoot(rootElement);
 root.render(<App />);
+
+// Remover estas linhas:
+// import './utils/preventAutoScroll.js';
+// import './styles/preventAutoScroll.css';

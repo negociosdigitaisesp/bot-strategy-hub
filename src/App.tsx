@@ -31,6 +31,8 @@ import TurboGanancia from "./pages/TurboGanancia";
 import GoldBotAntiRepeticion from "./pages/GoldBotAntiRepeticion";
 import BotDelApalancamiento from "./pages/BotDelApalancamiento";
 import VipBoster from "./pages/VipBoster";
+import DoubleCuentas from "./pages/DoubleCuentas";
+import AuraBot from "./pages/AuraBot";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -220,6 +222,23 @@ const App = () => {
                     </>
                   } />
                   
+                  <Route path="/double-cuentas" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <DoubleCuentas />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/aura-bot" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <AuraBot />
+                      </main>
+                    </>
+                  } />
 
                 </Route>
                 

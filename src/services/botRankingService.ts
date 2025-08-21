@@ -124,6 +124,13 @@ async function criarDadosRankingAlternativos(): Promise<BotRankingData[]> {
       total_operacoes: 200
     },
     {
+      nome_bot: 'Aura Bot',
+      assertividade_percentual: 75.0,
+      vitorias: 150,
+      derrotas: 50,
+      total_operacoes: 200
+    },
+    {
       nome_bot: 'TipBot',
       assertividade_percentual: 84.5,
       vitorias: 169,
@@ -308,6 +315,13 @@ function criarDadosRankingFallback(): BotRankingData[] {
       assertividade_percentual: 85.2,
       vitorias: 170,
       derrotas: 30,
+      total_operacoes: 200
+    },
+    {
+      nome_bot: 'Aura Bot',
+      assertividade_percentual: 75.0,
+      vitorias: 150,
+      derrotas: 50,
       total_operacoes: 200
     },
     {

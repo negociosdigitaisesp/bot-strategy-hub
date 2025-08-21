@@ -147,7 +147,7 @@ const GoldBot = () => {
                   <div>
                     <h4 className="font-semibold mb-1">Gestión Martingale Dobrado</h4>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                      <strong>Si gana:</strong> Vuelve al valor inicial (ej: $2).<br/>
+                      <strong>Si gana:</strong> Vuelve al valor inicial (ej: $2).<br />
                       <strong>Si pierde:</strong> Dobla el valor de la última pérdida para recuperar todo en una operación.
                     </p>
                   </div>

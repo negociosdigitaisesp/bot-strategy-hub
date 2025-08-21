@@ -67,7 +67,14 @@ const BotPerformanceCard = ({ bot, periodoSelecionado, showBestOfWeekBadge = fal
       'vipboster': { assertividade: 88.4, route: '/vip-boster' },
       'vip': { assertividade: 88.4, route: '/vip-boster' },
       'boster': { assertividade: 88.4, route: '/vip-boster' },
-      'vip boster': { assertividade: 88.4, route: '/vip-boster' }
+      'vip boster': { assertividade: 88.4, route: '/vip-boster' },
+      'doublecuentas': { assertividade: 86.7, route: '/double-cuentas' },
+      'double': { assertividade: 86.7, route: '/double-cuentas' },
+      'cuentas': { assertividade: 86.7, route: '/double-cuentas' },
+      'double cuentas': { assertividade: 86.7, route: '/double-cuentas' },
+      'aurabot': { assertividade: 75.0, route: '/aura-bot' },
+      'aura': { assertividade: 75.0, route: '/aura-bot' },
+      'aura bot': { assertividade: 75.0, route: '/aura-bot' }
     };
     
     return botConfigs[normalizedName] || { assertividade: bot.assertividade_percentual, route: '/' };

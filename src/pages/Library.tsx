@@ -252,7 +252,12 @@ const Library = () => {
       'scalebot': '/bot/scale-bot',
       'scale': '/bot/scale-bot',
       'alfabot': '/alfabot',
-      'alfa': '/alfabot'
+      'doublecuentas': '/double-cuentas',
+      'double': '/double-cuentas',
+      'cuentas': '/double-cuentas',
+      'doublecuentas1.0': '/double-cuentas',
+      'aurabot': '/aura-bot',
+      'aura': '/aura-bot'
     };
   
     return botRoutes[normalizedName] || '/';

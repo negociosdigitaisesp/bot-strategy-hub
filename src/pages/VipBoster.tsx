@@ -178,7 +178,7 @@ const VipBoster = () => {
                   <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg mt-3">
                     <p className="text-sm font-medium mb-2">Fórmula de Recuperación:</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                      La próxima aposta = (Total Lost × 100/35) ÷ 2<br/>
+                      La próxima aposta = (Total Lost × 100/35) ÷ 2<br />
                       Factor de multiplicación: ~2.85, dividido por 2 (Martingale Split)
                     </p>
                   </div>
