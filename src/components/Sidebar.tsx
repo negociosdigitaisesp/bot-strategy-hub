@@ -87,19 +87,19 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
       description: 'Robots disponibles'
     },
     { 
+      name: 'Radar del Apalancamiento', 
+      icon: <Target size={20} />, 
+      path: '/radardelapalancamiento',
+      badge: 'NUEVO',
+      description: 'Monitoreo inteligente'
+    },
+    { 
       name: 'Bots de Apalancamiento', 
       icon: <Zap size={20} />, 
       path: '/bots-apalancamiento',
       badge: null,
       description: 'Trading avanzado'
     },
-    // { 
-    //   name: 'Radar del Apalancamiento', 
-    //   icon: <Target size={20} />, 
-    //   path: '/radar-apalancamiento',
-    //   badge: 'NUEVO',
-    //   description: 'Monitoreo inteligente'
-    // },
     { 
       name: 'Mejores Horarios', 
       icon: <Clock size={20} />, 

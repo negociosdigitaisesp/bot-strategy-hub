@@ -249,6 +249,15 @@ const App = () => {
                       </main>
                     </>
                   } />
+                  
+                  <Route path="/radardelapalancamiento" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <RadarApalancamiento />
+                      </main>
+                    </>
+                  } />
 
                 </Route>
                 
