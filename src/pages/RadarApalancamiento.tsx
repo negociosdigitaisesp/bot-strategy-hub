@@ -599,62 +599,7 @@ const RadarApalancamiento = () => {
           </div>
         </div>
 
-        {/* Panel de Métricas Globales Compactas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-[#1C2A3A] p-3 rounded-lg border border-white/10 shadow-lg shadow-black/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-[#2DD4BF] rounded-lg">
-                <Target className="text-white" size={16} />
-              </div>
-              <span className="text-xs text-slate-400 font-medium">PRECISIÓN</span>
-            </div>
-            <div className="text-lg font-bold text-white mb-1">{botStats?.precision || 0}%</div>
-            <div className="text-xs text-slate-400 flex items-center gap-1">
-              {botStats?.precision >= 70 ? (
-                <><span className="text-green-400">●</span> Excelente</>
-              ) : botStats?.precision >= 50 ? (
-                <><span className="text-yellow-400">●</span> Bueno</>
-              ) : (
-                <><span className="text-red-400">●</span> Atención</>
-              )}
-            </div>
-          </div>
 
-          <div className="bg-slate-700 p-3 rounded-lg border border-white/10 shadow-lg shadow-black/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-purple-500 rounded-lg">
-                <Activity className="text-white" size={16} />
-              </div>
-              <span className="text-xs text-slate-400 font-medium">OPERACIONES</span>
-            </div>
-            <div className="text-lg font-bold text-white mb-1">{botStats?.totalOperations || 0}</div>
-            <div className="text-xs text-slate-400">Total ejecutadas</div>
-          </div>
-
-          <div className="bg-slate-700 p-3 rounded-lg border border-white/10 shadow-lg shadow-black/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-green-500 rounded-lg">
-                <BarChart3 className="text-white" size={16} />
-              </div>
-              <span className="text-xs text-slate-400 font-medium">V/D</span>
-            </div>
-            <div className="text-lg font-bold text-white mb-1">
-              {botStats?.victoriasVsDerrotas || '0/0'}
-            </div>
-            <div className="text-xs text-slate-400">Victorias / Derrotas</div>
-          </div>
-
-          <div className="bg-slate-700 p-3 rounded-lg border border-white/10 shadow-lg shadow-black/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-1.5 bg-orange-500 rounded-lg">
-                <Zap className="text-white" size={16} />
-              </div>
-              <span className="text-xs text-slate-400 font-medium">PATRÓN</span>
-            </div>
-            <div className="text-lg font-bold text-white mb-1">{botStats?.operationsAfterPattern || '0/3'}</div>
-            <div className="text-xs text-slate-400">Después patrón</div>
-          </div>
-        </div>
       </div>
 
       {/* Bot Cards - Lado a Lado */}
