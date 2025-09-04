@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Sparkles,
   TrendingUp,
-  Crown
+  Crown,
+  Target
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -92,7 +93,13 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
       badge: null,
       description: 'Trading avanzado'
     },
-
+    // { 
+    //   name: 'Radar del Apalancamiento', 
+    //   icon: <Target size={20} />, 
+    //   path: '/radar-apalancamiento',
+    //   badge: 'NUEVO',
+    //   description: 'Monitoreo inteligente'
+    // },
     { 
       name: 'Mejores Horarios', 
       icon: <Clock size={20} />, 

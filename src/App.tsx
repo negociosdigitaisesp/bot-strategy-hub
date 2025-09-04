@@ -33,6 +33,7 @@ import BotDelApalancamiento from "./pages/BotDelApalancamiento";
 import VipBoster from "./pages/VipBoster";
 import DoubleCuentas from "./pages/DoubleCuentas";
 import AuraBot from "./pages/AuraBot";
+import RadarApalancamiento from "./pages/RadarApalancamiento";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
@@ -236,6 +237,15 @@ const App = () => {
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <AuraBot />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/sys-monitor-x7" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <RadarApalancamiento />
                       </main>
                     </>
                   } />

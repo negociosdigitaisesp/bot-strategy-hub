@@ -45,6 +45,41 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 5% 15%;
     --sidebar-ring: 174 94% 56%;
+
+    /* Sistema de Cores Unificado - Radar del Apalancamiento */
+    /* Paleta principal do site */
+    --radar-primary: #0ea5e9;
+    --radar-primary-light: #e0f2fe;
+    --radar-primary-dark: #0284c7;
+    
+    /* Cores semânticas */
+    --success: #10b981;
+    --success-light: #d1fae5;
+    --success-border: #10b98120;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --warning-border: #f59e0b20;
+    --danger: #ef4444;
+    --danger-light: #fee2e2;
+    --danger-border: #ef444420;
+    
+    /* Neutros */
+    --neutral-50: #f8fafc;
+    --neutral-100: #f1f5f9;
+    --neutral-800: #1e293b;
+    --neutral-900: #0f172a;
+    
+    /* Scalping Bot (Azul) */
+    --scalping-primary: #0ea5e9;
+    --scalping-light: #e0f2fe;
+    --scalping-border: #0ea5e920;
+    --scalping-gradient: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    
+    /* Tunder Bot (Roxo) */
+    --tunder-primary: #8b5cf6;
+    --tunder-light: #f3e8ff;
+    --tunder-border: #8b5cf620;
+    --tunder-gradient: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   }
 }
 
@@ -72,6 +107,138 @@
 
   .stat-card {
     @apply relative flex flex-col p-5 bg-card rounded-lg shadow-md border border-border/50 transition-all duration-200 hover:border-primary/50;
+  }
+
+  /* Estados semânticos */
+  .status-safe {
+    background: var(--success-light);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+  }
+
+  .status-warning {
+    background: var(--warning-light);
+    color: var(--warning);
+    border: 1px solid var(--warning-border);
+  }
+
+  .status-danger {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+  }
+
+  /* Scalping Bot - Cores Azuis */
+  .scalping-card {
+    border-color: var(--scalping-primary);
+    background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+  }
+
+  .scalping-accent {
+    background: var(--scalping-primary);
+  }
+
+  .scalping-icon {
+    background: var(--scalping-light);
+    border-color: var(--scalping-border);
+    color: var(--scalping-primary);
+  }
+
+  .scalping-badge {
+    background: var(--scalping-primary);
+    color: white;
+  }
+
+  .scalping-button {
+    background: var(--scalping-primary);
+    border-color: var(--scalping-primary);
+  }
+
+  .scalping-button:hover {
+    background: var(--primary-dark);
+  }
+
+  /* Tunder Bot - Cores Roxas */
+  .tunder-card {
+    border-color: var(--tunder-primary);
+    background: linear-gradient(135deg, #f3e8ff 0%, #faf5ff 100%);
+  }
+
+  .tunder-accent {
+    background: var(--tunder-primary);
+  }
+
+  .tunder-icon {
+    background: var(--tunder-light);
+    border-color: var(--tunder-border);
+    color: var(--tunder-primary);
+  }
+
+  .tunder-badge {
+    background: var(--tunder-primary);
+    color: white;
+  }
+
+  .tunder-button {
+    background: var(--tunder-primary);
+    border-color: var(--tunder-primary);
+  }
+
+  .tunder-button:hover {
+    background: #7c3aed;
+  }
+
+  /* Classes para design compacto */
+  .radar-container {
+    padding: 1rem;
+  }
+
+  .compact-header {
+    @apply p-4 md:p-6;
+  }
+
+  .compact-card {
+    @apply max-h-[380px] overflow-hidden;
+  }
+
+  .compact-card-header {
+    @apply pb-3;
+  }
+
+  .compact-card-content {
+    @apply space-y-4;
+  }
+
+  .compact-title {
+    @apply text-lg flex items-center gap-2;
+  }
+
+  .compact-icon {
+    @apply p-2;
+  }
+
+  .compact-metrics-grid {
+    @apply grid grid-cols-2 md:grid-cols-4 gap-3 mb-6;
+  }
+
+  .compact-filter-grid {
+    @apply grid grid-cols-3 gap-2;
+  }
+
+  .compact-filter-item {
+    @apply p-2 text-xs;
+  }
+
+  .compact-metric-item {
+    @apply space-y-1;
+  }
+
+  .compact-metric-label {
+    @apply text-xs flex items-center gap-1;
+  }
+
+  .compact-metric-value {
+    @apply text-lg font-bold;
   }
 }
 
@@ -138,6 +305,34 @@
     .main-content,
     .main-content-expanded {
       margin-left: 0;
+    }
+  }
+
+  /* Breakpoints específicos para Radar del Apalancamiento */
+  /* Mobile First */
+  .radar-container {
+    padding: 1rem;
+  }
+
+  /* Tablet */
+  @media (min-width: 768px) {
+    .radar-container {
+      padding: 1.5rem;
+    }
+    .bot-cards {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+  }
+
+  /* Desktop */
+  @media (min-width: 1024px) {
+    .radar-container {
+      padding: 2rem;
+    }
+    .bot-cards {
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
     }
   }
 

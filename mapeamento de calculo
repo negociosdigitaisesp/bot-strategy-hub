@@ -1,0 +1,141 @@
+Mapeamento de Refatoração para Front-End - Dashboard Multi-Bot
+Objetivo: Substituir a lógica de busca de dados de um único bot (via query SQL estática) por uma nova lógica que busca dados de múltiplos bots (via função RPC dinâmica) e os exibe em uma única tela.
+Atenção, IA: A fonte de dados e sua estrutura irão mudar fundamentalmente. O código deve ser adaptado para lidar com um array de resultados, e não mais com um único objeto.
+1. A Nova Fonte de Dados (O que a API vai retornar)
+A busca de dados não será mais uma única chamada. Faremos uma chamada RPC para cada bot e o resultado final no front-end será um ARRAY de objetos.
+CÓDIGO DE BUSCA (Exemplo):
+code
+JavaScript
+const BOT_NAMES = ['Scalping Bot', 'Tunder Bot'];
+
+const promises = BOT_NAMES.map(botName =>
+  supabase.rpc('get_scalping_dashboard', { p_bot_name: botName }).single()
+);
+const results = await Promise.all(promises);
+
+// A variável 'results' conterá algo assim:
+// [
+//   { data: { name: 'Scalping Bot', stats: { wins: 150, losses: 45, wins_5_count: 4, losses_10_count: 7, wins_5_percent: 80.00, ... } } },
+//   { data: { name: 'Tunder Bot',   stats: { wins: 88, losses: 12, wins_5_count: 5, losses_10_count: 2, wins_5_percent: 100.00, ... } } }
+// ]
+NOVA ESTRUTURA DE DADOS A SER USADA NA RENDERIZAÇÃO:
+code
+JavaScript
+const allDashboards = [
+  { 
+    name: 'Scalping Bot',
+    stats: { wins: 150, losses: 45, wins_5_count: 4, losses_10_count: 7, wins_5_percent: 80.00 }
+  },
+  {
+    name: 'Tunder Bot',
+    stats: { wins: 88, losses: 12, wins_5_count: 5, losses_10_count: 2, wins_5_percent: 100.00 }
+  }
+];
+2. Mapeamento Campo a Campo (Como usar os novos dados para gerar o display antigo)
+Para CADA objeto dashboard dentro do array allDashboards, aplique as seguintes transformações:
+Dados de Entrada (para um bot): dashboard.stats
+code
+JavaScript
+// dashboard.stats = {
+//   wins: 150,           // Total de vitórias
+//   losses: 45,          // Total de derrotas
+//   losses_10_count: 7,  // Derrotas nas últimas 10
+//   wins_5_count: 4,     // Vitórias nas últimas 5
+//   wins_5_percent: 80.00  // % de vitórias nas últimas 5
+// }
+Cálculos e Formatação (dentro do loop de renderização):
+code
+JavaScript
+// Para cada 'dashboard' no array 'allDashboards'
+const stats = dashboard.stats;
+
+// 1. VICTORIAS vs DERROTAS
+//    Usa o total de wins/losses, que é mais relevante que apenas das últimas 20.
+const victoriasDisplay = `${stats.wins}/${stats.losses}`;  // Ex: "150/45"
+
+// 2. LOSSES 10 OPS
+//    Calculamos as vitórias assumindo 10 operações no total.
+const winsInLast10 = 10 - stats.losses_10_count;
+const losses10Display = `${stats.losses_10_count} x ${winsInLast10}`;  // Ex: "7 x 3"
+const losses10Percent = Math.round((stats.losses_10_count / 10) * 100); // Ex: 70%
+
+// 3. WINS 5 OPS
+//    Calculamos as derrotas assumindo 5 operações no total.
+const lossesInLast5 = 5 - stats.wins_5_count;
+const wins5Display = `${stats.wins_5_count}x${lossesInLast5}`;  // Ex: "4x1"
+const wins5Percent = Math.round(stats.wins_5_percent); // Ex: 80% (já vem calculado)
+3. Exemplo Completo de Implementação (Substitua o componente antigo por este)
+code
+JavaScript
+import { supabase } from './seu-arquivo-supabase.js'; 
+import { useState, useEffect } from 'react';
+
+// Componente para exibir um único "card" de dashboard
+function DashboardCard({ botName, stats }) {
+    if (!stats) {
+        return <div className="card"><h3>{botName}</h3><p>Aguardando dados...</p></div>;
+    }
+
+    // APLICANDO O MAPEAMENTO
+    const victoriasDisplay = `${stats.wins}/${stats.losses}`;
+    
+    const winsInLast10 = 10 - stats.losses_10_count;
+    const losses10Display = `${stats.losses_10_count} x ${winsInLast10}`;
+    const losses10Percent = Math.round((stats.losses_10_count / 10) * 100);
+
+    const lossesInLast5 = 5 - stats.wins_5_count;
+    const wins5Display = `${stats.wins_5_count}x${lossesInLast5}`;
+    const wins5Percent = Math.round(stats.wins_5_percent);
+
+    // RENDERIZAÇÃO NO FORMATO DESEJADO
+    return (
+        <div className="dashboard-card" style={{ border: '1px solid gray', padding: '1em', margin: '1em' }}>
+            <h3>{botName}</h3>
+            <hr/>
+            
+            {/* Bloco 1: Victorias vs Derrotas */}
+            <p>Victorias / Derrotas</p>
+            <h2 id="victorias-derrotas">{victoriasDisplay}</h2>
+            
+            {/* Bloco 2: Losses 10 Ops */}
+            <p>Losses 10 Ops</p>
+            <h2 id="losses-10-display">{losses10Display}</h2>
+            <small id="losses-10-percent">{losses10Percent}%</small>
+            
+            {/* Bloco 3: Wins 5 Ops */}
+            <p>Wins 5 Ops</p>
+            <h2 id="wins-5-display">{wins5Display}</h2>
+            <small id="wins-5-percent">{wins5Percent}%</small>
+        </div>
+    );
+}
+
+// Componente principal que busca todos os dados
+function ControlRoom() {
+    const BOT_NAMES = ['Scalping Bot', 'Tunder Bot'];
+    const [allDashboards, setAllDashboards] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchAllData() {
+            const promises = BOT_NAMES.map(name => 
+                supabase.rpc('get_scalping_dashboard', { p_bot_name: name }).single()
+            );
+            const results = await Promise.all(promises);
+            const formattedData = results.map((res, i) => ({ name: BOT_NAMES[i], stats: res.data }));
+            setAllDashboards(formattedData);
+            setLoading(false);
+        }
+        fetchAllData();
+    }, []);
+
+    if (loading) return <p>Carregando Painel de Controle...</p>;
+
+    return (
+        <div style={{ display: 'flex' }}>
+            {allDashboards.map(dash => (
+                <DashboardCard key={dash.name} botName={dash.name} stats={dash.stats} />
+            ))}
+        </div>
+    );
+}```
