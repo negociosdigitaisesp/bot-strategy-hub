@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Download, BarChart3, Activity, TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Target, Shield, Eye, RefreshCw, History } from 'lucide-react';
+import { ArrowLeft, Activity, TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Shield, Eye, RefreshCw, History, Target, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -220,7 +220,7 @@ const RadarApalancamiento = () => {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'scalping_accumulator_bot_logs')
+        .eq('bot_name', 'Scalping Bot')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -298,77 +298,7 @@ const RadarApalancamiento = () => {
 
 
 
-  // Función para obtener colores de estrategia
-  const getStrategyColors = (strategyType: string): StrategyColors => {
-    const colorMap: { [key: string]: StrategyColors } = {
-      'PREMIUM_RECOVERY': {
-        bg: 'bg-emerald-500/10',
-        border: 'border-emerald-500/20',
-        accent: 'bg-emerald-500',
-        text: 'text-emerald-400',
-        icon: 'text-emerald-400'
-      },
-      'MOMENTUM_CONTINUATION': {
-        bg: 'bg-blue-500/10',
-        border: 'border-blue-500/20',
-        accent: 'bg-blue-500',
-        text: 'text-blue-400',
-        icon: 'text-blue-400'
-      },
-      'VOLATILITY_BREAK': {
-        bg: 'bg-orange-500/10',
-        border: 'border-orange-500/20',
-        accent: 'bg-orange-500',
-        text: 'text-orange-400',
-        icon: 'text-orange-400'
-      },
-      'PATTERN_REVERSAL': {
-        bg: 'bg-purple-500/10',
-        border: 'border-purple-500/20',
-        accent: 'bg-purple-500',
-        text: 'text-purple-400',
-        icon: 'text-purple-400'
-      },
-      'CYCLE_TRANSITION': {
-        bg: 'bg-indigo-500/10',
-        border: 'border-indigo-500/20',
-        accent: 'bg-indigo-500',
-        text: 'text-indigo-400',
-        icon: 'text-indigo-400'
-      },
-      'FIBONACCI_RECOVERY': {
-        bg: 'bg-amber-500/10',
-        border: 'border-amber-500/20',
-        accent: 'bg-amber-500',
-        text: 'text-amber-400',
-        icon: 'text-amber-400'
-      },
-      'MOMENTUM_SHIFT': {
-        bg: 'bg-cyan-500/10',
-        border: 'border-cyan-500/20',
-        accent: 'bg-cyan-500',
-        text: 'text-cyan-400',
-        icon: 'text-cyan-400'
-      },
-      'STABILITY_BREAK': {
-        bg: 'bg-teal-500/10',
-        border: 'border-teal-500/20',
-        accent: 'bg-teal-500',
-        text: 'text-teal-400',
-        icon: 'text-teal-400'
-      }
-    };
 
-    return colorMap[strategyType] || {
-      bg: 'bg-gray-500/10',
-      border: 'border-gray-500/20',
-      accent: 'bg-gray-500',
-      text: 'text-gray-400',
-      icon: 'text-gray-400'
-    };
-  };
-
-  // Função generateMockStrategyData removida - agora usando dados reais do Supabase
 
   // Función para calcular estadísticas usando datos exactos
   const calcularEstadisticas = (historico: BotOperation[], radarInfo: RadarSignal | null, statsExactas: any = null, dashboardStats: any = null) => {
@@ -652,10 +582,15 @@ const RadarApalancamiento = () => {
       )
       .subscribe();
     
-    // Actualización automática removida - usando apenas realtime subscription
+    // ATUALIZAÇÃO AUTOMÁTICA A CADA 5 SEGUNDOS
+    const autoUpdateInterval = setInterval(() => {
+      console.log('🔄 Atualizando dados automaticamente...');
+      actualizarDatos();
+    }, 5000); // 5 segundos
     
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(autoUpdateInterval);
     };
   }, []);
 
@@ -683,113 +618,11 @@ const RadarApalancamiento = () => {
     return translations[reason] || reason || 'Aguardando estratégia...';
   };
 
-  // Componente StrategyIndicator
-  const StrategyIndicator = ({ strategy, reason }: { strategy: TradingStrategy | null; reason?: string }) => {
-    if (!strategy || !strategy.name || strategy.name === 'NONE') {
-      return (
-        <div className="flex items-center gap-2 text-slate-400" role="status" aria-label="Aguardando estratégia">
-          <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse" aria-hidden="true"></div>
-          <span className="text-sm">
-            {reason ? translateReason(reason) : 'Aguardando estratégia...'}
-          </span>
-        </div>
-      );
-    }
 
-    const colors = getStrategyColors(strategy.type);
-    
-    return (
-      <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-all duration-300 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500/50" 
-           style={{ 
-             backgroundColor: colors.bg, 
-             borderColor: colors.border 
-           }}
-           role="region"
-           aria-label={`Estratégia ativa: ${strategy.name.replace('_', ' ')} com ${strategy.confidence}% de confiança`}
-           tabIndex={0}>
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className={`w-3 h-3 rounded-full animate-pulse flex-shrink-0`} 
-               style={{ backgroundColor: colors.accent }}
-               aria-hidden="true"></div>
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm truncate" style={{ color: colors.text }}>
-              {strategy.name.replace('_', ' ')}
-            </div>
-            <div className="text-xs opacity-75 truncate" style={{ color: colors.text }}>
-              Confiança: {strategy.confidence}%
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  // Componente ConfidenceBadge
-  const ConfidenceBadge = ({ confidence, strategyType }: { confidence: number; strategyType?: string }) => {
-    const getConfidenceColor = (conf: number) => {
-      if (conf >= 90) return { bg: '#10B981', text: '#FFFFFF', label: 'Alta' };
-      return { bg: '#3B82F6', text: '#FFFFFF', label: 'Média' };
-    };
 
-    const colors = getConfidenceColor(confidence);
-    const shouldPulse = confidence >= 90;
 
-    return (
-      <div className={`inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-full text-xs font-medium transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 ${
-        shouldPulse ? 'animate-pulse' : ''
-      }`}
-           style={{ 
-             backgroundColor: colors.bg, 
-             color: colors.text 
-           }}
-           role="status"
-           aria-label={`Nível de confiança ${colors.label}: ${confidence}%`}
-           tabIndex={0}>
-        <div className="w-2 h-2 rounded-full bg-white/80 flex-shrink-0" aria-hidden="true"></div>
-        <span className="whitespace-nowrap">{colors.label} ({confidence}%)</span>
-      </div>
-    );
-  };
 
-  // Componente FilterPanel
-  const FilterPanel = ({ strategy }: { strategy: any }) => {
-    if (!strategy || !strategy.filters || !Array.isArray(strategy.filters) || strategy.filters.length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="space-y-2" role="region" aria-label="Filtros da estratégia ativa">
-        <div className="text-sm font-medium text-slate-300 mb-3" id="filters-heading">Filtros da Estratégia</div>
-        <div className="space-y-2" role="list" aria-labelledby="filters-heading">
-          {strategy.filters.map((filter, index) => (
-            <div key={index} 
-                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800/70 transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500/50"
-                 role="listitem"
-                 tabIndex={0}
-                 aria-label={`Filtro ${filter.name}: ${filter.status === 'passed' ? 'aprovado' : filter.status === 'failed' ? 'reprovado' : 'pendente'}, valor ${filter.value}`}>
-              <div className="flex items-center gap-2 mb-2 sm:mb-0">
-                {filter.status === 'passed' ? (
-                  <CheckCircle size={16} className="text-green-400 flex-shrink-0" aria-hidden="true" />
-                ) : filter.status === 'failed' ? (
-                  <XCircle size={16} className="text-red-400 flex-shrink-0" aria-hidden="true" />
-                ) : (
-                  <Clock size={16} className="text-yellow-400 flex-shrink-0" aria-hidden="true" />
-                )}
-                <span className="text-sm text-slate-300 font-medium">{filter.name}</span>
-              </div>
-              <div className="flex items-center justify-between sm:justify-end gap-2 ml-6 sm:ml-0">
-                <span className="text-xs text-slate-400 font-mono">{filter.value}</span>
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                  filter.status === 'passed' ? 'bg-green-400' :
-                  filter.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'
-                }`} aria-hidden="true"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   // Componente StrategyHistory
   const StrategyHistory = ({ strategies }: { strategies: TradingStrategy[] }) => {
@@ -868,48 +701,7 @@ const RadarApalancamiento = () => {
     );
   };
 
-  // Componente AlertBanner
-  const AlertBanner = ({ strategy, show }: { strategy: TradingStrategy | null; show: boolean }) => {
-    if (!show || !strategy) return null;
 
-    const colors = getStrategyColors(strategy.type);
-    
-    const getStrategyMessage = (strategyType: string) => {
-      const messages = {
-        'PREMIUM_RECOVERY': '🎯 Estratégia Premium Recovery detectada! Oportunidade de recuperação identificada.',
-        'MOMENTUM_CONTINUATION': '⚡ Momentum Continuation ativo! Tendência forte confirmada.',
-        'VOLATILITY_BREAK': '💥 Volatility Break detectado! Rompimento significativo identificado.',
-        'PATTERN_REVERSAL': '🔄 Pattern Reversal confirmado! Reversão de padrão em andamento.',
-        'CYCLE_TRANSITION': '🌊 Cycle Transition ativo! Mudança de ciclo detectada.',
-        'FIBONACCI_RECOVERY': '📐 Fibonacci Recovery identificado! Retração fibonacci confirmada.',
-        'MOMENTUM_SHIFT': '🚀 Momentum Shift detectado! Mudança de momentum identificada.',
-        'STABILITY_BREAK': '⚠️ Stability Break confirmado! Rompimento de estabilidade detectado.'
-      };
-      return messages[strategyType] || '🎯 Nova estratégia detectada!';
-    };
-
-    return (
-      <div className={`mb-4 p-4 rounded-xl border-2 animate-pulse transition-all duration-500`}
-           style={{
-             backgroundColor: colors.bg,
-             borderColor: colors.accent,
-             boxShadow: `0 0 20px ${colors.accent}40`
-           }}>
-        <div className="flex items-center gap-3">
-          <div className="w-4 h-4 rounded-full animate-ping" 
-               style={{ backgroundColor: colors.accent }}></div>
-          <div>
-            <div className="font-semibold text-sm" style={{ color: colors.text }}>
-              {getStrategyMessage(strategy.type)}
-            </div>
-            <div className="text-xs opacity-75 mt-1" style={{ color: colors.text }}>
-              Confiança: {strategy.confidence}% • Detectado às {new Date(strategy.detected_at).toLocaleTimeString('pt-BR')}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-background radar-container">
@@ -989,59 +781,36 @@ const RadarApalancamiento = () => {
           <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
             isPatternFound
               ? 'border-2 border-emerald-400 shadow-emerald-400/30 ring-2 ring-emerald-400/20'
-              : radarData?.strategy_details && radarData?.strategy_used !== 'Analisando el Mercado...' && radarData?.strategy_used !== null
-                ? 'border-2 border-cyan-400 shadow-cyan-400/30 ring-2 ring-cyan-400/20'
-                : scalpingHighVolatility 
-                  ? 'border-2 border-rose-400 shadow-rose-400/30' 
-                  : 'border border-slate-600/50 shadow-slate-900/50'
+              : 'border border-slate-600/50 shadow-slate-900/50'
           } relative overflow-hidden group`}>
-            {/* Alert Banner para estratégias */}
-            <AlertBanner strategy={radarData?.strategy_details} show={false} />
             
             {/* Banner Superior - Quando padrão encontrado */}
             {isPatternFound && (
-              <div className="absolute -top-0 left-0 right-0 z-20">
-                <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-black text-center py-2 px-4 shadow-lg">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                    <span className="font-black text-sm tracking-wide uppercase">
-                      ATIVAR BOT AHORA
-                    </span>
-                    <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                  </div>
+              <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-black text-center py-2 px-4 shadow-lg">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+                  <span className="font-black text-sm tracking-wide uppercase">
+                    ATIVAR BOT AHORA
+                  </span>
+                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                 </div>
-                <div className="h-1 bg-gradient-to-r from-transparent via-green-300 to-transparent opacity-70"></div>
               </div>
             )}
 
-            {/* Accent Bar com animação */}
-              <div className={`h-2 rounded-t-lg ${
-               radarData?.strategy_details && radarData?.strategy_used !== 'Analisando el Mercado...' && radarData?.strategy_used !== null
-                 ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400 animate-pulse'
-                 : scalpingHighVolatility ? 'bg-red-500' : 'bg-[#2DD4BF]'
-              }`}></div>
+            {/* Accent Bar */}
+            <div className={`h-2 rounded-t-lg ${
+              isPatternFound ? 'bg-emerald-400' : 'bg-[#2DD4BF]'
+            }`}></div>
             
-            {/* Alerta de Alta Volatilidade */}
-            {scalpingHighVolatility && !isScalpingPatternFound && (
-              <div className="bg-red-500/20 border-b border-red-500/30 px-4 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-red-400 font-bold text-sm">ALTA VOLATILIDAD - NO OPERAR</span>
-                </div>
-              </div>
-            )}
-            
-            <CardHeader className={`pb-3 bg-[#1C2A3A]/80 ${
-              isScalpingPatternFound || scalpingHighVolatility ? 'pt-6' : ''
-            }`}>
+            <CardHeader className="pb-3 bg-[#1C2A3A]/80">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 border shadow-md rounded-xl ${
-                    isScalpingPatternFound
+                    isPatternFound
                       ? 'bg-green-500/20 border-green-500/50 shadow-green-400/30'
                       : 'bg-[#2DD4BF]/20 border-[#2DD4BF]/30'
                   }`}>
-                    <Shield className={isScalpingPatternFound ? 'text-green-400' : 'text-[#2DD4BF]'} size={20} />
+                    <Shield className={isPatternFound ? 'text-green-400' : 'text-[#2DD4BF]'} size={20} />
                   </div>
                   <div>
                     <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -1056,158 +825,101 @@ const RadarApalancamiento = () => {
                         Última operación: {lastScalpingOperation.operation_result || 'N/A'}
                       </div>
                     )}
-                    {/* Strategy Indicator */}
-                    <div className="mt-2">
-                      <StrategyIndicator 
-                        strategy={radarData?.strategy_details} 
-                        reason={radarData?.reason} 
-                      />
-                    </div>
                   </div>
                 </div>
                 
-                <div className="text-right space-y-2">
+                <div className="text-right">
                   <Badge className={`text-white text-xs px-2 py-1 ${
-                    isScalpingPatternFound ? 'bg-green-500 animate-pulse' : 'bg-[#2DD4BF]'
+                    isPatternFound ? 'bg-green-500 animate-pulse' : 'bg-[#2DD4BF]'
                   }`}>
-                    {isScalpingPatternFound ? 'ACTIVAR' : 'ATIVO'}
+                    {isPatternFound ? 'PATRÓN ACTIVO' : 'MONITORANDO'}
                   </Badge>
-                  {radarData?.strategy_details && (
-                    <div>
-                      <ConfidenceBadge 
-                        confidence={radarData?.strategy_confidence || 0} 
-                        strategyType={radarData?.strategy_details?.type} 
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
-          </CardHeader>
+            </CardHeader>
 
             <CardContent className="space-y-4">
-            {/* Estratégia Ativa */}
-            <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg p-3 border border-blue-500/30">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-slate-400">Estrategia Activa</div>
-                  <div className="text-sm font-bold text-blue-400">
-                    {radarData?.strategy_used || 'Analisando el Mercado...'}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-400">Confianza</div>
-                  <div className="text-lg font-bold text-green-400">
-                    {radarData?.strategy_confidence || 0}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Painel de Filtros Avançado */}
-            {radarData?.strategy_details && radarData?.strategy_used !== 'Analisando el Mercado...' && radarData?.strategy_used !== null && (
-              <div className="bg-[#0F1419] rounded-lg p-4 border border-white/5">
-                <FilterPanel strategy={radarData?.strategy_details} />
-              </div>
-            )}
-
-            {/* Métricas de Operações Recentes - DESIGN UX PROFISSIONAL */}
-            <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 rounded-xl p-4 border border-slate-600/40 shadow-lg backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-medium text-slate-300 uppercase tracking-wider">Últimas 20 Operaciones</div>
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-              </div>
-              <div className="flex items-center justify-between">
+              {/* Status Principal Unificado */}
+              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-xl p-4 border border-slate-600/30">
                 <div className="flex items-center gap-3">
-                  <div className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                    {dashboardStats ? `${dashboardStats.wins}` : '0'}
-                  </div>
-                  <div className="text-slate-400 text-sm font-medium">x</div>
-                  <div className="text-2xl font-bold bg-gradient-to-r from-rose-400 to-red-400 bg-clip-text text-transparent">
-                    {dashboardStats ? `${dashboardStats.losses}` : '0'}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-
-
-            {/* Métricas Detalladas - Asertividad */}
-            <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 rounded-xl p-4 border border-slate-600/40 shadow-lg backdrop-blur-sm">
-              <div className="text-center space-y-2">
-                <p className="text-xs font-medium text-slate-300 uppercase tracking-wider flex items-center justify-center gap-1">
-                  <Target size={12} /> Asertividad
-                </p>
-                <p className={`text-2xl font-bold ${
-                  (botStats?.precision || 0) >= 70 
-                    ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent' 
-                    : (botStats?.precision || 0) >= 50 
-                      ? 'bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent' 
-                      : 'bg-gradient-to-r from-rose-400 to-red-400 bg-clip-text text-transparent'
-                }`}>{botStats?.precision || 0}%</p>
-              </div>
-            </div>
-
-            {/* Botones de Acción */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button className="flex-1 bg-[#2DD4BF] hover:bg-[#2DD4BF] text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg text-sm">
-                <Download size={16} className="mr-2" />
-                📥 Descargar
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="flex-1 border-[#2DD4BF]/30 text-[#2DD4BF] hover:bg-[#2DD4BF]/10 font-medium py-2 px-4 rounded-lg transition-all duration-300 text-sm"
-                onClick={() => setShowHistoryModal(true)}
-              >
-                <BarChart3 size={16} className="mr-2" />
-                📊 Histórico
-              </Button>
-            </div>
-            
-            {/* Histórico de Estratégias */}
-            {/* Histórico removido - será implementado quando houver dados reais do backend */}
-            
-            {/* Histórico de Operações - Scalping Bot */}
-            <div className="mt-4 space-y-4">
-
-              {/* Histórico Completo (Últimas 20) */}
-              <div className="p-4 bg-[#0F1419] rounded-lg border border-white/5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 bg-[#2DD4BF] rounded-full animate-pulse"></div>
-                  <h3 className="text-sm font-semibold text-slate-200">Histórico Completo (Últimas 20)</h3>
-                </div>
-                
-                <div className="grid grid-cols-10 gap-1">
-                  {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 ? (
-                    scalpingOperationsHistory.map((operation, index) => (
-                      <div
-                        key={index}
-                        className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
-                          operation.operation_result === 'WIN'
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
-                            : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
-                        }`}
-                        title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.timestamp)}`}
-                      >
-                        {operation.operation_result === 'WIN' ? 'W' : 'L'}
-                      </div>
-                    ))
+                  {isPatternFound ? (
+                    <CheckCircle className="text-green-400 flex-shrink-0" size={24} />
                   ) : (
-                    <div className="col-span-10 text-center text-slate-400 text-xs py-2">
-                      Cargando histórico...
-                    </div>
+                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
                   )}
-                </div>
-                
-                {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 && (
-                  <div className="mt-3 flex justify-between text-xs text-slate-400">
-                    <span>Más reciente</span>
-                        <span>Más antigua</span>
+                  <div className="flex-1">
+                    <div className={`text-lg font-bold mb-1 ${
+                      isPatternFound ? 'text-green-400' : 'text-slate-200'
+                    }`}>
+                      {radarData?.reason || 'Aguardando padrão...'}
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      Estrategia: <span className="text-slate-300 font-medium">{radarData?.strategy_used || 'PRECISION SURGE'}</span> • 
+                      Confianza: <span className="text-green-400 font-medium">{radarData?.strategy_confidence || 0}%</span>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+
+              {/* Métricas Simplificadas */}
+               <div className="grid grid-cols-2 gap-3">
+                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl p-4 border border-green-500/20">
+                   <div className="text-center">
+                     <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Vitórias</div>
+                     <div className="text-2xl font-bold text-green-400">
+                       {dashboardStats ? dashboardStats.wins : '0'}
+                     </div>
+                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
+                   </div>
+                 </div>
+                 
+                 <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-4 border border-red-500/20">
+                   <div className="text-center">
+                     <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-2">Derrotas</div>
+                     <div className="text-2xl font-bold text-red-400">
+                       {dashboardStats ? dashboardStats.losses : '0'}
+                     </div>
+                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Histórico Visual das Últimas 20 Operações */}
+               <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-xl p-4 border border-slate-600/20">
+                 <div className="flex items-center gap-2 mb-3">
+                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                   <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
+                 </div>
+                 
+                 <div className="grid grid-cols-10 gap-1">
+                   {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 ? (
+                     scalpingOperationsHistory.map((operation, index) => (
+                       <div
+                         key={index}
+                         className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
+                           operation.operation_result === 'WIN'
+                             ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
+                             : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
+                         }`}
+                         title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.timestamp)}`}
+                       >
+                         {operation.operation_result === 'WIN' ? 'W' : 'L'}
+                       </div>
+                     ))
+                   ) : (
+                     <div className="col-span-10 text-center text-slate-400 text-xs py-2">
+                       Cargando histórico...
+                     </div>
+                   )}
+                 </div>
+                 
+                 {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 && (
+                   <div className="mt-3 flex justify-between text-xs text-slate-400">
+                     <span>Más reciente</span>
+                     <span>Más antigua</span>
+                   </div>
+                 )}
+               </div>
             </CardContent>
           </Card>
 
