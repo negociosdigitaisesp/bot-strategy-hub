@@ -854,8 +854,7 @@ const RadarApalancamiento = () => {
                       {radarData?.reason || 'Aguardando padrão...'}
                     </div>
                     <div className="text-sm text-slate-400">
-                      Estrategia: <span className="text-slate-300 font-medium">{radarData?.strategy_used || 'PRECISION SURGE'}</span> • 
-                      Confianza: <span className="text-green-400 font-medium">{radarData?.strategy_confidence || 0}%</span>
+                      Estrategia: <span className="text-slate-300 font-medium">{radarData?.strategy_used || 'PRECISION SURGE'}</span>
                     </div>
                   </div>
                 </div>
