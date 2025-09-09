@@ -14,6 +14,14 @@ interface RadarSignal {
   reason: string;
   operations_after_pattern: number;
   created_at: string;
+  
+  // === NOVOS CAMPOS ADICIONADOS ===
+  strategy_used: string | null;
+  strategy_confidence: number | null;
+  available_strategies: number | null;
+  strategy_details: any; // Use 'any' por enquanto, pois o backend envia como JSONB
+  filters_applied: string[] | null;
+  tracking_id: string | null;
 }
 
 interface BotOperation {
@@ -75,13 +83,7 @@ interface StrategyPerformance {
   last_updated: string;
 }
 
-interface StrategyData {
-  strategy_used: string | null;
-  strategy_confidence: number;
-  available_strategies: number;
-  strategy_details: TradingStrategy | null;
-  strategy_history: TradingStrategy[];
-}
+// Interface StrategyData removida - dados agora vêm diretamente do RadarSignal
 
 interface StrategyColors {
   bg: string;
@@ -105,22 +107,13 @@ const RadarApalancamiento = () => {
   const [scalpingOperationsHistory, setScalpingOperationsHistory] = useState([]);
   const [tunderOperationsHistory, setTunderOperationsHistory] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
-  const [scalpingLast5Operations, setScalpingLast5Operations] = useState(null);
+
   
   // Estados para controle de alta volatilidade
   const [scalpingHighVolatility, setScalpingHighVolatility] = useState(false);
   const [tunderHighVolatility, setTunderHighVolatility] = useState(false);
 
-  // Estados para Sistema de Estratégias
-  const [strategyData, setStrategyData] = useState<StrategyData>({
-    strategy_used: null,
-    strategy_confidence: 0,
-    available_strategies: 8,
-    strategy_details: null,
-    strategy_history: []
-  });
-  const [activeStrategy, setActiveStrategy] = useState<TradingStrategy | null>(null);
-  const [showStrategyAlert, setShowStrategyAlert] = useState(false);
+  // Estados para Sistema de Estratégias removidos - agora usando radarData diretamente
 
   // Hook do Tunder Bot
   const tunderBot = useTunderBot();
@@ -168,25 +161,7 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Função para buscar últimas 5 operações da vw_scalping_dashboard
-  const fetchScalpingLast5Operations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vw_scalping_dashboard')
-        .select('wins_5_display')
-        .limit(1);
-      
-      if (error) {
-        console.error('Erro ao buscar últimas 5 operações do Scalping:', error);
-        return null;
-      }
-      
-      return data?.[0] || null;
-    } catch (error) {
-      console.error('Erro ao buscar últimas 5 operações do Scalping:', error);
-      return null;
-    }
-  };
+
 
   // Função para buscar histórico de operações do Tunder Bot
   const fetchTunderOperationsHistory = async () => {
@@ -393,61 +368,7 @@ const RadarApalancamiento = () => {
     };
   };
 
-  // Función para simular datos de estrategia (temporal - será reemplazada por datos reales)
-  const generateMockStrategyData = (): TradingStrategy => {
-    const strategies = [
-      'PREMIUM_RECOVERY',
-      'MOMENTUM_CONTINUATION', 
-      'VOLATILITY_BREAK',
-      'PATTERN_REVERSAL',
-      'CYCLE_TRANSITION',
-      'FIBONACCI_RECOVERY',
-      'MOMENTUM_SHIFT',
-      'STABILITY_BREAK'
-    ];
-    
-    const randomStrategy = strategies[Math.floor(Math.random() * strategies.length)];
-    const confidence = Math.floor(Math.random() * (97 - 84 + 1)) + 84;
-    
-    return {
-      id: `strategy_${Date.now()}`,
-      name: randomStrategy.replace('_', ' '),
-      confidence,
-      type: randomStrategy as any,
-      filters: [
-        {
-          name: 'Volume Analysis',
-          status: 'passed',
-          value: '85%',
-          description: 'Análisis de volumen de mercado',
-          weight: 0.3
-        },
-        {
-          name: 'Trend Confirmation',
-          status: 'passed',
-          value: 'Bullish',
-          description: 'Confirmación de tendencia',
-          weight: 0.4
-        },
-        {
-          name: 'Risk Assessment',
-          status: confidence > 90 ? 'passed' : 'pending',
-          value: `${confidence}%`,
-          description: 'Evaluación de riesgo',
-          weight: 0.3
-        }
-      ],
-      performance: {
-        success_rate: confidence,
-        total_operations: Math.floor(Math.random() * 100) + 50,
-        wins: Math.floor(Math.random() * 80) + 30,
-        losses: Math.floor(Math.random() * 20) + 5,
-        avg_profit: Math.random() * 5 + 2,
-        last_updated: new Date().toISOString()
-      },
-      detected_at: new Date().toISOString()
-    };
-  };
+  // Função generateMockStrategyData removida - agora usando dados reais do Supabase
 
   // Función para calcular estadísticas usando datos exactos
   const calcularEstadisticas = (historico: BotOperation[], radarInfo: RadarSignal | null, statsExactas: any = null, dashboardStats: any = null) => {
@@ -646,7 +567,7 @@ const RadarApalancamiento = () => {
   const actualizarDatos = async () => {
     setIsLoading(true);
     try {
-      const [estadoBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory, scalpingLast5] = await Promise.all([
+      const [estadoBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
         obtenerEstadoBot(),
         obtenerHistorico(),
         obtenerEstadisticasExactas(),
@@ -654,8 +575,7 @@ const RadarApalancamiento = () => {
         fetchLastOperation('scalping_accumulator_bot_logs'),
         fetchLastOperation('tunder_bot_logs'),
         fetchScalpingOperationsHistory(),
-        fetchTunderOperationsHistory(),
-        fetchScalpingLast5Operations()
+        fetchTunderOperationsHistory()
       ]);
 
       setRadarData(estadoBot);
@@ -671,7 +591,6 @@ const RadarApalancamiento = () => {
       setLastTunderOperation(lastTunder);
       setScalpingOperationsHistory(scalpingHistory);
       setTunderOperationsHistory(tunderHistory);
-      setScalpingLast5Operations(scalpingLast5);
       
       // Verificar alta volatilidade - Scalping Bot
       if (statsExactas && statsExactas.losses_5 > 4) {
@@ -701,16 +620,6 @@ const RadarApalancamiento = () => {
   useEffect(() => {
     actualizarDatos();
     
-    // Simular dados de estratégia iniciais
-    const mockStrategy = generateMockStrategyData();
-    setStrategyData({
-      strategy_used: mockStrategy.name,
-      strategy_confidence: mockStrategy.confidence,
-      available_strategies: 8,
-      strategy_details: mockStrategy,
-      strategy_history: []
-    });
-    
     // REALTIME SUBSCRIPTION para Scalping Bot
     const channel = supabase
       .channel('scalping-bot-realtime')
@@ -735,21 +644,7 @@ const RadarApalancamiento = () => {
               setBotStats(newStats);
             }
             
-            // Simular detecção de nova estratégia quando padrão é encontrado
-            if (payload.new.reason?.includes('Patrón encontrado')) {
-              const newStrategy = generateMockStrategyData();
-              setStrategyData({
-                strategy_used: newStrategy.name,
-                strategy_confidence: newStrategy.confidence,
-                available_strategies: 8,
-                strategy_details: newStrategy,
-                strategy_history: []
-              });
-              setShowStrategyAlert(true);
-              
-              // Esconder alerta após 5 segundos
-              setTimeout(() => setShowStrategyAlert(false), 5000);
-            }
+            // Dados da estratégia agora vêm diretamente do payload.new (dados reais do Supabase)
             
             setLastUpdateTime(new Date());
           }
@@ -757,32 +652,14 @@ const RadarApalancamiento = () => {
       )
       .subscribe();
     
-    // Actualización automática cada 5 segundos
-    const interval = setInterval(actualizarDatos, 5000);
-    
-    // Simular mudanças de estratégia periodicamente para demonstração
-    const strategyInterval = setInterval(() => {
-      const newStrategy = generateMockStrategyData();
-      setStrategyData(newStrategy);
-    }, 15000); // A cada 15 segundos
+    // Actualización automática removida - usando apenas realtime subscription
     
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(interval);
-      clearInterval(strategyInterval);
     };
   }, []);
 
-  // Efecto para detectar mudanças na estratégia ativa
-  useEffect(() => {
-    if (strategyData.strategy_details && activeStrategy !== strategyData.strategy_details.id) {
-      setActiveStrategy(strategyData.strategy_details.id);
-      setShowStrategyAlert(true);
-      
-      // Esconder alerta após 5 segundos
-      setTimeout(() => setShowStrategyAlert(false), 5000);
-    }
-  }, [strategyData.strategy_details, activeStrategy]);
+  // useEffect para detectar mudanças de estratégia removido - dados agora vêm diretamente do Supabase
 
   const scalpingCardColors = getCardColor(radarData?.reason || '');
   const tunderCardColors = getCardColor(tunderBot.data.status_message || '');
@@ -790,6 +667,9 @@ const RadarApalancamiento = () => {
 
   // Detectar padrão encontrado específico para Scalping Bot
   const isScalpingPatternFound = radarData?.reason?.includes("Patrón encontrado - encender bot");
+  
+  // Definir condição para padrão encontrado
+  const isPatternFound = radarData?.is_safe_to_operate === true;
 
   // Função para traduzir reason do Supabase
   const translateReason = (reason: string) => {
@@ -848,8 +728,7 @@ const RadarApalancamiento = () => {
   const ConfidenceBadge = ({ confidence, strategyType }: { confidence: number; strategyType?: string }) => {
     const getConfidenceColor = (conf: number) => {
       if (conf >= 90) return { bg: '#10B981', text: '#FFFFFF', label: 'Alta' };
-      if (conf >= 85) return { bg: '#3B82F6', text: '#FFFFFF', label: 'Média' };
-      return { bg: '#F59E0B', text: '#FFFFFF', label: 'Baixa' };
+      return { bg: '#3B82F6', text: '#FFFFFF', label: 'Média' };
     };
 
     const colors = getConfidenceColor(confidence);
@@ -873,13 +752,9 @@ const RadarApalancamiento = () => {
   };
 
   // Componente FilterPanel
-  const FilterPanel = ({ strategy }: { strategy: TradingStrategy | null }) => {
-    if (!strategy || !strategy.filters.length) {
-      return (
-        <div className="text-center py-4 text-slate-400" role="status" aria-label="Nenhum filtro ativo">
-          <div className="text-sm">Nenhum filtro ativo</div>
-        </div>
-      );
+  const FilterPanel = ({ strategy }: { strategy: any }) => {
+    if (!strategy || !strategy.filters || !Array.isArray(strategy.filters) || strategy.filters.length === 0) {
+      return null;
     }
 
     return (
@@ -1110,36 +985,38 @@ const RadarApalancamiento = () => {
       {/* Bot Cards - Lado a Lado */}
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* SCALPING BOT Card */}
-          <Card className={`bg-[#1C2A3A] shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ${
-            strategyData.strategy_details && strategyData.strategy_used !== 'Analisando el Mercado...' && strategyData.strategy_used !== null
-              ? 'border-2 border-blue-500 shadow-blue-500/50'
-              : scalpingHighVolatility 
-                ? 'border-2 border-red-500' 
-                : 'border border-white/10'
-          } relative overflow-hidden`}>
+          {/* SCALPING BOT Card - DESIGN UX PROFISSIONAL */}
+          <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
+            isPatternFound
+              ? 'border-2 border-emerald-400 shadow-emerald-400/30 ring-2 ring-emerald-400/20'
+              : radarData?.strategy_details && radarData?.strategy_used !== 'Analisando el Mercado...' && radarData?.strategy_used !== null
+                ? 'border-2 border-cyan-400 shadow-cyan-400/30 ring-2 ring-cyan-400/20'
+                : scalpingHighVolatility 
+                  ? 'border-2 border-rose-400 shadow-rose-400/30' 
+                  : 'border border-slate-600/50 shadow-slate-900/50'
+          } relative overflow-hidden group`}>
             {/* Alert Banner para estratégias */}
-            <AlertBanner strategy={strategyData.strategy_details} show={showStrategyAlert} />
+            <AlertBanner strategy={radarData?.strategy_details} show={false} />
             
-            {/* Banner Superior - Apenas quando padrão encontrado */}
-            {isScalpingPatternFound && (
+            {/* Banner Superior - Quando padrão encontrado */}
+            {isPatternFound && (
               <div className="absolute -top-0 left-0 right-0 z-20">
-                <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-400 text-black text-center py-2 px-4">
+                <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-black text-center py-2 px-4 shadow-lg">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                     <span className="font-black text-sm tracking-wide uppercase">
-                      Patrón Encontrado - Encender Bot
+                      ATIVAR BOT AHORA
                     </span>
-                    <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                   </div>
                 </div>
-                <div className="h-1 bg-gradient-to-r from-transparent via-green-300 to-transparent"></div>
+                <div className="h-1 bg-gradient-to-r from-transparent via-green-300 to-transparent opacity-70"></div>
               </div>
             )}
 
             {/* Accent Bar com animação */}
               <div className={`h-2 rounded-t-lg ${
-               strategyData.strategy_details && strategyData.strategy_used !== 'Analisando el Mercado...' && strategyData.strategy_used !== null
+               radarData?.strategy_details && radarData?.strategy_used !== 'Analisando el Mercado...' && radarData?.strategy_used !== null
                  ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400 animate-pulse'
                  : scalpingHighVolatility ? 'bg-red-500' : 'bg-[#2DD4BF]'
               }`}></div>
@@ -1182,7 +1059,7 @@ const RadarApalancamiento = () => {
                     {/* Strategy Indicator */}
                     <div className="mt-2">
                       <StrategyIndicator 
-                        strategy={strategyData.strategy_details} 
+                        strategy={radarData?.strategy_details} 
                         reason={radarData?.reason} 
                       />
                     </div>
@@ -1195,11 +1072,11 @@ const RadarApalancamiento = () => {
                   }`}>
                     {isScalpingPatternFound ? 'ACTIVAR' : 'ATIVO'}
                   </Badge>
-                  {strategyData.strategy_details && (
+                  {radarData?.strategy_details && (
                     <div>
                       <ConfidenceBadge 
-                        confidence={strategyData.strategy_details.confidence} 
-                        strategyType={strategyData.strategy_details.type} 
+                        confidence={radarData?.strategy_confidence || 0} 
+                        strategyType={radarData?.strategy_details?.type} 
                       />
                     </div>
                   )}
@@ -1227,41 +1104,47 @@ const RadarApalancamiento = () => {
             </div>
 
             {/* Painel de Filtros Avançado */}
-            {strategyData.strategy_details && strategyData.strategy_used !== 'Analisando el Mercado...' && strategyData.strategy_used !== null && (
+            {radarData?.strategy_details && radarData?.strategy_used !== 'Analisando el Mercado...' && radarData?.strategy_used !== null && (
               <div className="bg-[#0F1419] rounded-lg p-4 border border-white/5">
-                <FilterPanel strategy={strategyData.strategy_details} />
+                <FilterPanel strategy={radarData?.strategy_details} />
               </div>
             )}
 
-            {/* Métricas de Operações Recentes - RESTAURADO */}
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
-              <div className="text-xs text-slate-400 mb-1">Últimas 20 Operaciones</div>
-              <div className="text-sm font-bold text-cyan-400">
-                {dashboardStats ? `${dashboardStats.wins} x ${dashboardStats.losses}` : '0 x 0'}
+            {/* Métricas de Operações Recentes - DESIGN UX PROFISSIONAL */}
+            <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 rounded-xl p-4 border border-slate-600/40 shadow-lg backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-medium text-slate-300 uppercase tracking-wider">Últimas 20 Operaciones</div>
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
               </div>
-              <div className="text-xs text-slate-500">
-                Asertividad: {botStats?.assertivity20 || 0}%
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                    {dashboardStats ? `${dashboardStats.wins}` : '0'}
+                  </div>
+                  <div className="text-slate-400 text-sm font-medium">x</div>
+                  <div className="text-2xl font-bold bg-gradient-to-r from-rose-400 to-red-400 bg-clip-text text-transparent">
+                    {dashboardStats ? `${dashboardStats.losses}` : '0'}
+                  </div>
+                </div>
+
               </div>
             </div>
 
-            {/* Métricas das Últimas 5 Operações */}
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
-              <div className="text-xs text-slate-400 mb-1">Últimas 5 Operaciones</div>
-              <div className="text-sm font-bold text-green-400">
- os 
-              </div>
-              <div className="text-xs text-slate-500">
-                Resultado recente
-              </div>
-            </div>
 
-            {/* Métricas Detalladas */}
-            <div className="bg-[#1C2A3A] rounded-lg p-3 flex justify-center">
-              <div className="text-center space-y-1">
-                <p className="text-xs text-slate-400 flex items-center justify-center gap-1">
-                  <Target size={12} /> Precisión
+
+            {/* Métricas Detalladas - Asertividad */}
+            <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 rounded-xl p-4 border border-slate-600/40 shadow-lg backdrop-blur-sm">
+              <div className="text-center space-y-2">
+                <p className="text-xs font-medium text-slate-300 uppercase tracking-wider flex items-center justify-center gap-1">
+                  <Target size={12} /> Asertividad
                 </p>
-                <p className="text-lg font-bold text-[#2DD4BF]">{botStats?.precision || 0}%</p>
+                <p className={`text-2xl font-bold ${
+                  (botStats?.precision || 0) >= 70 
+                    ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent' 
+                    : (botStats?.precision || 0) >= 50 
+                      ? 'bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent' 
+                      : 'bg-gradient-to-r from-rose-400 to-red-400 bg-clip-text text-transparent'
+                }`}>{botStats?.precision || 0}%</p>
               </div>
             </div>
 
@@ -1283,49 +1166,10 @@ const RadarApalancamiento = () => {
             </div>
             
             {/* Histórico de Estratégias */}
-            {strategyData.strategy_history && strategyData.strategy_history.length > 0 && (
-              <div className="mt-4 p-4 bg-[#0F1419] rounded-lg border border-white/5">
-                <StrategyHistory strategies={strategyData.strategy_history} />
-              </div>
-            )}
+            {/* Histórico removido - será implementado quando houver dados reais do backend */}
             
             {/* Histórico de Operações - Scalping Bot */}
             <div className="mt-4 space-y-4">
-              {/* Últimas 5 Operações da vw_scalping_dashboard */}
-              <div className="p-4 bg-[#0F1419] rounded-lg border border-white/5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <h3 className="text-sm font-semibold text-slate-200">Últimas 5 Operaciones (Dashboard)</h3>
-                </div>
-                
-                <div className="flex gap-2 justify-center">
-                  {scalpingLast5Operations && scalpingLast5Operations.wins_5_display ? (
-                    scalpingLast5Operations.wins_5_display.split('').map((result, index) => (
-                      <div
-                        key={index}
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
-                          result === 'W'
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
-                            : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
-                        }`}
-                        title={`Operación ${index + 1}: ${result === 'W' ? 'WIN' : 'LOSS'}`}
-                      >
-                        {result}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-slate-400 text-xs py-2">
-                      Cargando últimas 5 operaciones...
-                    </div>
-                  )}
-                </div>
-                
-                {scalpingLast5Operations && scalpingLast5Operations.wins_5_display && (
-                  <div className="mt-3 text-center text-xs text-slate-400">
-                    Resultado: {scalpingLast5Operations.wins_5_display}
-                  </div>
-                )}
-              </div>
 
               {/* Histórico Completo (Últimas 20) */}
               <div className="p-4 bg-[#0F1419] rounded-lg border border-white/5">

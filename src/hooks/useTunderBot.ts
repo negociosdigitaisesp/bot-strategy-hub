@@ -37,7 +37,7 @@ export const useTunderBot = () => {
 
       // Query 3: Operations history
       const { data: opsData, error: opsError } = await supabase
-        .from('bot_operations')
+        .from('operacoes')
         .select('*')
         .eq('bot_name', 'TUNDER BOT')
         .order('created_at', { ascending: false })
