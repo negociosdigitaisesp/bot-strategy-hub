@@ -21,11 +21,21 @@ export const useTunderBot = () => {
     try {
       setIsLoading(true);
       
-      // Query 1: Performance data
+      // Query 1: Performance data da view vw_tunder_dashboard
       const { data: statsData, error: statsError } = await supabase
         .from('vw_tunder_dashboard')
         .select('*')
-        .limit(1);
+        .single();
+      
+      console.log('Tunder Dashboard Data:', statsData);
+      console.log('Tunder Dashboard Error:', statsError);
+      
+      // Pegar wins e losses da view
+      const wins = statsData?.wins || 0;
+      const losses = statsData?.losses || 0;
+      
+      console.log('Wins from vw_tunder_dashboard:', wins);
+      console.log('Losses from vw_tunder_dashboard:', losses);
       
       // Query 2: Operational signals
       const { data: signalData, error: signalError } = await supabase
@@ -39,11 +49,10 @@ export const useTunderBot = () => {
       const { data: opsData, error: opsError } = await supabase
         .from('operacoes')
         .select('*')
-        .eq('bot_name', 'TUNDER BOT')
+        .eq('bot_name', 'Tunder Bot')
         .order('created_at', { ascending: false })
         .limit(50);
 
-      const stats = statsData?.[0];
       const signalInfo = signalData?.[0];
       
       // Calcular precisión basada en operaciones reales
@@ -57,14 +66,14 @@ export const useTunderBot = () => {
                            reasonText.toLowerCase().includes('v-d-v') ||
                            reasonText.toLowerCase().includes('victoria-derrota-victoria');
 
-      // Corrigir V/D usando wins/losses da vw_tunder_dashboard
-      const vdDisplay = `${stats?.wins || 0}/${stats?.losses || 0}`;
+      // Usar dados da view vw_tunder_dashboard
+      const vdDisplay = `${wins}/${losses}`;
       
-      // Corrigir Wins 5 usando wins_5_count - 5
-      const wins5Count = stats?.wins_5_count || 0;
-      const losses5Count = 5 - wins5Count;
+      // Usar dados da view para wins 5
+      const wins5Count = statsData?.wins_5_count || 0;
+      const losses5Count = statsData?.losses_5_count || 0;
       const wins5Display = `${wins5Count}/${losses5Count}`;
-      const wins5Percent = wins5Count > 0 ? Math.round((wins5Count / 5) * 100) : 0;
+      const wins5Percent = statsData?.wins_5_percent || 0;
 
       setData({
         victorias_display: vdDisplay,
@@ -74,7 +83,9 @@ export const useTunderBot = () => {
         status_message: signalInfo?.reason || 'Esperando el patrón...',
         ops_patron: `${signalInfo?.operations_after_pattern || 0}/3`,
         estado: signalInfo?.is_safe_to_operate ? 'ACTIVO' : 'RIESGO',
-        vdv_pattern: hasVDVPattern
+        vdv_pattern: hasVDVPattern,
+        wins: wins,
+        losses: losses
       });
       
       setSignal(signalInfo);

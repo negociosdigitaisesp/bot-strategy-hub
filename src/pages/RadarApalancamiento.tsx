@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Activity, TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Shield, Eye, RefreshCw, History, Target, Download } from 'lucide-react';
+import { ArrowLeft, Activity, TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Shield, Eye, RefreshCw, History, Target, Download, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,7 +95,8 @@ interface StrategyColors {
 
 const RadarApalancamiento = () => {
   const navigate = useNavigate();
-  const [radarData, setRadarData] = useState<RadarSignal | null>(null);
+  const [scalpingRadarData, setScalpingRadarData] = useState<RadarSignal | null>(null);
+  const [tunderRadarData, setTunderRadarData] = useState<RadarSignal | null>(null);
   const [botStats, setBotStats] = useState<BotStats | null>(null);
   const [historicData, setHistoricData] = useState<BotOperation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,7 +114,7 @@ const RadarApalancamiento = () => {
   const [scalpingHighVolatility, setScalpingHighVolatility] = useState(false);
   const [tunderHighVolatility, setTunderHighVolatility] = useState(false);
 
-  // Estados para Sistema de Estratégias removidos - agora usando radarData diretamente
+  // Estados para Sistema de Estratégias removidos - agora usando scalpingRadarData diretamente
 
   // Hook do Tunder Bot
   const tunderBot = useTunderBot();
@@ -213,8 +214,8 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Función para obtener el estado del bot
-  const obtenerEstadoBot = async () => {
+  // Función para obtener el estado del Scalping Bot
+  const obtenerEstadoScalpingBot = async () => {
     try {
       setIsConnecting(true);
       const { data, error } = await supabase
@@ -225,13 +226,38 @@ const RadarApalancamiento = () => {
         .limit(1);
 
       if (error) {
-        console.error('Error fetching radar data:', error);
+        console.error('Error fetching scalping radar data:', error);
         return null;
       }
 
       return data?.[0] || null;
     } catch (error) {
-      console.error('Error in obtenerEstadoBot:', error);
+      console.error('Error in obtenerEstadoScalpingBot:', error);
+      return null;
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Función para obtener el estado del Tunder Bot
+  const obtenerEstadoTunderBot = async () => {
+    try {
+      setIsConnecting(true);
+      const { data, error } = await supabase
+        .from('radar_de_apalancamiento_signals')
+        .select('*')
+        .eq('bot_name', 'Tunder Bot')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching tunder radar data:', error);
+        return null;
+      }
+
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error in obtenerEstadoTunderBot:', error);
       return null;
     } finally {
       setIsConnecting(false);
@@ -497,8 +523,9 @@ const RadarApalancamiento = () => {
   const actualizarDatos = async () => {
     setIsLoading(true);
     try {
-      const [estadoBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
-        obtenerEstadoBot(),
+      const [estadoScalpingBot, estadoTunderBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
+        obtenerEstadoScalpingBot(),
+        obtenerEstadoTunderBot(),
         obtenerHistorico(),
         obtenerEstadisticasExactas(),
         obtenerDashboardStats(),
@@ -508,12 +535,13 @@ const RadarApalancamiento = () => {
         fetchTunderOperationsHistory()
       ]);
 
-      setRadarData(estadoBot);
+      setScalpingRadarData(estadoScalpingBot);
+      setTunderRadarData(estadoTunderBot);
       setHistoricData(historico);
       setDashboardStats(dashboardStats);
       
-      if (estadoBot) {
-        const stats = calcularEstadisticas(historico, estadoBot, statsExactas, dashboardStats);
+      if (estadoScalpingBot) {
+        const stats = calcularEstadisticas(historico, estadoScalpingBot, statsExactas, dashboardStats);
         setBotStats(stats);
       }
       
@@ -550,31 +578,34 @@ const RadarApalancamiento = () => {
   useEffect(() => {
     actualizarDatos();
     
-    // REALTIME SUBSCRIPTION para Scalping Bot
+    // REALTIME SUBSCRIPTION unificada para todos os bots
     const channel = supabase
-      .channel('scalping-bot-realtime')
+      .channel('shared-signals-realtime')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'radar_de_apalancamiento_signals',
-          filter: 'bot_name=eq.Scalping Bot'
+          table: 'radar_de_apalancamiento_signals'
         },
         (payload) => {
-          console.log('Scalping Bot - Update recebido:', payload);
+          console.log('Shared Signals - Update recebido:', payload);
           
           if (payload.new) {
-            // Atualizar radarData imediatamente
-            setRadarData(payload.new);
-            
-            // Recalcular estatísticas se necessário
-            if (historicData.length > 0) {
-              const newStats = calcularEstadisticas(historicData, payload.new, null, null);
-              setBotStats(newStats);
+            // Distribuir dados baseado no bot_name
+            if (payload.new.bot_name === 'Scalping Bot') {
+              console.log('Atualizando dados do Scalping Bot');
+              setScalpingRadarData(payload.new);
+              
+              // Recalcular estatísticas se necessário
+              if (historicData.length > 0) {
+                const newStats = calcularEstadisticas(historicData, payload.new, null, null);
+                setBotStats(newStats);
+              }
+            } else if (payload.new.bot_name === 'Tunder Bot') {
+              console.log('Atualizando dados do Tunder Bot');
+              setTunderRadarData(payload.new);
             }
-            
-            // Dados da estratégia agora vêm diretamente do payload.new (dados reais do Supabase)
             
             setLastUpdateTime(new Date());
           }
@@ -596,15 +627,18 @@ const RadarApalancamiento = () => {
 
   // useEffect para detectar mudanças de estratégia removido - dados agora vêm diretamente do Supabase
 
-  const scalpingCardColors = getCardColor(radarData?.reason || '');
+  const scalpingCardColors = getCardColor(scalpingRadarData?.reason || '');
   const tunderCardColors = getCardColor(tunderBot.data.status_message || '');
   const filterStatus = getFilterStatus(historicData, botStats || {});
 
   // Detectar padrão encontrado específico para Scalping Bot
-  const isScalpingPatternFound = radarData?.reason?.includes("Patrón encontrado - encender bot");
+  const isScalpingPatternFound = scalpingRadarData?.reason?.includes("Patrón encontrado - encender bot");
   
-  // Definir condição para padrão encontrado
-  const isPatternFound = radarData?.is_safe_to_operate === true;
+  // Detectar padrão encontrado específico para Tunder Bot
+  const isTunderPatternFound = tunderRadarData?.is_safe_to_operate === true;
+  
+  // Definir condição para padrão encontrado (usando a mesma lógica do Scalping Bot)
+  const isPatternFound = scalpingRadarData?.is_safe_to_operate === true;
 
   // Função para traduzir reason do Supabase
   const translateReason = (reason: string) => {
@@ -851,11 +885,14 @@ const RadarApalancamiento = () => {
                     <div className={`text-lg font-bold mb-1 ${
                       isPatternFound ? 'text-green-400' : 'text-slate-200'
                     }`}>
-                      {radarData?.reason || 'Aguardando padrão...'}
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      Estrategia: <span className="text-slate-300 font-medium">{radarData?.strategy_used || 'PRECISION SURGE'}</span>
-                    </div>
+                      {scalpingRadarData?.reason || 'Aguardando padrão...'}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Estrategia: <span className="text-slate-300 font-medium">{scalpingRadarData?.strategy_used || 'PRECISION SURGE'}</span>
+              </div>
+              <div className="text-xs text-emerald-400 font-semibold mt-1">
+                Ganancia: 10%
+              </div>
                   </div>
                 </div>
               </div>
@@ -919,35 +956,69 @@ const RadarApalancamiento = () => {
                    </div>
                  )}
                </div>
+
+               {/* Mercado Acumulators */}
+               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                   <h3 className="text-sm font-semibold text-slate-300">Mercado Acumuladores</h3>
+                 </div>
+               </div>
+
+               {/* Análise Avançada de Scalping */}
+               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                   <h3 className="text-sm font-semibold text-slate-300">Análisis Avanzado de Scalping</h3>
+                 </div>
+               </div>
+
+               {/* Botão Descargar Bot */}
+               <Button className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+                 <Download size={18} className="mr-2" />
+                 Descargar Bot
+               </Button>
+               
+               <p className="text-xs text-center text-slate-400">
+                 Copiar configuraciones
+               </p>
             </CardContent>
           </Card>
 
-          {/* TUNDER BOT Card */}
-          <Card className={`bg-[#1C2A3A] shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ${
-            tunderHighVolatility 
-              ? 'border-2 border-red-500' 
-              : 'border border-white/10'
-          }`}>
-            {/* Accent Bar */}
-            <div className={`h-2 rounded-t-lg ${
-              tunderHighVolatility ? 'bg-red-500' : 'bg-purple-500'
-            }`}></div>
+          {/* TUNDER BOT Card - DESIGN UX PROFISSIONAL */}
+          <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
+            isTunderPatternFound
+              ? 'border-2 border-purple-400 shadow-purple-400/30 ring-2 ring-purple-400/20'
+              : 'border border-slate-600/50 shadow-slate-900/50'
+          } relative overflow-hidden group`}>
             
-            {/* Alerta de Alta Volatilidade */}
-            {tunderHighVolatility && (
-              <div className="bg-red-500/20 border-b border-red-500/30 px-4 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-red-400 font-bold text-sm">ALTA VOLATILIDAD - NO OPERAR</span>
+            {/* Banner Superior - Quando padrão encontrado */}
+            {isTunderPatternFound && (
+              <div className="bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 text-black text-center py-2 px-4 shadow-lg">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+                  <span className="font-black text-sm tracking-wide uppercase">
+                    ATIVAR BOT AHORA
+                  </span>
+                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                 </div>
               </div>
             )}
+
+            {/* Accent Bar */}
+            <div className={`h-2 rounded-t-lg ${
+              isTunderPatternFound ? 'bg-purple-400' : 'bg-[#9333EA]'
+            }`}></div>
             
             <CardHeader className="pb-3 bg-[#1C2A3A]/80">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-500/20 border border-purple-500/30 shadow-md rounded-xl">
-                    <Zap className="text-purple-400" size={20} />
+                  <div className={`p-2 border shadow-md rounded-xl ${
+                    isTunderPatternFound
+                      ? 'bg-purple-500/20 border-purple-500/50 shadow-purple-400/30'
+                      : 'bg-[#9333EA]/20 border-[#9333EA]/30'
+                  }`}>
+                    <Zap className={isTunderPatternFound ? 'text-purple-400' : 'text-[#9333EA]'} size={20} />
                   </div>
                   <div>
                     <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -962,98 +1033,129 @@ const RadarApalancamiento = () => {
                         Última operación: {lastTunderOperation.operation_result || 'N/A'}
                       </div>
                     )}
-                    <div className={`text-sm font-medium`}>
-                      {tunderBot.data.status_message}
-                    </div>
                   </div>
+                </div>
+                
+                <div className="text-right">
+                  <Badge className={`text-white text-xs px-2 py-1 ${
+                    isTunderPatternFound ? 'bg-purple-500 animate-pulse' : 'bg-[#9333EA]'
+                  }`}>
+                    {isTunderPatternFound ? 'PATRÓN ACTIVO' : 'MONITORANDO'}
+                  </Badge>
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="space-y-4">
-              {/* Filtros de Estado del Tunder Bot */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="p-2 rounded-lg border text-center transition-all duration-300 bg-purple-50 border-purple-300 text-purple-800">
-                  <div className="text-xs font-medium mb-1">V/D</div>
-                  <div className="text-sm font-bold text-purple-800">
-                    {tunderLocalStats.vd_display}
-                  </div>
-                  <div className="text-xs">Últimas 20</div>
-                </div>
-                
-                {/* Filtro: Wins últimas 5 ops */}
-                <div className="p-2 rounded-lg border text-center transition-all duration-300 bg-purple-50 border-purple-300 text-purple-800">
-                  <div className="text-xs font-medium mb-1">Wins 5</div>
-                  <div className="text-sm font-bold text-purple-800">{tunderLocalStats.wins5_display}</div>
-                  <div className="text-xs text-purple-700">{tunderLocalStats.wins5_percent}%</div>
-                </div>
-                
-                <div className={`p-2 rounded-lg border text-center transition-all duration-300 ${
-                  tunderBot.data.vdv_pattern 
-                    ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-sm' 
-                    : 'bg-red-500/10 border-red-500/20 text-red-400'
-                }`}>
-                  <div className="text-xs font-medium mb-1">Patrón VDV</div>
-                  <div className="text-sm font-bold">{tunderBot.data.vdv_pattern ? '✓' : '✗'}</div>
-                </div>
-              </div>
-
-              {/* Métricas Detalladas del Tunder Bot */}
-              <div className="bg-muted/50 rounded-lg p-3 flex justify-center">
-                <div className="text-center space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    <Target size={12} /> Precisión
-                  </p>
-                  <p className="text-lg font-bold text-purple-500">{tunderBot.data.precision_percent}%</p>
-                </div>
-              </div>
-
-
-              
-              {/* Botones de Acción del Tunder Bot */}
-              <div className="flex justify-center pt-4">
-                <Button className="flex-1 tunder-button hover:bg-purple-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg text-sm">
-                  <Download size={16} className="mr-2" />
-                  ⚡ Descargar
-                </Button>
-              </div>
-              
-              {/* Histórico de Operações - Tunder Bot */}
-              <div className="mt-4 p-4 bg-[#0F1419] rounded-lg border border-white/5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                  <h3 className="text-sm font-semibold text-slate-200">Histórico de Operaciones (Últimas 20)</h3>
-                </div>
-                
-                <div className="grid grid-cols-10 gap-1">
-                  {tunderOperationsHistory && tunderOperationsHistory.length > 0 ? (
-                    tunderOperationsHistory.map((operation, index) => (
-                      <div
-                        key={index}
-                        className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
-                          operation.operation_result === 'WIN'
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
-                            : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
-                        }`}
-                        title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.created_at)}`}
-                      >
-                        {operation.operation_result === 'WIN' ? 'W' : 'L'}
-                      </div>
-                    ))
+              {/* Status Principal Unificado */}
+              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-xl p-4 border border-slate-600/30">
+                <div className="flex items-center gap-3">
+                  {isTunderPatternFound ? (
+                    <CheckCircle className="text-purple-400 flex-shrink-0" size={24} />
                   ) : (
-                    <div className="col-span-10 text-center text-slate-400 text-xs py-2">
-                      Cargando histórico...
-                    </div>
+                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
                   )}
-                </div>
-                
-                {tunderOperationsHistory && tunderOperationsHistory.length > 0 && (
-                  <div className="mt-3 flex justify-between text-xs text-slate-400">
-                    <span>Más reciente</span>
-                    <span>Más antigua</span>
-                  </div>
-                )}
+                  <div className="flex-1">
+                    <div className={`text-lg font-bold mb-1 ${
+                      isTunderPatternFound ? 'text-purple-400' : 'text-slate-200'
+                    }`}>
+                      {tunderRadarData?.reason || 'Aguardando padrão...'}
               </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Estrategia: <span className="text-slate-300 font-medium">{tunderRadarData?.strategy_used || 'THUNDER STRIKE'}</span>
+              </div>
+              <div className="text-xs text-purple-400 font-semibold mt-1">
+                Ganancia: 45%
+              </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Métricas Simplificadas */}
+               <div className="grid grid-cols-2 gap-3">
+                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl p-4 border border-green-500/20">
+                   <div className="text-center">
+                     <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Vitórias</div>
+                     <div className="text-2xl font-bold text-green-400">
+                       {tunderBot.data?.wins ?? '0'}
+                     </div>
+                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
+                   </div>
+                 </div>
+                 
+                 <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-4 border border-red-500/20">
+                   <div className="text-center">
+                     <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-2">Derrotas</div>
+                     <div className="text-2xl font-bold text-red-400">
+                       {tunderBot.data?.losses ?? '0'}
+                     </div>
+                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Histórico Visual das Últimas 20 Operações */}
+               <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-xl p-4 border border-slate-600/20">
+                 <div className="flex items-center gap-2 mb-3">
+                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                   <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
+                 </div>
+                 
+                 <div className="grid grid-cols-10 gap-1">
+                   {tunderOperationsHistory && tunderOperationsHistory.length > 0 ? (
+                     tunderOperationsHistory.map((operation, index) => (
+                       <div
+                         key={index}
+                         className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
+                           operation.operation_result === 'WIN'
+                             ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
+                             : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
+                         }`}
+                         title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.created_at)}`}
+                       >
+                         {operation.operation_result === 'WIN' ? 'W' : 'L'}
+                       </div>
+                     ))
+                   ) : (
+                     <div className="col-span-10 text-center text-slate-400 text-xs py-2">
+                       Cargando histórico...
+                     </div>
+                   )}
+                 </div>
+                 
+                 {tunderOperationsHistory && tunderOperationsHistory.length > 0 && (
+                   <div className="mt-3 flex justify-between text-xs text-slate-400">
+                     <span>Más reciente</span>
+                     <span>Más antigua</span>
+                   </div>
+                 )}
+               </div>
+
+               {/* Mercado Acumulators */}
+               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                   <h3 className="text-sm font-semibold text-slate-300">Mercado Acumuladores</h3>
+                 </div>
+               </div>
+
+               {/* Análise Avançada de Scalping */}
+               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                   <h3 className="text-sm font-semibold text-slate-300">Análisis Avanzado de Scalping</h3>
+                 </div>
+               </div>
+
+               {/* Botão Descargar Bot */}
+               <Button className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+                 <Download size={18} className="mr-2" />
+                 Descargar Bot
+               </Button>
+               
+               <p className="text-xs text-center text-slate-400">
+                 Copiar configuraciones
+               </p>
             </CardContent>
           </Card>
         </div>
