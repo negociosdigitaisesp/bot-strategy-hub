@@ -187,7 +187,7 @@ const RadarApalancamiento = () => {
   };
 
   // Função para buscar última operação
-  const fetchLastOperation = async (tableName) => {
+  const fetchLastOperation = async (tableName: string) => {
     try {
       // Usar timestamp para scalping_accumulator_bot_logs e created_at para outras tabelas
       const timestampColumn = tableName === 'scalping_accumulator_bot_logs' ? 'timestamp' : 'created_at';
@@ -221,7 +221,7 @@ const RadarApalancamiento = () => {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'Scalping Bot')
+        .eq('bot_name', 'Radar Scalping I.A')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -246,7 +246,7 @@ const RadarApalancamiento = () => {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'Tunder Bot')
+        .eq('bot_name', 'radartunder1.5')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -593,7 +593,7 @@ const RadarApalancamiento = () => {
           
           if (payload.new) {
             // Distribuir dados baseado no bot_name
-            if (payload.new.bot_name === 'Scalping Bot') {
+            if (payload.new.bot_name === 'Radar Scalping I.A') {
               console.log('Atualizando dados do Scalping Bot');
               setScalpingRadarData(payload.new);
               
@@ -602,7 +602,7 @@ const RadarApalancamiento = () => {
                 const newStats = calcularEstadisticas(historicData, payload.new, null, null);
                 setBotStats(newStats);
               }
-            } else if (payload.new.bot_name === 'Tunder Bot') {
+            } else if (payload.new.bot_name === 'radartunder1.5') {
               console.log('Atualizando dados do Tunder Bot');
               setTunderRadarData(payload.new);
             }
