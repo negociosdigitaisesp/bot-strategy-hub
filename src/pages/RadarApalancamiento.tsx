@@ -1020,7 +1020,7 @@ const RadarApalancamiento = () => {
                {/* Botão Descargar Bot */}
                <Button 
                  className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1GvTxgoItvCn6ngvuttIcTX_ryuMuJB4D/view?usp=sharing', '_blank')}
+                 onClick={() => window.open('https://drive.google.com/file/d/1J7JRlB3Jg99kx0ATfFTt40y1qQeE515Q/view?usp=sharing', '_blank')}
                >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
@@ -1241,7 +1241,7 @@ const RadarApalancamiento = () => {
                {/* Botão Descargar Bot */}
                <Button 
                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1W8YeFG7lMKKkb4kEMTpMlAUC3x9WfKUv/view?usp=sharing', '_blank')}
+                 onClick={() => window.open('https://drive.google.com/file/d/1rB8daQs4Iy001XfDkgekObOtd9ghJk-G/view?usp=sharing', '_blank')}
                >
                  <Download size={18} className="mr-2" />
                  Descargar Bot

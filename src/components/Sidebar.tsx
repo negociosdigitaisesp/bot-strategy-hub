@@ -17,7 +17,8 @@ import {
   Sparkles,
   TrendingUp,
   Crown,
-  Target
+  Target,
+  Calculator
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -106,6 +107,13 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
       path: '/mejores-horarios',
       badge: null,
       description: 'Optimización temporal'
+    },
+    { 
+      name: 'Gestión de Capital', 
+      icon: <Calculator size={20} />, 
+      path: '/calculadora-riesgo',
+      badge: 'NUEVO',
+      description: 'Optimiza tu capital y riesgo'
     },
     { 
       name: 'Tutorial de Instalación', 

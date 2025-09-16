@@ -23,6 +23,7 @@ import BotsApalancamiento from "./pages/BotsApalancamiento";
 import Factor50XPage from "./pages/Factor50XPage";
 import BKBot from "./pages/BKBot";
 import RiskManagement from "./pages/RiskManagement";
+import RiskCalculator from "./pages/RiskCalculator";
 import AlfaBot from "./pages/AlfaBot";
 import TipBot from "./pages/TipBot";
 import XtremeBot from "./pages/XtremeBot";
@@ -139,6 +140,15 @@ const App = () => {
                       <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                         <RiskManagement />
+                      </main>
+                    </>
+                  } />
+                  
+                  <Route path="/calculadora-riesgo" element={
+                    <>
+                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                        <RiskCalculator />
                       </main>
                     </>
                   } />
