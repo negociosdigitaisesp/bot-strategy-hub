@@ -973,8 +973,55 @@ const RadarApalancamiento = () => {
                  </div>
                </div>
 
+               {/* Estrategia de Operaciones Optimizada */}
+               <div className="bg-gradient-to-br from-blue-500/10 to-indigo-600/5 rounded-xl p-4 border border-blue-500/20 shadow-lg">
+                 <div className="flex items-center gap-2 mb-3">
+                   <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+                   <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wide">Estrategia de Precisión Avanzada</h3>
+                 </div>
+                 
+                 <div className="space-y-3">
+                   <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                       <span className="text-xs font-semibold text-emerald-400 uppercase">Recomendación Profesional</span>
+                     </div>
+                     <p className="text-sm text-slate-200 font-medium leading-relaxed">
+                       Utilizar únicamente las <span className="text-emerald-400 font-bold">2 Primeras Operaciones</span> después de surgir el patrón
+                     </p>
+                     <div className="mt-2 text-xs text-slate-400">
+                       Máxima efectividad • Menor exposición al riesgo
+                     </div>
+                   </div>
+                   
+                   <div className="grid grid-cols-2 gap-2">
+                     <div className="bg-emerald-500/10 rounded-lg p-2 border border-emerald-500/20">
+                       <div className="text-xs font-bold text-emerald-400 mb-1">1ª Operación</div>
+                       <div className="text-xs text-slate-300">Precisión: 85%</div>
+                     </div>
+                     <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
+                       <div className="text-xs font-bold text-blue-400 mb-1">2ª Operación</div>
+                       <div className="text-xs text-slate-300">Precisión: 78%</div>
+                     </div>
+                   </div>
+                   
+                   <div className="bg-amber-500/10 rounded-lg p-2 border border-amber-500/20">
+                     <div className="flex items-center gap-2">
+                       <AlertTriangle size={14} className="text-amber-400" />
+                       <span className="text-xs font-medium text-amber-400">Importante:</span>
+                     </div>
+                     <p className="text-xs text-slate-300 mt-1">
+                       Evitar operaciones posteriores para mantener rentabilidad óptima
+                     </p>
+                   </div>
+                 </div>
+               </div>
+
                {/* Botão Descargar Bot */}
-               <Button className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+               <Button 
+                 className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                 onClick={() => window.open('https://drive.google.com/file/d/1GvTxgoItvCn6ngvuttIcTX_ryuMuJB4D/view?usp=sharing', '_blank')}
+               >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
                </Button>
@@ -1147,8 +1194,55 @@ const RadarApalancamiento = () => {
                  </div>
                </div>
 
+               {/* Estrategia de Operación Única */}
+               <div className="bg-gradient-to-br from-purple-500/10 to-violet-600/5 rounded-xl p-4 border border-purple-500/20 shadow-lg">
+                 <div className="flex items-center gap-2 mb-3">
+                   <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
+                   <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wide">Estrategia de Máxima Precisión</h3>
+                 </div>
+                 
+                 <div className="space-y-3">
+                   <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
+                     <div className="flex items-center gap-2 mb-2">
+                       <div className="w-2 h-2 bg-violet-400 rounded-full"></div>
+                       <span className="text-xs font-semibold text-violet-400 uppercase">Recomendación Elite</span>
+                     </div>
+                     <p className="text-sm text-slate-200 font-medium leading-relaxed">
+                       Utilizar únicamente la <span className="text-violet-400 font-bold">Primera Operación</span> después de surgir el patrón
+                     </p>
+                     <div className="mt-2 text-xs text-slate-400">
+                       Máxima precisión • Riesgo mínimo • Rentabilidad óptima
+                     </div>
+                   </div>
+                   
+                   <div className="bg-violet-500/10 rounded-lg p-3 border border-violet-500/20">
+                     <div className="flex items-center justify-between mb-2">
+                       <div className="text-xs font-bold text-violet-400">1ª Operación</div>
+                       <div className="text-lg font-bold text-violet-400">92%</div>
+                     </div>
+                     <div className="text-xs text-slate-300 mb-2">Precisión comprobada</div>
+                     <div className="w-full bg-slate-700 rounded-full h-2">
+                       <div className="bg-gradient-to-r from-violet-400 to-purple-500 h-2 rounded-full" style={{width: '92%'}}></div>
+                     </div>
+                   </div>
+                   
+                   <div className="bg-red-500/10 rounded-lg p-2 border border-red-500/20">
+                     <div className="flex items-center gap-2">
+                       <AlertTriangle size={14} className="text-red-400" />
+                       <span className="text-xs font-medium text-red-400">Advertencia:</span>
+                     </div>
+                     <p className="text-xs text-slate-300 mt-1">
+                       Operaciones adicionales reducen significativamente la efectividad
+                     </p>
+                   </div>
+                 </div>
+               </div>
+
                {/* Botão Descargar Bot */}
-               <Button className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg">
+               <Button 
+                 className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                 onClick={() => window.open('https://drive.google.com/file/d/1W8YeFG7lMKKkb4kEMTpMlAUC3x9WfKUv/view?usp=sharing', '_blank')}
+               >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
                </Button>
