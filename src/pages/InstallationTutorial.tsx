@@ -11,51 +11,93 @@ const InstallationTutorial = () => {
 
       {/* Video Tutorial Section */}
       <div className="mb-10 bg-gradient-to-br from-primary/5 to-primary/10 p-8 rounded-2xl border border-primary/20 shadow-lg">
-        <div className="text-center mb-6">
-           <h2 className="text-2xl font-bold text-foreground mb-3 flex items-center justify-center gap-3">
-             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-               <svg className="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+        <div className="text-center mb-8">
+           <h2 className="text-3xl font-bold text-foreground mb-4 flex items-center justify-center gap-3">
+             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+               <svg className="w-6 h-6 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
                  <path d="M8 5v10l8-5-8-5z"/>
                </svg>
              </div>
-             Video Tutorial Completo
+             Tutoriales en Video
            </h2>
-           <p className="text-muted-foreground max-w-2xl mx-auto">
-             Mira el tutorial en video para una explicación visual detallada de todo el proceso de instalación y configuración.
+           <p className="text-muted-foreground max-w-3xl mx-auto text-lg">
+             Mira los tutoriales en video para una explicación visual detallada de todo el proceso de instalación, configuración y uso del Radar de Apalancamiento.
            </p>
-           <div className="mt-4 p-4 bg-primary/10 rounded-lg border border-primary/30 max-w-3xl mx-auto">
+           <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/30 max-w-4xl mx-auto">
              <p className="text-sm font-medium text-foreground">
-               💡 <strong>Recomendación:</strong> Te recomendamos ver el video hasta el final para utilizar los robots de la mejor forma posible y aprovechar al máximo todas las funcionalidades.
+               💡 <strong>Recomendación:</strong> Te recomendamos ver ambos videos hasta el final para utilizar los robots de la mejor forma posible y aprovechar al máximo todas las funcionalidades.
              </p>
            </div>
          </div>
         
-        <div className="relative max-w-4xl mx-auto">
-          <div className="relative rounded-xl overflow-hidden shadow-2xl border-4 border-primary/20">
-            <div className="aspect-video bg-black/5">
-              <iframe
-                className="w-full h-full"
-                src="https://www.youtube.com/embed/K2GAE-vJ490"
-                title="Tutorial de Instalação - Million Bots"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              ></iframe>
+        {/* Videos Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
+          {/* Tutorial de Instalación */}
+          <div className="space-y-4">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-foreground mb-2 flex items-center justify-center gap-2">
+                <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  1
+                </div>
+                Tutorial de Instalación
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Aprende a instalar y configurar tu robot de trading paso a paso
+              </p>
+            </div>
+            <div className="relative rounded-xl overflow-hidden shadow-2xl border-4 border-primary/20">
+              <div className="aspect-video bg-black/5">
+                <iframe
+                  className="w-full h-full"
+                  src="https://www.youtube.com/embed/K2GAE-vJ490"
+                  title="Tutorial de Instalação - Million Bots"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                ></iframe>
+              </div>
             </div>
           </div>
-          
-          {/* Call to action */}
-            <div className="mt-6 text-center">
-              <a 
-                href="https://deriv.com/?t=TRCjAn8FEcUivlVU8hndU2Nd7ZgqdRLk&utm_source=affiliate_223442&utm_medium=affiliate&utm_campaign=MyAffiliates&utm_content=&referrer=" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-              >
-                <ExternalLink size={18} />
-                Ingresar en Deriv
-              </a>
+
+          {/* Tutorial Radar de Alavancagem */}
+          <div className="space-y-4">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-foreground mb-2 flex items-center justify-center gap-2">
+                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  2
+                </div>
+                Radar de Apalancamiento
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Descubre cómo utilizar el Radar del Apalancamiento para maximizar tus ganancias
+              </p>
             </div>
+            <div className="relative rounded-xl overflow-hidden shadow-2xl border-4 border-purple-500/20">
+              <div className="aspect-video bg-black/5">
+                <iframe
+                  className="w-full h-full"
+                  src="https://www.youtube.com/embed/tUDX8-zyAk0"
+                  title="Como Utilizar el Radar del Apalancamiento"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+          
+        {/* Call to action */}
+        <div className="mt-8 text-center">
+          <a 
+            href="https://deriv.com/?t=TRCjAn8FEcUivlVU8hndU2Nd7ZgqdRLk&utm_source=affiliate_223442&utm_medium=affiliate&utm_campaign=MyAffiliates&utm_content=&referrer=" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg font-semibold"
+          >
+            <ExternalLink size={20} />
+            Ingresar en Deriv
+          </a>
         </div>
       </div>
 

@@ -808,6 +808,20 @@ const RadarApalancamiento = () => {
 
       </div>
 
+      {/* Botão de Instalação */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="text-center">
+          <Button 
+            onClick={() => navigate('/installation-tutorial')}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl border border-blue-500/30"
+          >
+            <Download size={20} className="mr-3" />
+            📚 Cómo Instalar y Configurar el Radar Del Apalancamiento
+          </Button>
+          <p className="text-sm text-slate-400 mt-2">Aprende a configurar correctamente tu radar para máxima precisión</p>
+        </div>
+      </div>
+
       {/* Bot Cards - Lado a Lado */}
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -837,6 +851,13 @@ const RadarApalancamiento = () => {
             }`}></div>
             
             <CardHeader className="pb-3 bg-[#1C2A3A]/80">
+              {/* Tag Minimalista dentro do Card */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-400/30 px-3 py-1.5 rounded-full">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-bold text-emerald-400 tracking-wide">🎯 MÁS PRECISO</span>
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 border shadow-md rounded-xl ${
@@ -1017,18 +1038,25 @@ const RadarApalancamiento = () => {
                  </div>
                </div>
 
+               {/* Tarja de Aviso */}
+               <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-lg p-3 mb-4">
+                 <div className="flex items-center gap-2 text-amber-400">
+                   <AlertTriangle size={16} />
+                   <span className="text-xs font-bold">⚠️ ATENCIÓN:</span>
+                 </div>
+                 <p className="text-xs text-amber-300 mt-1 font-medium">
+                   Antes de utilizar el Bot, verifica que la Tasa de Crescimiento esté en 2%
+                 </p>
+               </div>
+
                {/* Botão Descargar Bot */}
                <Button 
                  className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1J7JRlB3Jg99kx0ATfFTt40y1qQeE515Q/view?usp=sharing', '_blank')}
+                 onClick={() => window.open('https://drive.google.com/file/d/1GvTxgoItvCn6ngvuttIcTX_ryuMuJB4D/view?usp=sharing', '_blank')}
                >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
                </Button>
-               
-               <p className="text-xs text-center text-slate-400">
-                 Copiar configuraciones
-               </p>
             </CardContent>
           </Card>
 
@@ -1058,6 +1086,13 @@ const RadarApalancamiento = () => {
             }`}></div>
             
             <CardHeader className="pb-3 bg-[#1C2A3A]/80">
+              {/* Tag Minimalista dentro do Card */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500/20 to-violet-500/20 border border-purple-400/30 px-3 py-1.5 rounded-full">
+                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-bold text-purple-400 tracking-wide">💰 MÁS RENTABLE</span>
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 border shadow-md rounded-xl ${
@@ -1238,18 +1273,25 @@ const RadarApalancamiento = () => {
                  </div>
                </div>
 
+               {/* Tarja de Aviso */}
+               <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-lg p-3 mb-4">
+                 <div className="flex items-center gap-2 text-amber-400">
+                   <AlertTriangle size={16} />
+                   <span className="text-xs font-bold">⚠️ ATENCIÓN:</span>
+                 </div>
+                 <p className="text-xs text-amber-300 mt-1 font-medium">
+                   Antes de utilizar el Bot, verifica que la Tasa de Crescimiento esté en 2%
+                 </p>
+               </div>
+
                {/* Botão Descargar Bot */}
                <Button 
                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1rB8daQs4Iy001XfDkgekObOtd9ghJk-G/view?usp=sharing', '_blank')}
+                 onClick={() => window.open('https://drive.google.com/file/d/1W8YeFG7lMKKkb4kEMTpMlAUC3x9WfKUv/view?usp=sharing', '_blank')}
                >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
                </Button>
-               
-               <p className="text-xs text-center text-slate-400">
-                 Copiar configuraciones
-               </p>
             </CardContent>
           </Card>
         </div>
