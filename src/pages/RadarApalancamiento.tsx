@@ -809,16 +809,16 @@ const RadarApalancamiento = () => {
       </div>
 
       {/* Botão de Instalação */}
-      <div className="max-w-7xl mx-auto mb-8">
+      <div className="max-w-7xl mx-auto mb-8 px-4">
         <div className="text-center">
           <Button 
             onClick={() => navigate('/installation-tutorial')}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl border border-blue-500/30"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 sm:py-4 sm:px-8 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl border border-blue-500/30 w-full sm:w-auto text-sm sm:text-base"
           >
-            <Download size={20} className="mr-3" />
-            📚 Cómo Instalar y Configurar el Radar Del Apalancamiento
+            <Download size={16} className="mr-2 sm:mr-3 flex-shrink-0" />
+            <span className="truncate">📚 Cómo Instalar y Configurar el Radar Del Apalancamiento</span>
           </Button>
-          <p className="text-sm text-slate-400 mt-2">Aprende a configurar correctamente tu radar para máxima precisión</p>
+          <p className="text-xs sm:text-sm text-slate-400 mt-2 px-2">Aprende a configurar correctamente tu radar para máxima precisión</p>
         </div>
       </div>
 
