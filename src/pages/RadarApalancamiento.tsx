@@ -96,7 +96,8 @@ interface StrategyColors {
 const RadarApalancamiento = () => {
   const navigate = useNavigate();
   const [scalpingRadarData, setScalpingRadarData] = useState<RadarSignal | null>(null);
-  const [tunderRadarData, setTunderRadarData] = useState<RadarSignal | null>(null);
+  const [scalpingReversionData, setScalpingReversionData] = useState<RadarSignal | null>(null);
+  const [tunderRadarData, setTunderRadarData] = useState<TunderRadarSignal | null>(null);
   const [botStats, setBotStats] = useState<BotStats | null>(null);
   const [historicData, setHistoricData] = useState<BotOperation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -236,6 +237,28 @@ const RadarApalancamiento = () => {
       return null;
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  // Función para obtener el estado del Scalping Reversion Bot
+  const obtenerEstadoScalpingReversion = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('radar_de_apalancamiento_signals')
+        .select('*')
+        .eq('bot_name', 'Scalping Reversion')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching scalping reversion data:', error);
+        return null;
+      }
+
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error in obtenerEstadoScalpingReversion:', error);
+      return null;
     }
   };
 
@@ -523,8 +546,9 @@ const RadarApalancamiento = () => {
   const actualizarDatos = async () => {
     setIsLoading(true);
     try {
-      const [estadoScalpingBot, estadoTunderBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
+      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
         obtenerEstadoScalpingBot(),
+        obtenerEstadoScalpingReversion(),
         obtenerEstadoTunderBot(),
         obtenerHistorico(),
         obtenerEstadisticasExactas(),
@@ -536,6 +560,7 @@ const RadarApalancamiento = () => {
       ]);
 
       setScalpingRadarData(estadoScalpingBot);
+      setScalpingReversionData(estadoScalpingReversion);
       setTunderRadarData(estadoTunderBot);
       setHistoricData(historico);
       setDashboardStats(dashboardStats);
@@ -632,13 +657,16 @@ const RadarApalancamiento = () => {
   const filterStatus = getFilterStatus(historicData, botStats || {});
 
   // Detectar padrão encontrado específico para Scalping Bot
-  const isScalpingPatternFound = scalpingRadarData?.reason?.includes("Patrón encontrado - encender bot");
+  const isScalpingPatternFound = scalpingRadarData?.is_safe_to_operate === true;
+  
+  // Detectar padrão encontrado específico para Scalping Reversion
+  const isScalpingReversionPatternFound = scalpingReversionData?.is_safe_to_operate === true;
   
   // Detectar padrão encontrado específico para Tunder Bot
   const isTunderPatternFound = tunderRadarData?.is_safe_to_operate === true;
   
-  // Definir condição para padrão encontrado (usando a mesma lógica do Scalping Bot)
-  const isPatternFound = scalpingRadarData?.is_safe_to_operate === true;
+  // Definir condição para padrão encontrado (qualquer uma das estratégias do Scalping Bot)
+  const isPatternFound = isScalpingPatternFound || isScalpingReversionPatternFound;
 
   // Função para traduzir reason do Supabase
   const translateReason = (reason: string) => {
@@ -893,27 +921,122 @@ const RadarApalancamiento = () => {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-              {/* Status Principal Unificado */}
-              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-xl p-4 border border-slate-600/30">
+            <CardContent className="space-y-5">
+              {/* Header com Performance Metrics */}
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {isPatternFound ? (
-                    <CheckCircle className="text-green-400 flex-shrink-0" size={24} />
-                  ) : (
-                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-slate-300">Estratégias Ativas</span>
+                </div>
+                <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-500/15 to-green-500/15 border border-emerald-400/30 px-3 py-1.5 rounded-lg">
+                  <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-semibold text-emerald-400">Ganancia: 10%</span>
+                </div>
+              </div>
+
+              {/* Estratégias Grid Layout */}
+              <div className="grid gap-4">
+                {/* Estratégia 1 - PRECISION SURGE */}
+                <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${
+                  isScalpingPatternFound 
+                    ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-green-700/10 border-green-500/50 shadow-lg shadow-green-500/20' 
+                    : 'bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-700/20 border-slate-600/30 hover:border-slate-500/50'
+                }`}>
+                  {isScalpingPatternFound && (
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
                   )}
-                  <div className="flex-1">
-                    <div className={`text-lg font-bold mb-1 ${
-                      isPatternFound ? 'text-green-400' : 'text-slate-200'
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          isScalpingPatternFound 
+                            ? 'bg-green-500/20 text-green-400' 
+                            : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {isScalpingPatternFound ? (
+                            <CheckCircle size={20} />
+                          ) : (
+                            <Eye size={20} />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-200 mb-1">PRECISION SURGE</h4>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                            <span className="text-xs text-slate-400">Estratégia Principal</span>
+                          </div>
+                        </div>
+                      </div>
+                      {isScalpingPatternFound && (
+                        <div className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-green-500/30 animate-pulse">
+                          🚀 ATIVAR
+                        </div>
+                      )}
+                    </div>
+                    <div className={`text-sm font-medium mb-2 ${
+                      isScalpingPatternFound ? 'text-green-300' : 'text-slate-300'
                     }`}>
-                      {scalpingRadarData?.reason || 'Aguardando padrão...'}
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                Estrategia: <span className="text-slate-300 font-medium">{scalpingRadarData?.strategy_used || 'PRECISION SURGE'}</span>
-              </div>
-              <div className="text-xs text-emerald-400 font-semibold mt-1">
-                Ganancia: 10%
-              </div>
+                      {scalpingRadarData?.reason || 'Aguardando padrão de entrada...'}
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">Status:</span>
+                      <span className={isScalpingPatternFound ? 'text-green-400 font-medium' : 'text-slate-400'}>
+                        {isScalpingPatternFound ? 'Padrão Detectado' : 'Monitorando'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estratégia 2 - SCALPING REVERSION */}
+                <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${
+                  isScalpingReversionPatternFound 
+                    ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-green-700/10 border-green-500/50 shadow-lg shadow-green-500/20' 
+                    : 'bg-gradient-to-br from-purple-900/30 via-purple-800/20 to-purple-700/10 border-purple-600/30 hover:border-purple-500/50'
+                }`}>
+                  {isScalpingReversionPatternFound && (
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          isScalpingReversionPatternFound 
+                            ? 'bg-green-500/20 text-green-400' 
+                            : 'bg-purple-500/20 text-purple-400'
+                        }`}>
+                          {isScalpingReversionPatternFound ? (
+                            <CheckCircle size={20} />
+                          ) : (
+                            <Eye size={20} />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-200 mb-1">SCALPING REVERSION</h4>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                            <span className="text-xs text-slate-400">Estratégia Reversa</span>
+                          </div>
+                        </div>
+                      </div>
+                      {isScalpingReversionPatternFound && (
+                        <div className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-green-500/30 animate-pulse">
+                          🚀 ATIVAR
+                        </div>
+                      )}
+                    </div>
+                    <div className={`text-sm font-medium mb-2 ${
+                      isScalpingReversionPatternFound ? 'text-green-300' : 'text-slate-300'
+                    }`}>
+                      {scalpingReversionData?.reason || 'Aguardando padrão de reversão...'}
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">Status:</span>
+                      <span className={isScalpingReversionPatternFound ? 'text-green-400 font-medium' : 'text-slate-400'}>
+                        {isScalpingReversionPatternFound ? 'Padrão Detectado' : 'Monitorando'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
