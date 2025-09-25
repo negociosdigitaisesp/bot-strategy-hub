@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Activity, TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Shield, Eye, RefreshCw, History, Target, Download, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useTunderBot } from '../hooks/useTunderBot';
+import { useAudioNotification } from '../services/audioNotificationService';
 
 interface RadarSignal {
   id: string;
@@ -119,6 +120,15 @@ const RadarApalancamiento = () => {
 
   // Hook do Tunder Bot
   const tunderBot = useTunderBot();
+
+  // Hook para notificação sonora
+  const { playNotification, initializeAudio } = useAudioNotification();
+
+  // Refs para controlar quando reproduzir som (evitar sons repetidos)
+  const previousScalpingPatternFound = useRef(false);
+  const previousScalpingReversionPatternFound = useRef(false);
+  const previousTunderPatternFound = useRef(false);
+  const audioInitialized = useRef(false);
 
   // Função para converter UTC-3 para horário local do dispositivo
   const convertUTCMinus3ToLocal = (utcMinus3String) => {
@@ -667,6 +677,72 @@ const RadarApalancamiento = () => {
   
   // Definir condição para padrão encontrado (qualquer uma das estratégias do Scalping Bot)
   const isPatternFound = isScalpingPatternFound || isScalpingReversionPatternFound;
+
+  // useEffect para reproduzir som quando padrão for detectado
+  useEffect(() => {
+    const playNotificationSound = async () => {
+      try {
+        await playNotification();
+      } catch (error) {
+        console.warn('Erro ao reproduzir notificação sonora:', error);
+      }
+    };
+
+    // Verificar se um novo padrão foi encontrado no Scalping Bot
+    if (isScalpingPatternFound && !previousScalpingPatternFound.current) {
+      playNotificationSound();
+      console.log('🔊 Som reproduzido: Padrão detectado no Scalping Bot (PRECISION SURGE)');
+    }
+    previousScalpingPatternFound.current = isScalpingPatternFound;
+
+    // Verificar se um novo padrão foi encontrado no Scalping Reversion
+    if (isScalpingReversionPatternFound && !previousScalpingReversionPatternFound.current) {
+      playNotificationSound();
+      console.log('🔊 Som reproduzido: Padrão detectado no Scalping Reversion');
+    }
+    previousScalpingReversionPatternFound.current = isScalpingReversionPatternFound;
+
+    // Verificar se um novo padrão foi encontrado no Tunder Bot
+    if (isTunderPatternFound && !previousTunderPatternFound.current) {
+      playNotificationSound();
+      console.log('🔊 Som reproduzido: Padrão detectado no Tunder Bot');
+    }
+    previousTunderPatternFound.current = isTunderPatternFound;
+  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isTunderPatternFound, playNotification]);
+
+  // useEffect para inicializar áudio após primeira interação do usuário
+  useEffect(() => {
+    const initializeAudioOnInteraction = async () => {
+      if (!audioInitialized.current) {
+        try {
+          await initializeAudio();
+          audioInitialized.current = true;
+          console.log('🔊 Áudio inicializado com sucesso');
+        } catch (error) {
+          console.warn('Erro ao inicializar áudio:', error);
+        }
+      }
+    };
+
+    // Inicializar áudio na primeira interação (click, touch, etc.)
+    const handleFirstInteraction = () => {
+      initializeAudioOnInteraction();
+      // Remover listeners após primeira interação
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('touchstart', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('touchstart', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+
+    return () => {
+       document.removeEventListener('click', handleFirstInteraction);
+       document.removeEventListener('touchstart', handleFirstInteraction);
+       document.removeEventListener('keydown', handleFirstInteraction);
+     };
+   }, [initializeAudio]);
 
   // Função para traduzir reason do Supabase
   const translateReason = (reason: string) => {
