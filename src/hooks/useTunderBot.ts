@@ -41,7 +41,7 @@ export const useTunderBot = () => {
       const { data: signalData, error: signalError } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'radartunder1.5')
+        .eq('bot_name', 'executor_momentum_calmo_v1')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -49,7 +49,7 @@ export const useTunderBot = () => {
       const { data: opsData, error: opsError } = await supabase
         .from('operacoes')
         .select('*')
-        .eq('bot_name', 'radartunder1.5')
+        .eq('bot_name', 'executor_momentum_calmo_v1')
         .order('created_at', { ascending: false })
         .limit(50);
 

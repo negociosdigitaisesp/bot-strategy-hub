@@ -99,6 +99,8 @@ const RadarApalancamiento = () => {
   const [scalpingRadarData, setScalpingRadarData] = useState<RadarSignal | null>(null);
   const [scalpingReversionData, setScalpingReversionData] = useState<RadarSignal | null>(null);
   const [tunderRadarData, setTunderRadarData] = useState<TunderRadarSignal | null>(null);
+  const [momentumMedioData, setMomentumMedioData] = useState<TunderRadarSignal | null>(null);
+  const [reversaoCalmaData, setReversaoCalmaData] = useState<TunderRadarSignal | null>(null);
   const [botStats, setBotStats] = useState<BotStats | null>(null);
   const [historicData, setHistoricData] = useState<BotOperation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -128,6 +130,8 @@ const RadarApalancamiento = () => {
   const previousScalpingPatternFound = useRef(false);
   const previousScalpingReversionPatternFound = useRef(false);
   const previousTunderPatternFound = useRef(false);
+  const previousMomentumMedioPatternFound = useRef(false);
+  const previousReversaoCalmaPatternFound = useRef(false);
   const audioInitialized = useRef(false);
 
   // Função para converter UTC-3 para horário local do dispositivo
@@ -279,7 +283,7 @@ const RadarApalancamiento = () => {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'radartunder1.5')
+        .eq('bot_name', 'executor_momentum_calmo_v1')
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -294,6 +298,50 @@ const RadarApalancamiento = () => {
       return null;
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  // Función para obtener el estado del Momentum Medio Bot
+  const obtenerEstadoMomentumMedio = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('radar_de_apalancamiento_signals')
+        .select('*')
+        .eq('bot_name', 'executor_momentum_medio_v1')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching momentum medio radar data:', error);
+        return null;
+      }
+
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error in obtenerEstadoMomentumMedio:', error);
+      return null;
+    }
+  };
+
+  // Función para obtener el estado del Reversão Calma Bot
+  const obtenerEstadoReversaoCalma = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('radar_de_apalancamiento_signals')
+        .select('*')
+        .eq('bot_name', 'executor_reversao_calma_v1')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching reversao calma radar data:', error);
+        return null;
+      }
+
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error in obtenerEstadoReversaoCalma:', error);
+      return null;
     }
   };
 
@@ -556,10 +604,12 @@ const RadarApalancamiento = () => {
   const actualizarDatos = async () => {
     setIsLoading(true);
     try {
-      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
+      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, estadoMomentumMedio, estadoReversaoCalma, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
         obtenerEstadoScalpingBot(),
         obtenerEstadoScalpingReversion(),
         obtenerEstadoTunderBot(),
+        obtenerEstadoMomentumMedio(),
+        obtenerEstadoReversaoCalma(),
         obtenerHistorico(),
         obtenerEstadisticasExactas(),
         obtenerDashboardStats(),
@@ -572,6 +622,8 @@ const RadarApalancamiento = () => {
       setScalpingRadarData(estadoScalpingBot);
       setScalpingReversionData(estadoScalpingReversion);
       setTunderRadarData(estadoTunderBot);
+      setMomentumMedioData(estadoMomentumMedio);
+      setReversaoCalmaData(estadoReversaoCalma);
       setHistoricData(historico);
       setDashboardStats(dashboardStats);
       
@@ -675,6 +727,12 @@ const RadarApalancamiento = () => {
   // Detectar padrão encontrado específico para Tunder Bot
   const isTunderPatternFound = tunderRadarData?.is_safe_to_operate === true;
   
+  // Detectar padrão encontrado específico para Momentum Medio Bot
+  const isMomentumMedioPatternFound = momentumMedioData?.is_safe_to_operate === true;
+  
+  // Detectar padrão encontrado específico para Reversão Calma Bot
+  const isReversaoCalmaPatternFound = reversaoCalmaData?.is_safe_to_operate === true;
+  
   // Definir condição para padrão encontrado (qualquer uma das estratégias do Scalping Bot)
   const isPatternFound = isScalpingPatternFound || isScalpingReversionPatternFound;
 
@@ -708,7 +766,21 @@ const RadarApalancamiento = () => {
       console.log('🔊 Som reproduzido: Padrão detectado no Tunder Bot');
     }
     previousTunderPatternFound.current = isTunderPatternFound;
-  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isTunderPatternFound, playNotification]);
+
+    // Verificar se um novo padrão foi encontrado no Momentum Medio Bot
+    if (isMomentumMedioPatternFound && !previousMomentumMedioPatternFound.current) {
+      playNotificationSound();
+      console.log('🔊 Som reproduzido: Padrão detectado no Momentum Medio Bot');
+    }
+    previousMomentumMedioPatternFound.current = isMomentumMedioPatternFound;
+
+    // Verificar se um novo padrão foi encontrado no Reversão Calma Bot
+    if (isReversaoCalmaPatternFound && !previousReversaoCalmaPatternFound.current) {
+      playNotificationSound();
+      console.log('🔊 Som reproduzido: Padrão detectado no Reversão Calma Bot');
+    }
+    previousReversaoCalmaPatternFound.current = isReversaoCalmaPatternFound;
+  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isTunderPatternFound, isMomentumMedioPatternFound, isReversaoCalmaPatternFound, playNotification]);
 
   // useEffect para inicializar áudio após primeira interação do usuário
   useEffect(() => {
@@ -954,7 +1026,7 @@ const RadarApalancamiento = () => {
               isPatternFound ? 'bg-emerald-400' : 'bg-[#2DD4BF]'
             }`}></div>
             
-            <CardHeader className="pb-3 bg-[#1C2A3A]/80">
+            <CardHeader className="pb-2 bg-[#1C2A3A]/80">
               {/* Tag Minimalista dentro do Card */}
               <div className="flex items-center justify-between mb-3">
                 <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-400/30 px-3 py-1.5 rounded-full">
@@ -1141,7 +1213,7 @@ const RadarApalancamiento = () => {
                </div>
 
                {/* Histórico Visual das Últimas 20 Operações */}
-               <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-xl p-4 border border-slate-600/20">
+               <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-lg p-3 border border-slate-600/20">
                  <div className="flex items-center gap-2 mb-3">
                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                    <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
@@ -1262,13 +1334,13 @@ const RadarApalancamiento = () => {
           {/* TUNDER BOT Card - DESIGN UX PROFISSIONAL */}
           <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
             isTunderPatternFound
-              ? 'border-2 border-purple-400 shadow-purple-400/30 ring-2 ring-purple-400/20'
+              ? 'border-2 border-orange-400 shadow-orange-400/30 ring-2 ring-orange-400/20'
               : 'border border-slate-600/50 shadow-slate-900/50'
           } relative overflow-hidden group`}>
             
             {/* Banner Superior - Quando padrão encontrado */}
             {isTunderPatternFound && (
-              <div className="bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 text-black text-center py-2 px-4 shadow-lg">
+              <div className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 text-black text-center py-2 px-4 shadow-lg">
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                   <span className="font-black text-sm tracking-wide uppercase">
@@ -1281,29 +1353,29 @@ const RadarApalancamiento = () => {
 
             {/* Accent Bar */}
             <div className={`h-2 rounded-t-lg ${
-              isTunderPatternFound ? 'bg-purple-400' : 'bg-[#9333EA]'
+              isTunderPatternFound ? 'bg-orange-400' : 'bg-orange-500'
             }`}></div>
             
             <CardHeader className="pb-3 bg-[#1C2A3A]/80">
               {/* Tag Minimalista dentro do Card */}
               <div className="flex items-center justify-between mb-3">
-                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500/20 to-violet-500/20 border border-purple-400/30 px-3 py-1.5 rounded-full">
+                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-400/30 px-3 py-1.5 rounded-full">
                   <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-bold text-purple-400 tracking-wide">💰 MÁS RENTABLE</span>
+                  <span className="text-xs font-bold text-orange-400 tracking-wide">💰 MÁS RENTABLE</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 border shadow-md rounded-xl ${
                     isTunderPatternFound
-                      ? 'bg-purple-500/20 border-purple-500/50 shadow-purple-400/30'
-                      : 'bg-[#9333EA]/20 border-[#9333EA]/30'
+                      ? 'bg-orange-500/20 border-orange-500/50 shadow-orange-400/30'
+                      : 'bg-orange-500/20 border-orange-500/30'
                   }`}>
-                    <Zap className={isTunderPatternFound ? 'text-purple-400' : 'text-[#9333EA]'} size={20} />
+                    <Zap className={isTunderPatternFound ? 'text-orange-400' : 'text-orange-500'} size={20} />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                      ⚡ TUNDER BOT
+                    <CardTitle className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      ⚡ ALAVANCA BOT
                     </CardTitle>
                     {lastTunderOperation && (
                       <div className={`text-xs px-2 py-1 rounded mt-1 ${
@@ -1319,7 +1391,7 @@ const RadarApalancamiento = () => {
                 
                 <div className="text-right">
                   <Badge className={`text-white text-xs px-2 py-1 ${
-                    isTunderPatternFound ? 'bg-purple-500 animate-pulse' : 'bg-[#9333EA]'
+                    isTunderPatternFound ? 'bg-orange-500 animate-pulse' : 'bg-orange-500'
                   }`}>
                     {isTunderPatternFound ? 'PATRÓN ACTIVO' : 'MONITORANDO'}
                   </Badge>
@@ -1327,47 +1399,87 @@ const RadarApalancamiento = () => {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {/* Status Principal Unificado */}
-              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-xl p-4 border border-slate-600/30">
+              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
                 <div className="flex items-center gap-3">
                   {isTunderPatternFound ? (
+                    <CheckCircle className="text-orange-400 flex-shrink-0" size={24} />
+                  ) : (
+                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
+                  )}
+                  <div className="flex-1">
+                    <div className={`text-sm font-bold mb-1 ${
+                      isTunderPatternFound ? 'text-orange-400' : 'text-slate-200'
+                    }`}>
+                      {tunderRadarData?.reason || 'Detectando momentum calmo para entrada segura en el mercado'}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Estrategia: <span className="text-slate-300 font-medium">{tunderRadarData?.strategy_used || 'MOMENTUM CALMO'}</span>
+              </div>
+
+                  </div>
+                </div>
+              </div>
+
+              {/* Nuevo elemento para Momentum Medio Bot */}
+              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
+                <div className="flex items-center gap-3">
+                  {momentumMedioData?.is_safe_to_operate ? (
                     <CheckCircle className="text-purple-400 flex-shrink-0" size={24} />
                   ) : (
                     <Eye className="text-blue-400 flex-shrink-0" size={24} />
                   )}
                   <div className="flex-1">
-                    <div className={`text-lg font-bold mb-1 ${
-                      isTunderPatternFound ? 'text-purple-400' : 'text-slate-200'
+                    <div className={`text-sm font-bold mb-1 ${
+                      momentumMedioData?.is_safe_to_operate ? 'text-purple-400' : 'text-slate-200'
                     }`}>
-                      {tunderRadarData?.reason || 'Aguardando padrão...'}
+                      {momentumMedioData?.reason || 'Analizando momentum medio para oportunidades de entrada'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      Estrategia: <span className="text-slate-300 font-medium">{momentumMedioData?.strategy_used || 'MOMENTUM MEDIO'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-slate-400 mt-1">
-                Estrategia: <span className="text-slate-300 font-medium">{tunderRadarData?.strategy_used || 'THUNDER STRIKE'}</span>
-              </div>
-              <div className="text-xs text-purple-400 font-semibold mt-1">
-                Ganancia: 45%
-              </div>
+
+              {/* Nuevo elemento para Reversão Calma Bot */}
+              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
+                <div className="flex items-center gap-3">
+                  {reversaoCalmaData?.is_safe_to_operate ? (
+                    <CheckCircle className="text-emerald-400 flex-shrink-0" size={24} />
+                  ) : (
+                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
+                  )}
+                  <div className="flex-1">
+                    <div className={`text-sm font-bold mb-1 ${
+                      reversaoCalmaData?.is_safe_to_operate ? 'text-emerald-400' : 'text-slate-200'
+                    }`}>
+                      {reversaoCalmaData?.reason || 'Analizando reversión calma para oportunidades de entrada'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      Estrategia: <span className="text-slate-300 font-medium">{reversaoCalmaData?.strategy_used || 'REVERSIÓN CALMA'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Métricas Simplificadas */}
-               <div className="grid grid-cols-2 gap-3">
-                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl p-4 border border-green-500/20">
+               <div className="grid grid-cols-2 gap-2">
+                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-lg p-3 border border-green-500/20">
                    <div className="text-center">
-                     <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Vitórias</div>
-                     <div className="text-2xl font-bold text-green-400">
+                     <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-1">Ganancias</div>
+                     <div className="text-xl font-bold text-green-400">
                        {tunderBot.data?.wins ?? '0'}
                      </div>
                      <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
                    </div>
                  </div>
                  
-                 <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-4 border border-red-500/20">
+                 <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-lg p-3 border border-red-500/20">
                    <div className="text-center">
-                     <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-2">Derrotas</div>
-                     <div className="text-2xl font-bold text-red-400">
+                     <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-1">Pérdidas</div>
+                     <div className="text-xl font-bold text-red-400">
                        {tunderBot.data?.losses ?? '0'}
                      </div>
                      <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
@@ -1378,7 +1490,7 @@ const RadarApalancamiento = () => {
                {/* Histórico Visual das Últimas 20 Operações */}
                <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-xl p-4 border border-slate-600/20">
                  <div className="flex items-center gap-2 mb-3">
-                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
                    <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
                  </div>
                  
