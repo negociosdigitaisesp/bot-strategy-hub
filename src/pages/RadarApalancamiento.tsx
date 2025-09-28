@@ -129,9 +129,7 @@ const RadarApalancamiento = () => {
   // Refs para controlar quando reproduzir som (evitar sons repetidos)
   const previousScalpingPatternFound = useRef(false);
   const previousScalpingReversionPatternFound = useRef(false);
-  const previousTunderPatternFound = useRef(false);
   const previousMomentumMedioPatternFound = useRef(false);
-  const previousReversaoCalmaPatternFound = useRef(false);
   const audioInitialized = useRef(false);
 
   // Função para converter UTC-3 para horário local do dispositivo
@@ -735,6 +733,9 @@ const RadarApalancamiento = () => {
   
   // Definir condição para padrão encontrado (qualquer uma das estratégias do Scalping Bot)
   const isPatternFound = isScalpingPatternFound || isScalpingReversionPatternFound;
+  
+  // Definir condição para padrão encontrado no Alavanca Bot (apenas Momentum Medio)
+  const isAlavancaPatternFound = isMomentumMedioPatternFound;
 
   // useEffect para reproduzir som quando padrão for detectado
   useEffect(() => {
@@ -760,27 +761,13 @@ const RadarApalancamiento = () => {
     }
     previousScalpingReversionPatternFound.current = isScalpingReversionPatternFound;
 
-    // Verificar se um novo padrão foi encontrado no Tunder Bot
-    if (isTunderPatternFound && !previousTunderPatternFound.current) {
-      playNotificationSound();
-      console.log('🔊 Som reproduzido: Padrão detectado no Tunder Bot');
-    }
-    previousTunderPatternFound.current = isTunderPatternFound;
-
     // Verificar se um novo padrão foi encontrado no Momentum Medio Bot
     if (isMomentumMedioPatternFound && !previousMomentumMedioPatternFound.current) {
       playNotificationSound();
       console.log('🔊 Som reproduzido: Padrão detectado no Momentum Medio Bot');
     }
     previousMomentumMedioPatternFound.current = isMomentumMedioPatternFound;
-
-    // Verificar se um novo padrão foi encontrado no Reversão Calma Bot
-    if (isReversaoCalmaPatternFound && !previousReversaoCalmaPatternFound.current) {
-      playNotificationSound();
-      console.log('🔊 Som reproduzido: Padrão detectado no Reversão Calma Bot');
-    }
-    previousReversaoCalmaPatternFound.current = isReversaoCalmaPatternFound;
-  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isTunderPatternFound, isMomentumMedioPatternFound, isReversaoCalmaPatternFound, playNotification]);
+  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isMomentumMedioPatternFound, playNotification]);
 
   // useEffect para inicializar áudio após primeira interação do usuário
   useEffect(() => {
@@ -1333,18 +1320,18 @@ const RadarApalancamiento = () => {
 
           {/* TUNDER BOT Card - DESIGN UX PROFISSIONAL */}
           <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
-            isTunderPatternFound
+            isAlavancaPatternFound
               ? 'border-2 border-orange-400 shadow-orange-400/30 ring-2 ring-orange-400/20'
               : 'border border-slate-600/50 shadow-slate-900/50'
           } relative overflow-hidden group`}>
             
             {/* Banner Superior - Quando padrão encontrado */}
-            {isTunderPatternFound && (
-              <div className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 text-black text-center py-2 px-4 shadow-lg">
+            {isAlavancaPatternFound && (
+              <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-black text-center py-2 px-4 shadow-lg">
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                   <span className="font-black text-sm tracking-wide uppercase">
-                    ATIVAR BOT AHORA
+                    ENCENDER BOT AHORA!
                   </span>
                   <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                 </div>
@@ -1400,29 +1387,7 @@ const RadarApalancamiento = () => {
             </CardHeader>
 
             <CardContent className="space-y-3">
-              {/* Status Principal Unificado */}
-              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
-                <div className="flex items-center gap-3">
-                  {isTunderPatternFound ? (
-                    <CheckCircle className="text-orange-400 flex-shrink-0" size={24} />
-                  ) : (
-                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
-                  )}
-                  <div className="flex-1">
-                    <div className={`text-sm font-bold mb-1 ${
-                      isTunderPatternFound ? 'text-orange-400' : 'text-slate-200'
-                    }`}>
-                      {tunderRadarData?.reason || 'Detectando momentum calmo para entrada segura en el mercado'}
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                Estrategia: <span className="text-slate-300 font-medium">{tunderRadarData?.strategy_used || 'MOMENTUM CALMO'}</span>
-              </div>
-
-                  </div>
-                </div>
-              </div>
-
-              {/* Nuevo elemento para Momentum Medio Bot */}
+              {/* Momentum Medio Bot - Estrategia Principal */}
               <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
                 <div className="flex items-center gap-3">
                   {momentumMedioData?.is_safe_to_operate ? (
@@ -1438,27 +1403,6 @@ const RadarApalancamiento = () => {
                     </div>
                     <div className="text-xs text-slate-400 mt-1">
                       Estrategia: <span className="text-slate-300 font-medium">{momentumMedioData?.strategy_used || 'MOMENTUM MEDIO'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Nuevo elemento para Reversão Calma Bot */}
-              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
-                <div className="flex items-center gap-3">
-                  {reversaoCalmaData?.is_safe_to_operate ? (
-                    <CheckCircle className="text-emerald-400 flex-shrink-0" size={24} />
-                  ) : (
-                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
-                  )}
-                  <div className="flex-1">
-                    <div className={`text-sm font-bold mb-1 ${
-                      reversaoCalmaData?.is_safe_to_operate ? 'text-emerald-400' : 'text-slate-200'
-                    }`}>
-                      {reversaoCalmaData?.reason || 'Analizando reversión calma para oportunidades de entrada'}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      Estrategia: <span className="text-slate-300 font-medium">{reversaoCalmaData?.strategy_used || 'REVERSIÓN CALMA'}</span>
                     </div>
                   </div>
                 </div>
