@@ -100,6 +100,7 @@ const RadarApalancamiento = () => {
   const [scalpingReversionData, setScalpingReversionData] = useState<RadarSignal | null>(null);
   const [tunderRadarData, setTunderRadarData] = useState<TunderRadarSignal | null>(null);
   const [momentumMedioData, setMomentumMedioData] = useState<TunderRadarSignal | null>(null);
+  const [momentumCalmoLLData, setMomentumCalmoLLData] = useState<TunderRadarSignal | null>(null);
   const [reversaoCalmaData, setReversaoCalmaData] = useState<TunderRadarSignal | null>(null);
   const [botStats, setBotStats] = useState<BotStats | null>(null);
   const [historicData, setHistoricData] = useState<BotOperation[]>([]);
@@ -130,6 +131,7 @@ const RadarApalancamiento = () => {
   const previousScalpingPatternFound = useRef(false);
   const previousScalpingReversionPatternFound = useRef(false);
   const previousMomentumMedioPatternFound = useRef(false);
+  const previousMomentumCalmoLLPatternFound = useRef(false);
   const audioInitialized = useRef(false);
 
   // Função para converter UTC-3 para horário local do dispositivo
@@ -192,10 +194,22 @@ const RadarApalancamiento = () => {
         return [];
       }
       
+      console.log('📊 Histórico Tunder Bot atualizado:', data?.length || 0, 'operações');
       return data || [];
     } catch (error) {
       console.error('Erro ao buscar histórico do Tunder Bot:', error);
       return [];
+    }
+  };
+
+  // Função específica para atualizar apenas o histórico do Tunder Bot
+  const atualizarHistoricoTunderBot = async () => {
+    try {
+      const tunderHistory = await fetchTunderOperationsHistory();
+      setTunderOperationsHistory(tunderHistory);
+      console.log('🔄 Histórico Tunder Bot atualizado com', tunderHistory.length, 'operações');
+    } catch (error) {
+      console.error('Erro ao atualizar histórico do Tunder Bot:', error);
     }
   };
 
@@ -317,6 +331,28 @@ const RadarApalancamiento = () => {
       return data?.[0] || null;
     } catch (error) {
       console.error('Error in obtenerEstadoMomentumMedio:', error);
+      return null;
+    }
+  };
+
+  // Función para obtener el estado del Momentum Calmo LL Bot
+  const obtenerEstadoMomentumCalmoLL = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('radar_de_apalancamiento_signals')
+        .select('*')
+        .eq('bot_name', 'executor_momentum_calmo_ll_v1')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching momentum calmo LL radar data:', error);
+        return null;
+      }
+
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error in obtenerEstadoMomentumCalmoLL:', error);
       return null;
     }
   };
@@ -602,11 +638,12 @@ const RadarApalancamiento = () => {
   const actualizarDatos = async () => {
     setIsLoading(true);
     try {
-      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, estadoMomentumMedio, estadoReversaoCalma, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
+      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, estadoMomentumMedio, estadoMomentumCalmoLL, estadoReversaoCalma, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
         obtenerEstadoScalpingBot(),
         obtenerEstadoScalpingReversion(),
         obtenerEstadoTunderBot(),
         obtenerEstadoMomentumMedio(),
+        obtenerEstadoMomentumCalmoLL(),
         obtenerEstadoReversaoCalma(),
         obtenerHistorico(),
         obtenerEstadisticasExactas(),
@@ -621,6 +658,7 @@ const RadarApalancamiento = () => {
       setScalpingReversionData(estadoScalpingReversion);
       setTunderRadarData(estadoTunderBot);
       setMomentumMedioData(estadoMomentumMedio);
+      setMomentumCalmoLLData(estadoMomentumCalmoLL);
       setReversaoCalmaData(estadoReversaoCalma);
       setHistoricData(historico);
       setDashboardStats(dashboardStats);
@@ -697,6 +735,24 @@ const RadarApalancamiento = () => {
         }
       )
       .subscribe();
+
+    // Listener específico para tunder_bot_logs
+    const tunderChannel = supabase
+      .channel('tunder-bot-logs-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tunder_bot_logs'
+        },
+        (payload) => {
+          console.log('🔄 Nova operação Tunder Bot detectada:', payload);
+          // Atualizar histórico imediatamente quando houver nova operação
+          atualizarHistoricoTunderBot();
+        }
+      )
+      .subscribe();
     
     // ATUALIZAÇÃO AUTOMÁTICA A CADA 5 SEGUNDOS
     const autoUpdateInterval = setInterval(() => {
@@ -706,6 +762,7 @@ const RadarApalancamiento = () => {
     
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(tunderChannel);
       clearInterval(autoUpdateInterval);
     };
   }, []);
@@ -728,14 +785,18 @@ const RadarApalancamiento = () => {
   // Detectar padrão encontrado específico para Momentum Medio Bot
   const isMomentumMedioPatternFound = momentumMedioData?.is_safe_to_operate === true;
   
+  // Detectar padrão encontrado específico para Momentum Calmo LL Bot
+  const isMomentumCalmoLLPatternFound = momentumCalmoLLData?.is_safe_to_operate === true && 
+    momentumCalmoLLData?.reason?.includes('SEÑAL ACTIVA: LL detectado');
+  
   // Detectar padrão encontrado específico para Reversão Calma Bot
   const isReversaoCalmaPatternFound = reversaoCalmaData?.is_safe_to_operate === true;
   
   // Definir condição para padrão encontrado (qualquer uma das estratégias do Scalping Bot)
   const isPatternFound = isScalpingPatternFound || isScalpingReversionPatternFound;
   
-  // Definir condição para padrão encontrado no Alavanca Bot (apenas Momentum Medio)
-  const isAlavancaPatternFound = isMomentumMedioPatternFound;
+  // Definir condição para padrão encontrado no Alavanca Bot (Momentum Medio OU Momentum Calmo LL)
+  const isAlavancaPatternFound = isMomentumMedioPatternFound || isMomentumCalmoLLPatternFound;
 
   // useEffect para reproduzir som quando padrão for detectado
   useEffect(() => {
@@ -767,7 +828,14 @@ const RadarApalancamiento = () => {
       console.log('🔊 Som reproduzido: Padrão detectado no Momentum Medio Bot');
     }
     previousMomentumMedioPatternFound.current = isMomentumMedioPatternFound;
-  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isMomentumMedioPatternFound, playNotification]);
+
+    // Verificar se um novo padrão foi encontrado no Momentum Calmo LL Bot (SEÑAL ACTIVA: LL detectado)
+    if (isMomentumCalmoLLPatternFound && !previousMomentumCalmoLLPatternFound.current) {
+      playNotificationSound();
+      console.log('🔊 Som reproduzido: SEÑAL ACTIVA: LL detectado no Momentum Calmo LL Bot');
+    }
+    previousMomentumCalmoLLPatternFound.current = isMomentumCalmoLLPatternFound;
+  }, [isScalpingPatternFound, isScalpingReversionPatternFound, isMomentumMedioPatternFound, isMomentumCalmoLLPatternFound, playNotification]);
 
   // useEffect para inicializar áudio após primeira interação do usuário
   useEffect(() => {
@@ -802,6 +870,22 @@ const RadarApalancamiento = () => {
        document.removeEventListener('keydown', handleFirstInteraction);
      };
    }, [initializeAudio]);
+
+  // useEffect específico para atualizar histórico do Tunder Bot a cada 5 segundos
+  useEffect(() => {
+    // Atualizar imediatamente ao montar o componente
+    atualizarHistoricoTunderBot();
+    
+    // Configurar intervalo para atualização automática
+    const tunderHistoryInterval = setInterval(() => {
+      console.log('🔄 Atualizando histórico do Tunder Bot automaticamente...');
+      atualizarHistoricoTunderBot();
+    }, 5000); // 5 segundos
+    
+    return () => {
+      clearInterval(tunderHistoryInterval);
+    };
+  }, []);
 
   // Função para traduzir reason do Supabase
   const translateReason = (reason: string) => {
@@ -1331,7 +1415,7 @@ const RadarApalancamiento = () => {
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                   <span className="font-black text-sm tracking-wide uppercase">
-                    ENCENDER BOT AHORA!
+                    ATIVAR BOT AHORA!
                   </span>
                   <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                 </div>
@@ -1403,6 +1487,27 @@ const RadarApalancamiento = () => {
                     </div>
                     <div className="text-xs text-slate-400 mt-1">
                       Estrategia: <span className="text-slate-300 font-medium">{momentumMedioData?.strategy_used || 'MOMENTUM MEDIO'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Momentum Calmo LL Bot - Nueva Estrategia */}
+              <div className="bg-gradient-to-r from-emerald-800/60 to-emerald-700/40 rounded-lg p-3 border border-emerald-600/30">
+                <div className="flex items-center gap-3">
+                  {momentumCalmoLLData?.is_safe_to_operate ? (
+                    <CheckCircle className="text-emerald-400 flex-shrink-0" size={24} />
+                  ) : (
+                    <Eye className="text-cyan-400 flex-shrink-0" size={24} />
+                  )}
+                  <div className="flex-1">
+                    <div className={`text-sm font-bold mb-1 ${
+                      momentumCalmoLLData?.is_safe_to_operate ? 'text-emerald-400' : 'text-slate-200'
+                    }`}>
+                      {momentumCalmoLLData?.reason || 'Analizando momentum calmo para entradas de baja volatilidad'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      Estrategia: <span className="text-slate-300 font-medium">{momentumCalmoLLData?.strategy_used || 'MOMENTUM CALMO LL'}</span>
                     </div>
                   </div>
                 </div>
