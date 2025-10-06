@@ -114,6 +114,11 @@ const RadarApalancamiento = () => {
   const [tunderOperationsHistory, setTunderOperationsHistory] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
+  // Estado centralizado para dados do Tunder Dashboard
+  const [tunderDashboardData, setTunderDashboardData] = useState({ 
+    visual_history_40: '' 
+  });
+
   
   // Estados para controle de alta volatilidade
   const [scalpingHighVolatility, setScalpingHighVolatility] = useState(false);
@@ -202,16 +207,7 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Função específica para atualizar apenas o histórico do Tunder Bot
-  const atualizarHistoricoTunderBot = async () => {
-    try {
-      const tunderHistory = await fetchTunderOperationsHistory();
-      setTunderOperationsHistory(tunderHistory);
-      console.log('🔄 Histórico Tunder Bot atualizado com', tunderHistory.length, 'operações');
-    } catch (error) {
-      console.error('Erro ao atualizar histórico do Tunder Bot:', error);
-    }
-  };
+
 
   // Função para buscar última operação
   const fetchLastOperation = async (tableName: string) => {
@@ -238,6 +234,27 @@ const RadarApalancamiento = () => {
     } catch (error) {
       console.error(`Erro ao buscar última operação de ${tableName}:`, error);
       return null;
+    }
+  };
+
+  // Função para buscar dados do Tunder Dashboard
+  const fetchTunderDashboardData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vw_tunder_dashboard')
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('Erro ao buscar dados do Tunder Dashboard:', error);
+        return { visual_history_40: '' };
+      }
+      
+      console.log('📊 Dados Tunder Dashboard atualizados:', data);
+      return data || { visual_history_40: '' };
+    } catch (error) {
+      console.error('Erro ao buscar dados do Tunder Dashboard:', error);
+      return { visual_history_40: '' };
     }
   };
 
@@ -638,7 +655,7 @@ const RadarApalancamiento = () => {
   const actualizarDatos = async () => {
     setIsLoading(true);
     try {
-      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, estadoMomentumMedio, estadoMomentumCalmoLL, estadoReversaoCalma, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory] = await Promise.all([
+      const [estadoScalpingBot, estadoScalpingReversion, estadoTunderBot, estadoMomentumMedio, estadoMomentumCalmoLL, estadoReversaoCalma, historico, statsExactas, dashboardStats, lastScalping, lastTunder, scalpingHistory, tunderHistory, tunderDashboard] = await Promise.all([
         obtenerEstadoScalpingBot(),
         obtenerEstadoScalpingReversion(),
         obtenerEstadoTunderBot(),
@@ -651,7 +668,8 @@ const RadarApalancamiento = () => {
         fetchLastOperation('scalping_accumulator_bot_logs'),
         fetchLastOperation('tunder_bot_logs'),
         fetchScalpingOperationsHistory(),
-        fetchTunderOperationsHistory()
+        fetchTunderOperationsHistory(),
+        fetchTunderDashboardData()
       ]);
 
       setScalpingRadarData(estadoScalpingBot);
@@ -672,6 +690,9 @@ const RadarApalancamiento = () => {
       setLastTunderOperation(lastTunder);
       setScalpingOperationsHistory(scalpingHistory);
       setTunderOperationsHistory(tunderHistory);
+      
+      // Atualizar dados centralizados do Tunder Dashboard
+      setTunderDashboardData(tunderDashboard);
       
       // Verificar alta volatilidade - Scalping Bot
       if (statsExactas && statsExactas.losses_5 > 4) {
@@ -736,7 +757,7 @@ const RadarApalancamiento = () => {
       )
       .subscribe();
 
-    // Listener específico para tunder_bot_logs
+    // Listener específico para tunder_bot_logs - Atualização Instantânea Otimizada
     const tunderChannel = supabase
       .channel('tunder-bot-logs-realtime')
       .on(
@@ -746,10 +767,26 @@ const RadarApalancamiento = () => {
           schema: 'public',
           table: 'tunder_bot_logs'
         },
-        (payload) => {
+        async (payload) => {
           console.log('🔄 Nova operação Tunder Bot detectada:', payload);
-          // Atualizar histórico imediatamente quando houver nova operação
-          atualizarHistoricoTunderBot();
+          console.log('⚡ Atualizando dados instantaneamente...');
+          
+          // Atualização instantânea otimizada
+          try {
+            // Atualizar VIEW do dashboard
+            const tunderDashboard = await fetchTunderDashboardData();
+            setTunderDashboardData(tunderDashboard);
+            
+            // Atualizar última operação instantaneamente
+            const lastTunderOperation = await fetchLastOperation('tunder_bot_logs');
+            setLastTunderOperation(lastTunderOperation);
+            
+            console.log('✅ Dashboard e última operação atualizados instantaneamente via Realtime');
+          } catch (error) {
+            console.error('❌ Erro na atualização instantânea:', error);
+            // Fallback para atualização completa em caso de erro
+            actualizarDatos();
+          }
         }
       )
       .subscribe();
@@ -871,21 +908,7 @@ const RadarApalancamiento = () => {
      };
    }, [initializeAudio]);
 
-  // useEffect específico para atualizar histórico do Tunder Bot a cada 5 segundos
-  useEffect(() => {
-    // Atualizar imediatamente ao montar o componente
-    atualizarHistoricoTunderBot();
-    
-    // Configurar intervalo para atualização automática
-    const tunderHistoryInterval = setInterval(() => {
-      console.log('🔄 Atualizando histórico do Tunder Bot automaticamente...');
-      atualizarHistoricoTunderBot();
-    }, 5000); // 5 segundos
-    
-    return () => {
-      clearInterval(tunderHistoryInterval);
-    };
-  }, []);
+
 
   // Função para traduzir reason do Supabase
   const translateReason = (reason: string) => {
@@ -1536,36 +1559,36 @@ const RadarApalancamiento = () => {
                  </div>
                </div>
 
-               {/* Histórico Visual das Últimas 20 Operações */}
+               {/* Histórico Visual das Últimas 40 Operações - VIEW Otimizada */}
                <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-xl p-4 border border-slate-600/20">
                  <div className="flex items-center gap-2 mb-3">
                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                   <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
+                   <h3 className="text-sm font-semibold text-slate-200">Histórico Visual (40 operações)</h3>
                  </div>
                  
                  <div className="grid grid-cols-10 gap-1">
-                   {tunderOperationsHistory && tunderOperationsHistory.length > 0 ? (
-                     tunderOperationsHistory.map((operation, index) => (
+                   {tunderDashboardData.visual_history_40 ? (
+                     tunderDashboardData.visual_history_40.split(',').map((result, index) => (
                        <div
                          key={index}
                          className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
-                           operation.operation_result === 'WIN'
+                           result.trim() === 'W'
                              ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
                              : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
                          }`}
-                         title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.created_at)}`}
+                         title={`${result.trim() === 'W' ? 'WIN' : 'LOSS'} - Operação ${index + 1}`}
                        >
-                         {operation.operation_result === 'WIN' ? 'W' : 'L'}
+                         {result.trim()}
                        </div>
                      ))
                    ) : (
                      <div className="col-span-10 text-center text-slate-400 text-xs py-2">
-                       Cargando histórico...
+                       Cargando histórico optimizado...
                      </div>
                    )}
                  </div>
                  
-                 {tunderOperationsHistory && tunderOperationsHistory.length > 0 && (
+                 {tunderDashboardData.visual_history_40 && (
                    <div className="mt-3 flex justify-between text-xs text-slate-400">
                      <span>Más reciente</span>
                      <span>Más antigua</span>
@@ -1647,7 +1670,7 @@ const RadarApalancamiento = () => {
                {/* Botão Descargar Bot */}
                <Button 
                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1W8YeFG7lMKKkb4kEMTpMlAUC3x9WfKUv/view?usp=sharing', '_blank')}
+                 onClick={() => window.open('https://drive.google.com/file/d/1DjqvkXD4ZwLJag-Wz1h7YbZvd-EF9RyB/view?usp=sharing', '_blank')}
                >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
