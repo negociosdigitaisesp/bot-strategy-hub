@@ -1670,7 +1670,7 @@ const RadarApalancamiento = () => {
                {/* Botão Descargar Bot */}
                <Button 
                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1DjqvkXD4ZwLJag-Wz1h7YbZvd-EF9RyB/view?usp=sharing', '_blank')}
+                 onClick={() => window.open('https://drive.google.com/file/d/10jQ5HKTz2rce4Am5AdZ1xRPQM2AXYru4/view?usp=sharing', '_blank')}
                >
                  <Download size={18} className="mr-2" />
                  Descargar Bot
