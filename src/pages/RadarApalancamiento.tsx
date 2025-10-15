@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useTunderBot } from '../hooks/useTunderBot';
 import { useAudioNotification } from '../services/audioNotificationService';
+import EnhancedTunderBotCard from '../components/EnhancedTunderBotCard';
 
 interface RadarSignal {
   id: string;
@@ -46,8 +47,13 @@ interface TunderRadarSignal {
   bot_name: string;
   is_safe_to_operate: boolean;
   reason: string;
-  operations_after_pattern: number;
-  created_at: string;
+  operations_after_pattern?: number;
+  created_at?: string;
+  strategy_used: string;
+  strategy_confidence: number;
+  pattern_found_at: string;
+  last_update: string;
+  last_operations: any; // JSON field with operation data
 }
 
 interface TunderBotOperation {
@@ -93,6 +99,96 @@ interface StrategyColors {
   text: string;
   icon: string;
 }
+
+// Função para obter cores baseadas no tipo de estratégia
+const getStrategyColors = (type: string): StrategyColors => {
+  const colorMap: Record<string, StrategyColors> = {
+    'PREMIUM_RECOVERY': {
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-200',
+      accent: 'bg-emerald-500',
+      text: 'text-emerald-700',
+      icon: 'text-emerald-600'
+    },
+    'MOMENTUM_CONTINUATION': {
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
+      accent: 'bg-blue-500',
+      text: 'text-blue-700',
+      icon: 'text-blue-600'
+    },
+    'VOLATILITY_BREAK': {
+      bg: 'bg-orange-50',
+      border: 'border-orange-200',
+      accent: 'bg-orange-500',
+      text: 'text-orange-700',
+      icon: 'text-orange-600'
+    },
+    'PATTERN_REVERSAL': {
+      bg: 'bg-purple-50',
+      border: 'border-purple-200',
+      accent: 'bg-purple-500',
+      text: 'text-purple-700',
+      icon: 'text-purple-600'
+    },
+    'CYCLE_TRANSITION': {
+      bg: 'bg-indigo-50',
+      border: 'border-indigo-200',
+      accent: 'bg-indigo-500',
+      text: 'text-indigo-700',
+      icon: 'text-indigo-600'
+    },
+    'FIBONACCI_RECOVERY': {
+      bg: 'bg-teal-50',
+      border: 'border-teal-200',
+      accent: 'bg-teal-500',
+      text: 'text-teal-700',
+      icon: 'text-teal-600'
+    },
+    'MOMENTUM_SHIFT': {
+      bg: 'bg-cyan-50',
+      border: 'border-cyan-200',
+      accent: 'bg-cyan-500',
+      text: 'text-cyan-700',
+      icon: 'text-cyan-600'
+    },
+    'STABILITY_BREAK': {
+      bg: 'bg-red-50',
+      border: 'border-red-200',
+      accent: 'bg-red-500',
+      text: 'text-red-700',
+      icon: 'text-red-600'
+    }
+  };
+
+  return colorMap[type] || {
+    bg: 'bg-gray-50',
+    border: 'border-gray-200',
+    accent: 'bg-gray-500',
+    text: 'text-gray-700',
+    icon: 'text-gray-600'
+  };
+};
+
+// Componente ConfidenceBadge
+const ConfidenceBadge: React.FC<{ confidence: number }> = ({ confidence }) => {
+  const getConfidenceColor = (conf: number) => {
+    if (conf >= 90) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (conf >= 80) return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (conf >= 70) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (conf >= 60) return 'bg-orange-100 text-orange-800 border-orange-200';
+    return 'bg-red-100 text-red-800 border-red-200';
+  };
+
+  return (
+    <Badge 
+      variant="outline" 
+      className={`${getConfidenceColor(confidence)} font-medium`}
+    >
+      {confidence}% confiança
+    </Badge>
+  );
+};
 
 const RadarApalancamiento = () => {
   const navigate = useNavigate();
@@ -305,15 +401,16 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Función para obtener el estado del Tunder Bot
+  // Función para obtener el estado del Tunder Bot - ACTUALIZADA para nueva estructura
   const obtenerEstadoTunderBot = async () => {
     try {
       setIsConnecting(true);
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'executor_momentum_calmo_v1')
-        .order('created_at', { ascending: false })
+        .like('bot_name', 'Radar Tunder 3.5%')
+        .in('strategy_used', ['Log-ANALISIS', 'Log-RECOMENDACION', 'Log-CICLO'])
+        .order('pattern_found_at', { ascending: false })
         .limit(1);
 
       if (error) {
@@ -330,14 +427,15 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Función para obtener el estado del Momentum Medio Bot
+  // Función para obtener el estado del Momentum Medio Bot - ACTUALIZADA
   const obtenerEstadoMomentumMedio = async () => {
     try {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'executor_momentum_medio_v1')
-        .order('created_at', { ascending: false })
+        .like('bot_name', 'Radar Tunder 3.5%')
+        .eq('strategy_used', 'Log-ANALISIS')
+        .order('pattern_found_at', { ascending: false })
         .limit(1);
 
       if (error) {
@@ -352,14 +450,15 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Función para obtener el estado del Momentum Calmo LL Bot
+  // Función para obtener el estado del Momentum Calmo LL Bot - ACTUALIZADA
   const obtenerEstadoMomentumCalmoLL = async () => {
     try {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'executor_momentum_calmo_ll_v1')
-        .order('created_at', { ascending: false })
+        .like('bot_name', 'Radar Tunder 3.5%')
+        .eq('strategy_used', 'Log-METRICAS')
+        .order('pattern_found_at', { ascending: false })
         .limit(1);
 
       if (error) {
@@ -374,14 +473,15 @@ const RadarApalancamiento = () => {
     }
   };
 
-  // Función para obtener el estado del Reversão Calma Bot
+  // Función para obtener el estado del Reversão Calma Bot - ACTUALIZADA
   const obtenerEstadoReversaoCalma = async () => {
     try {
       const { data, error } = await supabase
         .from('radar_de_apalancamiento_signals')
         .select('*')
-        .eq('bot_name', 'executor_reversao_calma_v1')
-        .order('created_at', { ascending: false })
+        .like('bot_name', 'Radar Tunder 3.5%')
+        .eq('strategy_used', 'Log-RECOMENDACION')
+        .order('pattern_found_at', { ascending: false })
         .limit(1);
 
       if (error) {
@@ -564,7 +664,23 @@ const RadarApalancamiento = () => {
 
   // Función para determinar el color del card
   const getCardColor = (reason) => {
-    if (reason.includes("Esperando el patrón") || reason.includes("Aguardando")) {
+    if (reason.includes("Mercado Acumuladores")) {
+      return {
+        bg: 'bg-purple-500/10',
+        border: 'border-purple-500/20',
+        accent: 'bg-purple-500',
+        text: 'text-purple-400',
+        icon: 'text-purple-400'
+      };
+    } else if (reason.includes("Análisis Avanzado de Scalping")) {
+      return {
+        bg: 'bg-cyan-500/10',
+        border: 'border-cyan-500/20',
+        accent: 'bg-cyan-500',
+        text: 'text-cyan-400',
+        icon: 'text-cyan-400'
+      };
+    } else if (reason.includes("Esperando el patrón") || reason.includes("Aguardando")) {
       return {
         bg: 'bg-yellow-500/10',
         border: 'border-yellow-500/20',
@@ -736,7 +852,7 @@ const RadarApalancamiento = () => {
           console.log('Shared Signals - Update recebido:', payload);
           
           if (payload.new) {
-            // Distribuir dados baseado no bot_name
+            // Distribuir dados baseado no bot_name - ATUALIZADO para nova estrutura
             if (payload.new.bot_name === 'Radar Scalping I.A') {
               console.log('Atualizando dados do Scalping Bot');
               setScalpingRadarData(payload.new);
@@ -746,9 +862,18 @@ const RadarApalancamiento = () => {
                 const newStats = calcularEstadisticas(historicData, payload.new, null, null);
                 setBotStats(newStats);
               }
-            } else if (payload.new.bot_name === 'radartunder1.5') {
-              console.log('Atualizando dados do Tunder Bot');
+            } else if (payload.new.bot_name && payload.new.bot_name.includes('Radar Tunder 3.5%')) {
+              console.log('Atualizando dados do Tunder Bot - Nova estrutura:', payload.new);
               setTunderRadarData(payload.new);
+              
+              // Atualizar dados específicos baseado no strategy_used
+              if (payload.new.strategy_used === 'Log-ANALISIS') {
+                console.log('Atualização de análise recebida');
+              } else if (payload.new.strategy_used === 'Log-RECOMENDACION') {
+                console.log('Nova recomendação recebida');
+              } else if (payload.new.strategy_used === 'Log-CICLO') {
+                console.log('Atualização de ciclo recebida');
+              }
             }
             
             setLastUpdateTime(new Date());
@@ -757,39 +882,29 @@ const RadarApalancamiento = () => {
       )
       .subscribe();
 
-    // Listener específico para tunder_bot_logs - Atualização Instantânea Otimizada
-    const tunderChannel = supabase
-      .channel('tunder-bot-logs-realtime')
+    // SEGUNDA SUBSCRIPTION para bot_metrics_consolidated - TUNDER BOT
+    const metricsChannel = supabase
+      .channel('bot-metrics-realtime')
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'tunder_bot_logs'
+          table: 'bot_metrics_consolidated',
+          filter: 'bot_name=eq.radartunder3.5'
         },
-        async (payload) => {
-          console.log('🔄 Nova operação Tunder Bot detectada:', payload);
-          console.log('⚡ Atualizando dados instantaneamente...');
-          
-          // Atualização instantânea otimizada
-          try {
-            // Atualizar VIEW do dashboard
-            const tunderDashboard = await fetchTunderDashboardData();
-            setTunderDashboardData(tunderDashboard);
-            
-            // Atualizar última operação instantaneamente
-            const lastTunderOperation = await fetchLastOperation('tunder_bot_logs');
-            setLastTunderOperation(lastTunderOperation);
-            
-            console.log('✅ Dashboard e última operação atualizados instantaneamente via Realtime');
-          } catch (error) {
-            console.error('❌ Erro na atualização instantânea:', error);
-            // Fallback para atualização completa em caso de erro
-            actualizarDatos();
+        (payload) => {
+          console.log('📊 Bot metrics atualizados:', payload);
+          if (payload.new) {
+            // Atualizar dados do EnhancedTunderBotCard automaticamente
+            console.log('Métricas do Tunder Bot atualizadas:', payload.new);
+            setLastUpdateTime(new Date());
           }
         }
       )
       .subscribe();
+
+    // REMOVIDO: Listener específico para tunder_bot_logs - Agora usando radar_de_apalancamiento_signals unificado
     
     // ATUALIZAÇÃO AUTOMÁTICA A CADA 5 SEGUNDOS
     const autoUpdateInterval = setInterval(() => {
@@ -799,7 +914,7 @@ const RadarApalancamiento = () => {
     
     return () => {
       supabase.removeChannel(channel);
-      supabase.removeChannel(tunderChannel);
+      supabase.removeChannel(metricsChannel);
       clearInterval(autoUpdateInterval);
     };
   }, []);
@@ -1343,21 +1458,7 @@ const RadarApalancamiento = () => {
                  )}
                </div>
 
-               {/* Mercado Acumulators */}
-               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
-                 <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                   <h3 className="text-sm font-semibold text-slate-300">Mercado Acumuladores</h3>
-                 </div>
-               </div>
 
-               {/* Análise Avançada de Scalping */}
-               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
-                 <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                   <h3 className="text-sm font-semibold text-slate-300">Análisis Avanzado de Scalping</h3>
-                 </div>
-               </div>
 
                {/* Estrategia de Operaciones Optimizada */}
                <div className="bg-gradient-to-br from-blue-500/10 to-indigo-600/5 rounded-xl p-4 border border-blue-500/20 shadow-lg">
@@ -1426,257 +1527,7 @@ const RadarApalancamiento = () => {
           </Card>
 
           {/* TUNDER BOT Card - DESIGN UX PROFISSIONAL */}
-          <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
-            isAlavancaPatternFound
-              ? 'border-2 border-orange-400 shadow-orange-400/30 ring-2 ring-orange-400/20'
-              : 'border border-slate-600/50 shadow-slate-900/50'
-          } relative overflow-hidden group`}>
-            
-            {/* Banner Superior - Quando padrão encontrado */}
-            {isAlavancaPatternFound && (
-              <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-black text-center py-2 px-4 shadow-lg">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                  <span className="font-black text-sm tracking-wide uppercase">
-                    ATIVAR BOT AHORA!
-                  </span>
-                  <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                </div>
-              </div>
-            )}
-
-            {/* Accent Bar */}
-            <div className={`h-2 rounded-t-lg ${
-              isTunderPatternFound ? 'bg-orange-400' : 'bg-orange-500'
-            }`}></div>
-            
-            <CardHeader className="pb-3 bg-[#1C2A3A]/80">
-              {/* Tag Minimalista dentro do Card */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-400/30 px-3 py-1.5 rounded-full">
-                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-bold text-orange-400 tracking-wide">💰 MÁS RENTABLE</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 border shadow-md rounded-xl ${
-                    isTunderPatternFound
-                      ? 'bg-orange-500/20 border-orange-500/50 shadow-orange-400/30'
-                      : 'bg-orange-500/20 border-orange-500/30'
-                  }`}>
-                    <Zap className={isTunderPatternFound ? 'text-orange-400' : 'text-orange-500'} size={20} />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-bold text-slate-100 flex items-center gap-2">
-                      ⚡ ALAVANCA BOT
-                    </CardTitle>
-                    {lastTunderOperation && (
-                      <div className={`text-xs px-2 py-1 rounded mt-1 ${
-                        lastTunderOperation.operation_result === 'WIN'
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        Última operación: {lastTunderOperation.operation_result || 'N/A'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="text-right">
-                  <Badge className={`text-white text-xs px-2 py-1 ${
-                    isTunderPatternFound ? 'bg-orange-500 animate-pulse' : 'bg-orange-500'
-                  }`}>
-                    {isTunderPatternFound ? 'PATRÓN ACTIVO' : 'MONITORANDO'}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-3">
-              {/* Momentum Medio Bot - Estrategia Principal */}
-              <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
-                <div className="flex items-center gap-3">
-                  {momentumMedioData?.is_safe_to_operate ? (
-                    <CheckCircle className="text-purple-400 flex-shrink-0" size={24} />
-                  ) : (
-                    <Eye className="text-blue-400 flex-shrink-0" size={24} />
-                  )}
-                  <div className="flex-1">
-                    <div className={`text-sm font-bold mb-1 ${
-                      momentumMedioData?.is_safe_to_operate ? 'text-purple-400' : 'text-slate-200'
-                    }`}>
-                      {momentumMedioData?.reason || 'Analizando momentum medio para oportunidades de entrada'}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      Estrategia: <span className="text-slate-300 font-medium">{momentumMedioData?.strategy_used || 'MOMENTUM MEDIO'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Momentum Calmo LL Bot - Nueva Estrategia */}
-              <div className="bg-gradient-to-r from-emerald-800/60 to-emerald-700/40 rounded-lg p-3 border border-emerald-600/30">
-                <div className="flex items-center gap-3">
-                  {momentumCalmoLLData?.is_safe_to_operate ? (
-                    <CheckCircle className="text-emerald-400 flex-shrink-0" size={24} />
-                  ) : (
-                    <Eye className="text-cyan-400 flex-shrink-0" size={24} />
-                  )}
-                  <div className="flex-1">
-                    <div className={`text-sm font-bold mb-1 ${
-                      momentumCalmoLLData?.is_safe_to_operate ? 'text-emerald-400' : 'text-slate-200'
-                    }`}>
-                      {momentumCalmoLLData?.reason || 'Analizando momentum calmo para entradas de baja volatilidad'}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      Estrategia: <span className="text-slate-300 font-medium">{momentumCalmoLLData?.strategy_used || 'MOMENTUM CALMO LL'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Métricas Simplificadas */}
-               <div className="grid grid-cols-2 gap-2">
-                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-lg p-3 border border-green-500/20">
-                   <div className="text-center">
-                     <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-1">Ganancias</div>
-                     <div className="text-xl font-bold text-green-400">
-                       {tunderBot.data?.wins ?? '0'}
-                     </div>
-                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
-                   </div>
-                 </div>
-                 
-                 <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-lg p-3 border border-red-500/20">
-                   <div className="text-center">
-                     <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-1">Pérdidas</div>
-                     <div className="text-xl font-bold text-red-400">
-                       {tunderBot.data?.losses ?? '0'}
-                     </div>
-                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
-                   </div>
-                 </div>
-               </div>
-
-               {/* Histórico Visual das Últimas 40 Operações - VIEW Otimizada */}
-               <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-xl p-4 border border-slate-600/20">
-                 <div className="flex items-center gap-2 mb-3">
-                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                   <h3 className="text-sm font-semibold text-slate-200">Histórico Visual (40 operações)</h3>
-                 </div>
-                 
-                 <div className="grid grid-cols-10 gap-1">
-                   {tunderDashboardData.visual_history_40 ? (
-                     tunderDashboardData.visual_history_40.split(',').map((result, index) => (
-                       <div
-                         key={index}
-                         className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
-                           result.trim() === 'W'
-                             ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
-                             : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
-                         }`}
-                         title={`${result.trim() === 'W' ? 'WIN' : 'LOSS'} - Operação ${index + 1}`}
-                       >
-                         {result.trim()}
-                       </div>
-                     ))
-                   ) : (
-                     <div className="col-span-10 text-center text-slate-400 text-xs py-2">
-                       Cargando histórico optimizado...
-                     </div>
-                   )}
-                 </div>
-                 
-                 {tunderDashboardData.visual_history_40 && (
-                   <div className="mt-3 flex justify-between text-xs text-slate-400">
-                     <span>Más reciente</span>
-                     <span>Más antigua</span>
-                   </div>
-                 )}
-               </div>
-
-               {/* Mercado Acumulators */}
-               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
-                 <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                   <h3 className="text-sm font-semibold text-slate-300">Mercado Acumuladores</h3>
-                 </div>
-               </div>
-
-               {/* Análise Avançada de Scalping */}
-               <div className="bg-gradient-to-br from-slate-700/20 to-slate-600/10 rounded-xl p-4 border border-slate-500/20">
-                 <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-                   <h3 className="text-sm font-semibold text-slate-300">Análisis Avanzado de Scalping</h3>
-                 </div>
-               </div>
-
-               {/* Estrategia de Operación Única */}
-               <div className="bg-gradient-to-br from-purple-500/10 to-violet-600/5 rounded-xl p-4 border border-purple-500/20 shadow-lg">
-                 <div className="flex items-center gap-2 mb-3">
-                   <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse"></div>
-                   <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wide">Estrategia de Máxima Precisión</h3>
-                 </div>
-                 
-                 <div className="space-y-3">
-                   <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
-                     <div className="flex items-center gap-2 mb-2">
-                       <div className="w-2 h-2 bg-violet-400 rounded-full"></div>
-                       <span className="text-xs font-semibold text-violet-400 uppercase">Recomendación Elite</span>
-                     </div>
-                     <p className="text-sm text-slate-200 font-medium leading-relaxed">
-                       Utilizar únicamente la <span className="text-violet-400 font-bold">Primera Operación</span> después de surgir el patrón
-                     </p>
-                     <div className="mt-2 text-xs text-slate-400">
-                       Máxima precisión • Riesgo mínimo • Rentabilidad óptima
-                     </div>
-                   </div>
-                   
-                   <div className="bg-violet-500/10 rounded-lg p-3 border border-violet-500/20">
-                     <div className="flex items-center justify-between mb-2">
-                       <div className="text-xs font-bold text-violet-400">1ª Operación</div>
-                       <div className="text-lg font-bold text-violet-400">92%</div>
-                     </div>
-                     <div className="text-xs text-slate-300 mb-2">Precisión comprobada</div>
-                     <div className="w-full bg-slate-700 rounded-full h-2">
-                       <div className="bg-gradient-to-r from-violet-400 to-purple-500 h-2 rounded-full" style={{width: '92%'}}></div>
-                     </div>
-                   </div>
-                   
-                   <div className="bg-red-500/10 rounded-lg p-2 border border-red-500/20">
-                     <div className="flex items-center gap-2">
-                       <AlertTriangle size={14} className="text-red-400" />
-                       <span className="text-xs font-medium text-red-400">Advertencia:</span>
-                     </div>
-                     <p className="text-xs text-slate-300 mt-1">
-                       Operaciones adicionales reducen significativamente la efectividad
-                     </p>
-                   </div>
-                 </div>
-               </div>
-
-               {/* Tarja de Aviso */}
-               <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-lg p-3 mb-4">
-                 <div className="flex items-center gap-2 text-amber-400">
-                   <AlertTriangle size={16} />
-                   <span className="text-xs font-bold">⚠️ ATENCIÓN:</span>
-                 </div>
-                 <p className="text-xs text-amber-300 mt-1 font-medium">
-                   Antes de utilizar el Bot, verifica que la Tasa de Crescimiento esté en 2%
-                 </p>
-               </div>
-
-               {/* Botão Descargar Bot */}
-               <Button 
-                 className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/10jQ5HKTz2rce4Am5AdZ1xRPQM2AXYru4/view?usp=sharing', '_blank')}
-               >
-                 <Download size={18} className="mr-2" />
-                 Descargar Bot
-               </Button>
-            </CardContent>
-          </Card>
+          <EnhancedTunderBotCard />
         </div>
       </div>
 

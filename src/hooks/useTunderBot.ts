@@ -21,10 +21,11 @@ export const useTunderBot = () => {
     try {
       setIsLoading(true);
       
-      // Query 1: Performance data da view vw_tunder_dashboard
+      // Query 1: Performance data da view vw_tunder_dashboard para ID específico 1055185
       const { data: statsData, error: statsError } = await supabase
         .from('vw_tunder_dashboard')
         .select('*')
+        .eq('id', 1055185)
         .single();
       
       console.log('Tunder Dashboard Data:', statsData);
@@ -80,12 +81,13 @@ export const useTunderBot = () => {
         wins_5_display: wins5Display,
         wins_5_percent: wins5Percent,
         precision_percent: calculatedPrecision,
-        status_message: signalInfo?.reason || 'Esperando el patrón...',
+        status_message: statsData?.reason || 'Esperando el patrón...',
         ops_patron: `${signalInfo?.operations_after_pattern || 0}/3`,
         estado: signalInfo?.is_safe_to_operate ? 'ACTIVO' : 'RIESGO',
         vdv_pattern: hasVDVPattern,
         wins: wins,
-        losses: losses
+        losses: losses,
+        visual_history_40: statsData?.visual_history_40 || ''
       });
       
       setSignal(signalInfo);
