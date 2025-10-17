@@ -220,7 +220,7 @@ const EnhancedTunderBotCard = () => {
   }, []);
 
   const handleDownload = () => {
-    window.open('https://drive.google.com/file/d/1n1ebKg4nHpm3pvehUIEu3Sbs55LgnsQC/view?usp=sharing', '_blank');
+    window.open('https://drive.google.com/open?id=1xmKhrRbzV8bD-M21vL3pbAj_1Tf_mEgQ&usp=drive_copy', '_blank');
   };
 
   const renderHistoricoVisual = () => {
