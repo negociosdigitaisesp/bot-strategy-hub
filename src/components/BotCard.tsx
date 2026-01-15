@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Star, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useToast } from '../hooks/use-toast';
+import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
+import { usePricingModal } from '../contexts/PricingModalContext';
 
 interface BotCardProps {
   id: string;
@@ -16,25 +18,27 @@ interface BotCardProps {
   isFavorite?: boolean;
 }
 
-const BotCard = ({ 
-  id, 
-  name, 
-  description, 
-  strategy, 
-  accuracy, 
-  operations, 
+const BotCard = ({
+  id,
+  name,
+  description,
+  strategy,
+  accuracy,
+  operations,
   imageUrl,
   ranking,
   isFavorite: initialFavorite = false
 }: BotCardProps) => {
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const { toast } = useToast();
+  const { isFree } = useFreemiumLimiter();
+  const { openPricingModal } = usePricingModal();
 
   const toggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsFavorite(!isFavorite);
-    
+
     toast({
       title: !isFavorite ? "¡Bot añadido a favoritos!" : "¡Bot eliminado de favoritos!",
       description: !isFavorite ? `${name} ha sido añadido a tu lista de favoritos.` : `${name} ha sido eliminado de tu lista de favoritos.`,
@@ -62,9 +66,9 @@ const BotCard = ({
           #{ranking}
         </div>
       )}
-      
+
       {/* Favorite button */}
-      <button 
+      <button
         onClick={toggleFavorite}
         className={cn(
           "absolute top-2 right-2 z-10 bg-black/50 rounded-full p-2 transition-all",
@@ -72,19 +76,19 @@ const BotCard = ({
         )}
         aria-label={isFavorite ? "Eliminar de favoritos" : "Añadir a favoritos"}
       >
-        <Star 
-          size={16} 
+        <Star
+          size={16}
           className={cn(
-            "transition-colors", 
+            "transition-colors",
             isFavorite ? "fill-yellow-400 text-yellow-400" : "text-white"
-          )} 
+          )}
         />
       </button>
 
       <div className="relative mb-3">
         {imageUrl ? (
-          <img 
-            src={imageUrl} 
+          <img
+            src={imageUrl}
             alt={name}
             className="w-full h-32 object-cover rounded-md"
           />
@@ -107,40 +111,52 @@ const BotCard = ({
           <Clock size={12} className="mr-1" /> {operations} ops
         </div>
       </div>
-      
+
       <div className="flex justify-between items-start mb-2">
         <h3 className="font-semibold text-base line-clamp-1">{name}</h3>
-        <span 
+        <span
           className={cn(
-            "text-xs px-3 py-1 rounded-full border shadow-sm flex items-center gap-1", 
-            accuracy >= 60 ? "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border-emerald-200" : 
-            accuracy >= 40 ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200" : 
-            "bg-gradient-to-r from-rose-50 to-rose-100 text-rose-700 border-rose-200"
+            "text-xs px-3 py-1 rounded-full border shadow-sm flex items-center gap-1",
+            accuracy >= 60 ? "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border-emerald-200" :
+              accuracy >= 40 ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200" :
+                "bg-gradient-to-r from-rose-50 to-rose-100 text-rose-700 border-rose-200"
           )}
         >
           <span className={cn(
             "w-2 h-2 rounded-full",
-            accuracy >= 60 ? "bg-emerald-500" : 
-            accuracy >= 40 ? "bg-blue-500" : 
-            "bg-rose-500"
+            accuracy >= 60 ? "bg-emerald-500" :
+              accuracy >= 40 ? "bg-blue-500" :
+                "bg-rose-500"
           )}></span>
           {accuracy}% asertivo
         </span>
       </div>
-      
+
       <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{description}</p>
-      
+
       <div className="flex justify-between items-center">
         <span className="text-xs py-1 px-2 bg-primary/10 text-primary rounded-full">
           {strategy}
         </span>
-        
-        <Link 
-          to={id === 'factor50x' ? '/factor50x' : `/bot/${id}`}
-          className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
-        >
-          Detalles <ArrowRight size={12} />
-        </Link>
+
+        {isFree ? (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              openPricingModal();
+            }}
+            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-bold"
+          >
+            Desbloquear <Unlock size={12} />
+          </button>
+        ) : (
+          <Link
+            to={id === 'factor50x' ? '/factor50x' : `/bot/${id}`}
+            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+          >
+            Detalles <ArrowRight size={12} />
+          </Link>
+        )}
       </div>
     </div>
   );

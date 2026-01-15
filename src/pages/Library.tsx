@@ -4,15 +4,16 @@ import BotPerformanceCard from '../components/BotPerformanceCard';
 import SkeletonCard from '../components/SkeletonCard';
 import EnhancedFilterControls from '../components/EnhancedFilterControls';
 import LoadingState from '../components/LoadingState';
-import { 
-  Search, 
-  Filter, 
-  SortDesc, 
-  ChevronDown, 
-  Shield, 
-  BarChart3, 
-  Target, 
-  Users, 
+import RecentGainsTicker from '../components/RecentGainsTicker';
+import {
+  Search,
+  Filter,
+  SortDesc,
+  ChevronDown,
+  Shield,
+  BarChart3,
+  Target,
+  Users,
   Star,
   TrendingUp,
   Activity,
@@ -38,20 +39,20 @@ interface BotStats {
 
 const Library = () => {
   const navigate = useNavigate();
-  
+
   // Estados principais - ÚNICA FONTE DE DADOS
   const [periodoSelecionado, setPeriodoSelecionado] = useState('24 hours');
   const [stats, setStats] = useState<BotStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Estados para filtros profissionais
   const [searchTerm, setSearchTerm] = useState('');
   const [performanceFilter, setPerformanceFilter] = useState<'all' | 'excellent' | 'good' | 'average'>('all');
   const [sortBy, setSortBy] = useState<'accuracy' | 'operations' | 'wins' | 'name'>('accuracy');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Estados para filtros avançados
   const [advancedFilters, setAdvancedFilters] = useState({
     showMostAssertive: false,    // Más Asertivos (>80%)
@@ -59,42 +60,42 @@ const Library = () => {
     showTopApalancamiento: false, // Top Apalancamiento (bots com badges TOP 01 e TOP 02)
     showBestOfWeek: false        // Mejores Bots del la Semana
   });
-  
+
   // Novos estados para controle de exibição
   const [showResults, setShowResults] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [isLoadingTransition, setIsLoadingTransition] = useState(false);
-  
+
   // Estado para filtro de tempo real
   const [realTimeFilter, setRealTimeFilter] = useState<'none' | '5min'>('none');
-  
+
   // Estado para dados em tempo real
   const [realTimeData, setRealTimeData] = useState<any[]>([]);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
-  
+
   // Função centralizada para buscar dados em tempo real
   const fetchRealTimeData = async () => {
     try {
       setLoading(true);
       const currentTime = new Date();
       setLastUpdateTime(currentTime);
-      
+
       console.log('[TEMPO REAL] Buscando dados dos últimos 5 minutos...');
-      
+
       // Obter timestamp de 5 minutos atrás no formato ISO
       const cincoMinutosAtras = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      
+
       // Usar a nova função que aceita timestamp do cliente
       const { data: realTimeStats, error } = await supabase
         .rpc('calcular_estatisticas_desde_timestamp', { timestamp_inicio: cincoMinutosAtras });
-      
+
       if (error) {
         console.error('Erro ao buscar dados em tempo real:', error);
         setError(`Erro ao carregar dados em tempo real: ${error.message}`);
         setLoading(false);
         return;
       }
-      
+
       if (realTimeStats && realTimeStats.length > 0) {
         // Mapear os dados reais dos últimos 5 minutos
         const mappedRealTimeData = realTimeStats.map(bot => ({
@@ -112,7 +113,7 @@ const Library = () => {
           last_signal_time: currentTime,
           is_real_time: true
         }));
-        
+
         setRealTimeData(mappedRealTimeData);
         setStats(mappedRealTimeData); // Definir como dados principais
         console.log(`[TEMPO REAL] ${mappedRealTimeData.length} bots com dados em tempo real`);
@@ -136,9 +137,9 @@ const Library = () => {
       setRealTimeFilter('5min');
       setPeriodoSelecionado(''); // Limpar período selecionado
       setShowResults(true); // Mostrar resultados imediatamente
-      
+
       console.log('[TEMPO REAL] Ativando filtro de dados em tempo real');
-      
+
       // Executar busca imediatamente
       fetchRealTimeData();
     } else {
@@ -152,7 +153,7 @@ const Library = () => {
       setPeriodoSelecionado('24 hours'); // Definir período padrão
     }
   };
-  
+
   // Função para lidar com a mudança de período
   const handlePeriodChange = (periodo: string) => {
     // Se for a primeira seleção ou uma mudança de período
@@ -161,15 +162,15 @@ const Library = () => {
       setRealTimeFilter('none');
       setRealTimeData([]);
       setLastUpdateTime(null);
-      
+
       setPeriodoSelecionado(periodo);
       setIsLoadingTransition(true);
-      
+
       // Se for a primeira carga, atualizar o estado
       if (isFirstLoad) {
         setIsFirstLoad(false);
       }
-      
+
       // Simular um tempo de carregamento para melhor UX
       setTimeout(() => {
         setShowResults(true);
@@ -177,32 +178,32 @@ const Library = () => {
       }, 1500); // Tempo suficiente para mostrar a animação de loading
     }
   };
-  
+
   // useEffect para gerenciar dados em tempo real
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
+
     if (realTimeFilter === '5min') {
       // Configurar intervalo para atualizar dados a cada 30 segundos
       const intervalTime = 30 * 1000; // 30 segundos para dados mais atualizados
       interval = setInterval(fetchRealTimeData, intervalTime);
-      
+
       // Executar busca imediatamente
       fetchRealTimeData();
     }
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [realTimeFilter]);
-  
+
   // useEffect principal - ÚNICA FONTE DE DADOS
   useEffect(() => {
     // Só buscar dados se não for a primeira carga (após seleção do usuário)
     if (!isFirstLoad) {
       // Blindar a chamada RPC com período vazio
       if (!periodoSelecionado) return;
-      
+
       const fetchFilteredStats = async () => {
         setLoading(true);
         setError(null);
@@ -221,18 +222,18 @@ const Library = () => {
           console.log(`[DIAGNÓSTICO] Dados recebidos da RPC:`, data);
           setStats(data || []);
         }
-        
+
         setLoading(false);
       };
-    
+
       fetchFilteredStats();
     }
   }, [periodoSelecionado, isFirstLoad]);
-  
+
   // Função para mapear nomes de bots para suas rotas específicas
   const getBotRoute = (botName: string): string => {
     const normalizedName = botName.toLowerCase().replace(/[_\s]/g, '');
-    
+
     const botRoutes: { [key: string]: string } = {
       'quantumbotfixedstake': '/bot/11',
       'quantumbot': '/bot/11',
@@ -259,16 +260,16 @@ const Library = () => {
       'aurabot': '/aura-bot',
       'aura': '/aura-bot'
     };
-  
+
     return botRoutes[normalizedName] || '/';
   };
-  
+
   // Função para navegar para a página do bot
   const handleBotClick = (botName: string) => {
     const route = getBotRoute(botName);
     navigate(route);
   };
-  
+
   // Función para obtener el color de la asertividad
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 80) return 'text-emerald-500';
@@ -276,7 +277,7 @@ const Library = () => {
     if (accuracy >= 60) return 'text-blue-500';
     return 'text-orange-500';
   };
-  
+
   // Función para obtener el color del progreso
   const getProgressColor = (accuracy: number) => {
     if (accuracy >= 80) return 'from-emerald-500 to-emerald-400';
@@ -284,26 +285,26 @@ const Library = () => {
     if (accuracy >= 60) return 'from-blue-500 to-blue-400';
     return 'from-orange-500 to-orange-400';
   };
-  
+
   // Lógica de filtros e ordenação com useMemo para performance
   const filteredAndSortedStats = useMemo(() => {
     // Decidir qual array de dados usar
     let dataToFilter = [];
-    
+
     if (realTimeFilter === '5min') {
       dataToFilter = realTimeData;
     } else {
       dataToFilter = stats;
     }
-    
+
     let filtered = dataToFilter.filter(bot => {
       // Filtro de busca
       const matchesSearch = bot.nome_bot.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       // Filtro de performance
       const accuracy = parseFloat(bot.assertividade_percentual?.toString() || '0');
       let matchesPerformance = true;
-      
+
       switch (performanceFilter) {
         case 'excellent':
           matchesPerformance = accuracy >= 80;
@@ -317,18 +318,18 @@ const Library = () => {
         default:
           matchesPerformance = true;
       }
-      
+
       // Filtros avançados simplificados
       let matchesMostAssertive = true;
       if (advancedFilters.showMostAssertive) {
         matchesMostAssertive = bot.assertividade_percentual >= 80;
       }
-      
+
       let matchesMostProfitable = true;
       if (advancedFilters.showMostProfitable && bot.lucro_total !== undefined) {
         matchesMostProfitable = bot.lucro_total > 0;
       }
-      
+
       // Filtro Top Apalancamiento - bots com tarja de alavancagem
       let matchesTopApalancamiento = true;
       if (advancedFilters.showTopApalancamiento) {
@@ -338,13 +339,13 @@ const Library = () => {
         // Verifica se é Factor 50X (TOP 02 APALANCAMIENTO)
         const isFactor50X = botName.includes('factor') && botName.includes('50x');
         // Verifica se é Bot del Apalancamiento, Apalancamiento 100X ou Apalancamiento
-        const isApalancamientoBot = (botName.includes('bot') && botName.includes('apalancamiento')) || 
-                                   (botName.includes('apalancamiento') && botName.includes('100x')) ||
-                                   (botName.includes('apalancamiento') && !botName.includes('bot') && !botName.includes('100x'));
-        
+        const isApalancamientoBot = (botName.includes('bot') && botName.includes('apalancamiento')) ||
+          (botName.includes('apalancamiento') && botName.includes('100x')) ||
+          (botName.includes('apalancamiento') && !botName.includes('bot') && !botName.includes('100x'));
+
         matchesTopApalancamiento = isVipBoster || isFactor50X || isApalancamientoBot;
       }
-      
+
       // Filtro Mejores Bots del la Semana
       let matchesBestOfWeek = true;
       if (advancedFilters.showBestOfWeek) {
@@ -352,7 +353,7 @@ const Library = () => {
         const isFactor50X = botName.includes('factor') && botName.includes('50x');
         const isVipBoster = botName.includes('vip') && botName.includes('boster');
         const isQuantumBot = botName.includes('quantum') && botName.includes('bot');
-        
+
         matchesBestOfWeek = isFactor50X || isVipBoster || isQuantumBot;
       }
 
@@ -363,7 +364,7 @@ const Library = () => {
     filtered.sort((a, b) => {
       let aValue: number | string;
       let bValue: number | string;
-      
+
       // Se o filtro "Más Lucrativos" estiver ativo, priorizar ordenação por lucro
       if (advancedFilters.showMostProfitable && sortBy === 'accuracy') {
         aValue = a.lucro_total || 0;
@@ -391,7 +392,7 @@ const Library = () => {
             bValue = parseFloat(b.assertividade_percentual?.toString() || '0');
         }
       }
-      
+
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -408,7 +409,7 @@ const Library = () => {
     const avgAccuracy = totalBots > 0 ? filteredAndSortedStats.reduce((sum, bot) => sum + parseFloat(bot.assertividade_percentual?.toString() || '0'), 0) / totalBots : 0;
     const totalOperations = filteredAndSortedStats.reduce((sum, bot) => sum + parseInt(bot.total_operacoes?.toString() || '0'), 0);
     const excellentBots = filteredAndSortedStats.filter(bot => parseFloat(bot.assertividade_percentual?.toString() || '0') >= 80).length;
-    
+
     return {
       totalBots,
       avgAccuracy: Math.round(avgAccuracy * 10) / 10,
@@ -424,7 +425,7 @@ const Library = () => {
         <section className="mb-12">
           <div className="relative overflow-hidden rounded-2xl shadow-xl">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/15 to-background"></div>
-            
+
             <div className="relative z-10 py-12 px-8 text-center">
               <div className="inline-block mb-3 bg-primary/10 backdrop-blur-sm rounded-full px-4 py-1.5 border border-primary/20">
                 <span className="text-primary font-medium text-sm flex items-center gap-2">
@@ -435,7 +436,7 @@ const Library = () => {
               <h1 className="text-4xl md:text-5xl font-bold mb-8 text-foreground leading-tight">
                 🏆 <span className="text-primary">Ranking de Asertividad</span>
               </h1>
-              
+
               <div className="bg-primary/10 border border-primary/30 rounded-xl p-6 max-w-md mx-auto">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -464,7 +465,7 @@ const Library = () => {
         <section className="mb-12">
           <div className="relative overflow-hidden rounded-2xl shadow-xl">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/15 to-background"></div>
-            
+
             <div className="relative z-10 py-12 px-8 text-center">
               <div className="inline-block mb-3 bg-primary/10 backdrop-blur-sm rounded-full px-4 py-1.5 border border-primary/20">
                 <span className="text-primary font-medium text-sm flex items-center gap-2">
@@ -475,7 +476,7 @@ const Library = () => {
               <h1 className="text-4xl md:text-5xl font-bold mb-8 text-foreground leading-tight">
                 🏆 <span className="text-primary">Ranking de Asertividad</span>
               </h1>
-              
+
               <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-6 max-w-md mx-auto">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
@@ -501,117 +502,133 @@ const Library = () => {
 
   return (
     <div className="container max-w-7xl mx-auto py-8 px-4 animate-in fade-in duration-500">
-      {/* Hero Section */}
-      <section className="mb-12">
-        <div className="relative overflow-hidden rounded-2xl shadow-xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/15 to-background"></div>
-          
-          {/* Elementos decorativos */}
-          <div className="absolute inset-0 w-full h-full overflow-hidden opacity-70">
-            <div className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-br from-primary/20 to-transparent -top-[350px] -right-[100px] blur-md"></div>
-            <div className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-br from-primary/15 to-transparent top-[50%] -left-[200px] blur-md"></div>
-            <div className="absolute top-0 right-0 w-full h-full bg-grid-white/[0.05] [mask-image:linear-gradient(to_bottom,transparent,black)]"></div>
-            <svg className="absolute right-0 bottom-0 text-primary/10 w-64 h-64" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-              <path fill="currentColor" d="M47.1,-57.8C58.6,-47.6,63.6,-30.8,66.8,-13.5C70,3.8,71.5,21.6,64.6,35.5C57.6,49.4,42.2,59.5,25.7,65.1C9.1,70.7,-8.5,72,-23.9,66.3C-39.3,60.7,-52.5,48.1,-63.1,32.5C-73.7,16.9,-81.7,-1.7,-77.9,-17.7C-74.1,-33.7,-58.5,-47.1,-42.2,-56.5C-25.9,-65.9,-8.9,-71.4,6.8,-79.5C22.6,-87.6,39.4,-98.5,47.1,-57.8Z" transform="translate(120 130)" />
-            </svg>
-          </div>
-          
-          <div className="relative z-10 py-12 px-8 flex flex-col md:flex-row items-start gap-10">
-            <div className="flex-1 max-w-3xl">
-              <div className="inline-block mb-3 bg-primary/10 backdrop-blur-sm rounded-full px-4 py-1.5 border border-primary/20">
-                <span className="text-primary font-medium text-sm flex items-center gap-2">
+      {/* Recent Gains Ticker */}
+      <RecentGainsTicker className="mb-6 -mx-4" />
+
+      {/* Hero Section - Premium Design */}
+      <section className="mb-10">
+        <div className="relative overflow-hidden rounded-3xl p-[1px] group">
+          {/* Infinite Border Animation - Super subtle */}
+          <div className="absolute inset-[-100%] animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0000_0%,theme(colors.primary.DEFAULT)_50%,#0000_100%)] opacity-20" />
+
+          {/* Main Content Container */}
+          <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl rounded-[calc(1.5rem-1px)] border border-primary/10 overflow-hidden">
+
+            {/* Background layers with subtle pulse */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-background opacity-50" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-30 animate-pulse" style={{ animationDuration: '4s' }} />
+
+            {/* Decorative elements */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-br from-primary/10 to-transparent -top-64 -right-32 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+              <div className="absolute w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-emerald-500/5 to-transparent bottom-0 -left-32 blur-3xl" />
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-30" />
+            </div>
+
+            <div className="relative z-10 py-10 px-6 md:px-10 flex flex-col lg:flex-row items-start gap-8">
+              {/* Left content */}
+              <div className="flex-1 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 backdrop-blur-sm border border-primary/20 mb-4 shadow-[0_0_15px_-3px_var(--primary)] shadow-primary/20">
                   <Award size={14} className="text-primary" />
-                  Ranking de Asertividad
-                </span>
+                  <span className="text-xs font-semibold text-primary uppercase tracking-wider">Ranking de Asertividad</span>
+                </div>
+
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-foreground leading-tight tracking-tight">
+                  <span className="bg-gradient-to-r from-primary via-primary to-emerald-400 bg-clip-text text-transparent drop-shadow-sm">
+                    Ranking de Asertividad
+                  </span>
+                </h1>
+
+                <p className="text-base md:text-lg text-muted-foreground mb-6 leading-relaxed max-w-xl">
+                  Descubre los bots de trading con mejor desempeño en nuestra plataforma.
+                  Analiza su asertividad, operaciones y resultados en diferentes períodos de tiempo.
+                </p>
+
+                {showResults && (
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/5 backdrop-blur-sm border border-primary/20 hover:bg-primary/10 transition-colors duration-300">
+                      <Zap size={16} className="text-primary" />
+                      <span className="text-sm font-semibold">
+                        <span className="text-primary">{localStats.totalBots}</span>
+                        <span className="text-muted-foreground ml-1">Bots Analizados</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/5 backdrop-blur-sm border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors duration-300">
+                      <TrendingUp size={16} className="text-emerald-500" />
+                      <span className="text-sm font-semibold">
+                        <span className="text-emerald-500">{localStats.excellentBots}</span>
+                        <span className="text-muted-foreground ml-1">Bots Excelentes</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/5 backdrop-blur-sm border border-blue-500/20 hover:bg-blue-500/10 transition-colors duration-300">
+                      <Activity size={16} className="text-blue-500" />
+                      <span className="text-sm font-semibold">
+                        <span className="text-blue-500">{localStats.avgAccuracy}%</span>
+                        <span className="text-muted-foreground ml-1">Precisión Media</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground leading-tight">
-                🏆 <span className="text-primary">Ranking de Asertividad</span>
-              </h1>
-              <p className="text-lg text-muted-foreground mb-6">
-                Descubre los bots de trading con mejor desempeño en nuestra plataforma. 
-                Analiza su asertividad, operaciones y resultados en diferentes períodos de tiempo.
-              </p>
-              
+
+              {/* Right stats card */}
               {showResults && (
-                <div className="flex flex-wrap gap-4 mt-6">
-                  <div className="flex items-center gap-2 bg-primary/10 backdrop-blur-sm rounded-full px-4 py-2 border border-primary/20">
-                    <Zap size={16} className="text-primary" />
-                    <span className="text-sm font-medium">
-                      <span className="text-primary">{localStats.totalBots}</span> Bots Analizados
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-emerald-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-emerald-500/20">
-                    <TrendingUp size={16} className="text-emerald-500" />
-                    <span className="text-sm font-medium">
-                      <span className="text-emerald-500">{localStats.excellentBots}</span> Bots Excelentes
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-blue-500/10 backdrop-blur-sm rounded-full px-4 py-2 border border-blue-500/20">
-                    <Activity size={16} className="text-blue-500" />
-                    <span className="text-sm font-medium">
-                      <span className="text-blue-500">{localStats.avgAccuracy}%</span> Precisión Media
-                    </span>
+                <div className="w-full lg:w-80 lg:flex-shrink-0">
+                  <div className="bg-card/40 backdrop-blur-xl rounded-2xl border border-white/5 p-5 shadow-2xl shadow-black/10 hover:shadow-primary/5 transition-shadow duration-500">
+                    <div className="flex items-center gap-3 mb-5 pb-4 border-b border-white/5">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/10">
+                        <BarChart3 className="text-primary" size={22} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground text-sm">Estadísticas Globales</h3>
+                        <p className="text-xs text-muted-foreground">Período: {periodoSelecionado || 'Todos'}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-xs text-muted-foreground font-medium">Operaciones Totales</span>
+                          <span className="text-xs font-bold text-foreground">{localStats.totalOperations.toLocaleString()}</span>
+                        </div>
+                        <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-primary/60 to-primary rounded-full transition-all duration-1000 ease-out" style={{ width: '100%' }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-xs text-muted-foreground font-medium">Precisión Media</span>
+                          <span className="text-xs font-bold text-emerald-500">{localStats.avgAccuracy}%</span>
+                        </div>
+                        <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-emerald-500/60 to-emerald-500 rounded-full transition-all duration-1000 ease-out delay-100" style={{ width: `${localStats.avgAccuracy}%` }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-xs text-muted-foreground font-medium">Bots Excelentes</span>
+                          <span className="text-xs font-bold text-blue-500">{localStats.excellentBots} de {localStats.totalBots}</span>
+                        </div>
+                        <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-blue-500/60 to-blue-500 rounded-full transition-all duration-1000 ease-out delay-200" style={{ width: `${(localStats.excellentBots / Math.max(localStats.totalBots, 1)) * 100}%` }} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-            
-            {showResults && (
-              <div className="w-full md:w-auto mt-8 md:mt-0">
-                <div className="bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 p-6 shadow-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <BarChart3 className="text-primary" size={24} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">Estadísticas Globales</h3>
-                      <p className="text-sm text-muted-foreground">Período: {periodoSelecionado}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Operaciones Totales</span>
-                        <span className="text-sm font-medium">{localStats.totalOperations.toLocaleString()}</span>
-                      </div>
-                      <div className="h-2 bg-background rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-primary/50 to-primary rounded-full" style={{ width: '100%' }}></div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Precisión Media</span>
-                        <span className="text-sm font-medium">{localStats.avgAccuracy}%</span>
-                      </div>
-                      <div className="h-2 bg-background rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500/50 to-emerald-500 rounded-full" style={{ width: `${localStats.avgAccuracy}%` }}></div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Bots Excelentes</span>
-                        <span className="text-sm font-medium">{localStats.excellentBots} de {localStats.totalBots}</span>
-                      </div>
-                      <div className="h-2 bg-background rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-blue-500/50 to-blue-500 rounded-full" style={{ width: `${(localStats.excellentBots / Math.max(localStats.totalBots, 1)) * 100}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </section>
-      
+
       {/* Controles de filtro aprimorados */}
       <section className="mb-8">
         <div className="flex justify-center">
-          <EnhancedFilterControls 
-            periodoAtual={periodoSelecionado} 
+          <EnhancedFilterControls
+            periodoAtual={periodoSelecionado}
             onPeriodoChange={handlePeriodChange}
             showResults={showResults}
             showBestOfWeek={advancedFilters.showBestOfWeek}
@@ -696,15 +713,13 @@ const Library = () => {
                       ...prev,
                       showMostAssertive: !prev.showMostAssertive
                     }))}
-                    className={`w-full px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
-                      advancedFilters.showMostAssertive 
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 shadow-lg shadow-emerald-500/10' 
-                        : 'bg-background border-border hover:border-emerald-500/20 hover:bg-emerald-500/5 text-muted-foreground hover:text-emerald-600'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center justify-center gap-2 ${advancedFilters.showMostAssertive
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                      : 'bg-background border-border hover:border-emerald-500/20 hover:bg-emerald-500/5 text-muted-foreground hover:text-emerald-600'
+                      }`}
                   >
-                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      advancedFilters.showMostAssertive ? 'bg-emerald-500' : 'bg-muted-foreground/30'
-                    }`}></div>
+                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${advancedFilters.showMostAssertive ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                      }`}></div>
                     <span className="text-sm font-medium">≥80%</span>
                   </button>
                 </div>
@@ -720,15 +735,13 @@ const Library = () => {
                       ...prev,
                       showMostProfitable: !prev.showMostProfitable
                     }))}
-                    className={`w-full px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
-                      advancedFilters.showMostProfitable 
-                        ? 'bg-green-500/10 border-green-500/30 text-green-600 shadow-lg shadow-green-500/10' 
-                        : 'bg-background border-border hover:border-green-500/20 hover:bg-green-500/5 text-muted-foreground hover:text-green-600'
-                    }`}
+                    className={`w-full px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center justify-center gap-2 ${advancedFilters.showMostProfitable
+                      ? 'bg-green-500/10 border-green-500/30 text-green-600 shadow-lg shadow-green-500/10'
+                      : 'bg-background border-border hover:border-green-500/20 hover:bg-green-500/5 text-muted-foreground hover:text-green-600'
+                      }`}
                   >
-                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      advancedFilters.showMostProfitable ? 'bg-green-500' : 'bg-muted-foreground/30'
-                    }`}></div>
+                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${advancedFilters.showMostProfitable ? 'bg-green-500' : 'bg-muted-foreground/30'
+                      }`}></div>
                     <span className="text-sm font-medium">Positivos</span>
                   </button>
                 </div>
@@ -770,13 +783,13 @@ const Library = () => {
                   <span className="font-medium">{stats?.length || 0}</span> robots
                 </span>
               </div>
-              {(searchTerm || performanceFilter !== 'all' || advancedFilters.showMostAssertive || 
+              {(searchTerm || performanceFilter !== 'all' || advancedFilters.showMostAssertive ||
                 advancedFilters.showMostProfitable) && (
-                <div className="flex items-center gap-2 text-primary">
-                  <Filter size={14} />
-                  <span>Filtros activos</span>
-                </div>
-              )}
+                  <div className="flex items-center gap-2 text-primary">
+                    <Filter size={14} />
+                    <span>Filtros activos</span>
+                  </div>
+                )}
             </div>
           </div>
         </section>
@@ -830,20 +843,25 @@ const Library = () => {
           )}
 
           {!loading && !error && filteredAndSortedStats.length === 0 && (
-            <div className="text-center py-10 text-gray-500">
-              Nenhuma operação encontrada para este período.
+            <div className="text-center py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                <Zap size={28} className="text-primary animate-pulse" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Aguardando próxima oportunidad de mercado...</h3>
+              <p className="text-muted-foreground">Los bots están analizando las condiciones del mercado.</p>
             </div>
           )}
 
           {!loading && !error && filteredAndSortedStats.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredAndSortedStats.map((bot, index) => (
-                <BotPerformanceCard 
-                  key={bot.nome_bot} 
-                  bot={bot} 
-                  index={index} 
+                <BotPerformanceCard
+                  key={bot.nome_bot}
+                  bot={bot}
+                  index={index}
                   periodoSelecionado={periodoSelecionado}
                   showBestOfWeekBadge={advancedFilters.showBestOfWeek}
+                  rankingPosition={index + 1}
                   isRealTime={realTimeFilter !== 'none'}
                   realTimeMetrics={realTimeFilter !== 'none' ? {
                     assertividade_tempo_real: bot.assertividade_tempo_real,

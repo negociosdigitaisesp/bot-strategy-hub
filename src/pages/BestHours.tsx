@@ -2,6 +2,10 @@ import React from 'react';
 import { Clock, AlertTriangle, CheckCircle, TrendingUp, Sunrise, Sunset, Info, Shield, BarChart2, BookOpen, Award, ThumbsUp, Zap } from 'lucide-react';
 
 const BestHours = () => {
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Array of market sessions and their characteristics
   const marketSessions = [
     {
@@ -84,7 +88,7 @@ const BestHours = () => {
           <div className="absolute top-0 right-0 w-full h-full bg-grid-white/[0.05] [mask-image:linear-gradient(to_bottom,transparent,black)]"></div>
           <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
         </div>
-        
+
         <div className="relative z-10 py-16 px-8">
           <div className="max-w-3xl">
             <div className="inline-block mb-3 bg-primary/10 backdrop-blur-sm rounded-full px-4 py-1.5 border border-primary/20">
@@ -94,10 +98,10 @@ const BestHours = () => {
               Mejores Horarios <span className="text-primary">para Trading</span>
             </h1>
             <p className="text-xl mb-8 text-muted-foreground leading-relaxed max-w-2xl">
-              Comprende cómo los diferentes períodos del día pueden impactar el rendimiento 
+              Comprende cómo los diferentes períodos del día pueden impactar el rendimiento
               de tus robots de trading y optimiza tus resultados.
             </p>
-            
+
             <div className="bg-card/70 backdrop-blur-sm rounded-lg p-5 border border-border shadow-lg">
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-6 w-6 flex-shrink-0 text-yellow-500" />
@@ -118,15 +122,15 @@ const BestHours = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold mb-3">La Verdad Sobre Horarios y Robots de Trading</h2>
-              
+
               <p className="text-muted-foreground mb-4 leading-relaxed">
-                <strong className="text-foreground">No existe un horario "definitivamente mejor" para operar los robots.</strong> El rendimiento de los bots 
-                en el mercado de índices sintéticos, como el R_100, no es predecible por horario del día, ya que estos mercados están basados 
+                <strong className="text-foreground">No existe un horario "definitivamente mejor" para operar los robots.</strong> El rendimiento de los bots
+                en el mercado de índices sintéticos, como el R_100, no es predecible por horario del día, ya que estos mercados están basados
                 en algoritmos de números pseudoaleatorios que no siguen patrones temporales fijos.
               </p>
-              
+
               <p className="text-muted-foreground leading-relaxed">
-                Sin embargo, existen <strong className="text-foreground">factores externos</strong> que pueden influir en tu experiencia de trading, como tu disponibilidad para monitorear las operaciones, 
+                Sin embargo, existen <strong className="text-foreground">factores externos</strong> que pueden influir en tu experiencia de trading, como tu disponibilidad para monitorear las operaciones,
                 niveles de liquidez, e incluso tu estado emocional en diferentes momentos del día.
               </p>
             </div>
@@ -136,7 +140,7 @@ const BestHours = () => {
         {/* Best Practices - Improved card design */}
         <div className="mb-10">
           <h2 className="text-2xl font-bold mb-6 border-b pb-2">Prácticas Recomendadas</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-card rounded-xl p-6 shadow-md border border-border hover:shadow-lg transition-shadow duration-300">
               <div className="flex items-center gap-3 mb-4">
@@ -173,7 +177,7 @@ const BestHours = () => {
         {/* Sessions Information - Updated with consistent site colors */}
         <div className="mb-10">
           <h2 className="text-2xl font-bold mb-6 border-b pb-2">Sesiones de Mercado y Características</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {marketSessions.map((session, index) => (
               <div key={index} className={`bg-gradient-to-r ${session.color} rounded-xl p-6 border ${session.borderColor} shadow-md hover:shadow-lg transition-shadow duration-300`}>
@@ -181,7 +185,7 @@ const BestHours = () => {
                   {session.icon}
                   <h3 className={`font-semibold text-lg ${session.textColor}`}>{session.title}</h3>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Horario:</span>
@@ -208,7 +212,7 @@ const BestHours = () => {
         {/* Tips and Insights - Completely redesigned section */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold mb-6 border-b pb-2">Consejos e Insights Profesionales</h2>
-          
+
           <div className="bg-card rounded-xl border border-border shadow-md p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {professionalInsights.map((insight, index) => (
@@ -223,7 +227,7 @@ const BestHours = () => {
                 </div>
               ))}
             </div>
-            
+
             <div className="mt-8 bg-primary/5 rounded-lg p-6 border border-primary/20">
               <div className="flex items-start gap-3">
                 <div className="bg-primary/10 p-2 rounded-full mt-1">
@@ -232,7 +236,7 @@ const BestHours = () => {
                 <div>
                   <h3 className="font-semibold text-lg mb-2">Recuerda:</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    El éxito en el trading no depende solo de horarios específicos, sino de una combinación de estrategia sólida, 
+                    El éxito en el trading no depende solo de horarios específicos, sino de una combinación de estrategia sólida,
                     disciplina consistente y gestión de riesgo eficaz. Usa estos consejos como parte de un plan más amplio para alcanzar tus objetivos.
                   </p>
                 </div>
@@ -241,28 +245,28 @@ const BestHours = () => {
           </div>
         </div>
       </div>
-      
+
       {/* FAQ Section - Enhanced design */}
       <div className="mb-12">
         <h2 className="text-2xl font-bold mb-6 border-b pb-2">Preguntas Frecuentes</h2>
-        
+
         <div className="bg-card rounded-xl border border-border shadow-md p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-background p-6 rounded-lg border border-border">
               <h3 className="font-semibold text-lg mb-3 text-primary">¿Realmente existe un mejor horario para operar?</h3>
               <p className="text-muted-foreground leading-relaxed">Para índices sintéticos como los disponibles en Deriv, no hay un horario universalmente mejor, ya que están basados en algoritmos pseudoaleatorios. Lo importante es probar y encontrar períodos que funcionen para tu estrategia específica.</p>
             </div>
-            
+
             <div className="bg-background p-6 rounded-lg border border-border">
               <h3 className="font-semibold text-lg mb-3 text-primary">¿Debo dejar mi robot operando durante la madrugada?</h3>
               <p className="text-muted-foreground leading-relaxed">Es recomendable operar en horarios en los que puedas monitorear el rendimiento del robot, especialmente al principio. Las operaciones durante la madrugada sin supervisión pueden resultar en pérdidas inesperadas.</p>
             </div>
-            
+
             <div className="bg-background p-6 rounded-lg border border-border">
               <h3 className="font-semibold text-lg mb-3 text-primary">¿Cómo identificar si un horario está siendo favorable?</h3>
               <p className="text-muted-foreground leading-relaxed">Observa los resultados en cuenta demo por algunas horas. Si el robot presenta una secuencia de 3-5 operaciones positivas consecutivas, puede ser un buen momento para cambiar a la cuenta real, siempre respetando tu gestión de riesgo.</p>
             </div>
-            
+
             <div className="bg-background p-6 rounded-lg border border-border">
               <h3 className="font-semibold text-lg mb-3 text-primary">¿La volatilidad del mercado afecta el rendimiento del robot?</h3>
               <p className="text-muted-foreground leading-relaxed">Sí, cada robot está diseñado para funcionar mejor en determinadas condiciones de mercado. Algunos destacan en mercados más volátiles, mientras que otros rinden mejor en condiciones más estables.</p>
@@ -271,8 +275,8 @@ const BestHours = () => {
         </div>
       </div>
 
-            {/* Call to Action - Enhanced with more modern design */}      <div className="bg-transparent rounded-2xl shadow-xl overflow-hidden relative">
-        
+      {/* Call to Action - Enhanced with more modern design */}      <div className="bg-transparent rounded-2xl shadow-xl overflow-hidden relative">
+
         <div className="relative p-10 text-center">
           <h2 className="text-3xl font-bold mb-4 text-foreground">¿Listo para Comenzar?</h2>          <p className="text-xl mb-8 max-w-2xl mx-auto text-muted-foreground">Prueba tu robot en la cuenta demo en diferentes horarios y descubre los períodos que funcionan mejor para tu estrategia específica.</p>
           <div className="flex flex-col sm:flex-row gap-5 justify-center">

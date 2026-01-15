@@ -2,6 +2,10 @@ import React from 'react';
 import { ExternalLink, CheckCircle, AlertCircle, HelpCircle, Download } from 'lucide-react';
 
 const InstallationTutorial = () => {
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="container max-w-5xl mx-auto py-8 px-4">
       <div className="mb-8">
@@ -12,24 +16,24 @@ const InstallationTutorial = () => {
       {/* Video Tutorial Section */}
       <div className="mb-10 bg-gradient-to-br from-primary/5 to-primary/10 p-8 rounded-2xl border border-primary/20 shadow-lg">
         <div className="text-center mb-8">
-           <h2 className="text-3xl font-bold text-foreground mb-4 flex items-center justify-center gap-3">
-             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-               <svg className="w-6 h-6 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
-                 <path d="M8 5v10l8-5-8-5z"/>
-               </svg>
-             </div>
-             Tutoriales en Video
-           </h2>
-           <p className="text-muted-foreground max-w-3xl mx-auto text-lg">
-             Mira los tutoriales en video para una explicación visual detallada de todo el proceso de instalación, configuración y uso del Radar de Apalancamiento.
-           </p>
-           <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/30 max-w-4xl mx-auto">
-             <p className="text-sm font-medium text-foreground">
-               💡 <strong>Recomendación:</strong> Te recomendamos ver ambos videos hasta el final para utilizar los robots de la mejor forma posible y aprovechar al máximo todas las funcionalidades.
-             </p>
-           </div>
-         </div>
-        
+          <h2 className="text-3xl font-bold text-foreground mb-4 flex items-center justify-center gap-3">
+            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8 5v10l8-5-8-5z" />
+              </svg>
+            </div>
+            Tutoriales en Video
+          </h2>
+          <p className="text-muted-foreground max-w-3xl mx-auto text-lg">
+            Mira los tutoriales en video para una explicación visual detallada de todo el proceso de instalación, configuración y uso del Radar de Apalancamiento.
+          </p>
+          <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/30 max-w-4xl mx-auto">
+            <p className="text-sm font-medium text-foreground">
+              💡 <strong>Recomendación:</strong> Te recomendamos ver ambos videos hasta el final para utilizar los robots de la mejor forma posible y aprovechar al máximo todas las funcionalidades.
+            </p>
+          </div>
+        </div>
+
         {/* Videos Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
           {/* Tutorial de Instalación */}
@@ -86,12 +90,12 @@ const InstallationTutorial = () => {
             </div>
           </div>
         </div>
-          
+
         {/* Call to action */}
         <div className="mt-8 text-center">
-          <a 
-            href="https://deriv.com/?t=TRCjAn8FEcUivlVU8hndU2Nd7ZgqdRLk&utm_source=affiliate_223442&utm_medium=affiliate&utm_campaign=MyAffiliates&utm_content=&referrer=" 
-            target="_blank" 
+          <a
+            href="https://deriv.com/?t=TRCjAn8FEcUivlVU8hndU2Nd7ZgqdRLk&utm_source=affiliate_223442&utm_medium=affiliate&utm_campaign=MyAffiliates&utm_content=&referrer="
+            target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg font-semibold"
           >
@@ -105,7 +109,7 @@ const InstallationTutorial = () => {
       <div className="mb-10 bg-card p-6 rounded-xl border border-border shadow-md">
         <h2 className="text-xl font-bold mb-4">Preparación Inicial</h2>
         <p className="text-muted-foreground mb-6">Antes de comenzar la instalación, asegúrate de tener los siguientes elementos preparados:</p>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-accent/30 p-4 rounded-lg border border-border flex items-start gap-3">
             <CheckCircle size={20} className="text-green-500 mt-0.5" />
@@ -114,7 +118,7 @@ const InstallationTutorial = () => {
               <p className="text-sm text-muted-foreground">Usa Chrome, Firefox o Edge en la versión más reciente para máxima compatibilidad con la plataforma.</p>
             </div>
           </div>
-          
+
           <div className="bg-accent/30 p-4 rounded-lg border border-border flex items-start gap-3">
             <CheckCircle size={20} className="text-green-500 mt-0.5" />
             <div>
@@ -122,7 +126,7 @@ const InstallationTutorial = () => {
               <p className="text-sm text-muted-foreground">Crea una cuenta con el enlace a continuación <a href="https://track.deriv.be/_XZsgLOqstMrrhBvO3lYd_WNd7ZgqdRLk/1/" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Deriv</a>, es 100% seguro y con retiros más rápidos.</p>
             </div>
           </div>
-          
+
           <div className="bg-accent/30 p-4 rounded-lg border border-border flex items-start gap-3">
             <CheckCircle size={20} className="text-green-500 mt-0.5" />
             <div>
@@ -130,7 +134,7 @@ const InstallationTutorial = () => {
               <p className="text-sm text-muted-foreground">Ten el archivo XML del robot descargado y guardado en una carpeta de fácil acceso en tu computadora.</p>
             </div>
           </div>
-          
+
           <div className="bg-accent/30 p-4 rounded-lg border border-border flex items-start gap-3">
             <CheckCircle size={20} className="text-green-500 mt-0.5" />
             <div>
@@ -139,7 +143,7 @@ const InstallationTutorial = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="mt-6 bg-warning/10 p-4 rounded-lg border border-warning/30">
           <h3 className="font-medium mb-2 flex items-center gap-2 text-warning">
             <AlertCircle size={18} />
@@ -162,16 +166,16 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Accede a la plataforma Deriv</h3>
             <p className="text-muted-foreground mb-4">Para comenzar, accede a la plataforma oficial de Deriv a través del enlace a continuación.</p>
-            
-            <a 
-              href="https://track.deriv.be/_XZsgLOqstMrrhBvO3lYd_WNd7ZgqdRLk/1/" 
-              target="_blank" 
+
+            <a
+              href="https://track.deriv.be/_XZsgLOqstMrrhBvO3lYd_WNd7ZgqdRLk/1/"
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg transition-colors inline-block"
             >
               Acceder a la Plataforma Deriv <ExternalLink size={16} />
             </a>
-            
+
             <div className="mt-4 bg-muted p-3 rounded-lg border border-border flex items-start gap-2">
               <HelpCircle size={18} className="text-primary mt-1" />
               <p className="text-sm text-muted-foreground">Este enlace es seguro y te redirigirá al sitio oficial de Deriv.</p>
@@ -187,7 +191,7 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Inicia sesión en tu cuenta</h3>
             <p className="text-muted-foreground mb-4">Ingresa con tus credenciales en la plataforma Deriv (cuenta Demo o Real).</p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div className="bg-accent/30 p-4 rounded-lg border border-border">
                 <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -204,11 +208,11 @@ const InstallationTutorial = () => {
                 <p className="text-sm text-muted-foreground">Utiliza solo cuando estés confiado en la estrategia y gestión de riesgo.</p>
               </div>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/login-screen.jpg" 
-                alt="Pantalla de inicio de sesión de Deriv" 
+              <img
+                src="/images/login-screen.jpg"
+                alt="Pantalla de inicio de sesión de Deriv"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Pantalla+de+Inicio+Deriv";
@@ -226,15 +230,15 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Importa el robot</h3>
             <p className="text-muted-foreground mb-4">En el menú superior de la plataforma Deriv Bot, haz clic en la opción "Importar" (o "Load").</p>
-            
+
             <div className="bg-accent/30 p-4 rounded-lg border border-border mb-4">
               <p className="text-sm"><span className="font-medium">Consejo:</span> Asegúrate de estar en la interfaz de Deriv Bot antes de continuar con este paso.</p>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/import-bot.jpg" 
-                alt="Importando el robot en la plataforma" 
+              <img
+                src="/images/import-bot.jpg"
+                alt="Importando el robot en la plataforma"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Importar+Robot";
@@ -252,16 +256,16 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Carga el archivo</h3>
             <p className="text-muted-foreground mb-4">Localiza el archivo .xml del robot de tu elección en tu computadora y cárgalo en la plataforma.</p>
-            
+
             <div className="flex items-center gap-2 p-4 bg-muted rounded-lg border border-border mb-4">
               <AlertCircle size={18} className="text-amber-500" />
               <p className="text-sm">Asegúrate de haber descargado el archivo .xml antes de este paso. El archivo debe tener la extensión .xml y ser compatible con Deriv Bot.</p>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/load-file.jpg" 
-                alt="Cargando archivo XML del robot" 
+              <img
+                src="/images/load-file.jpg"
+                alt="Cargando archivo XML del robot"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Cargar+Archivo+XML";
@@ -279,15 +283,15 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Verifica la carga</h3>
             <p className="text-muted-foreground mb-4">Confirma que el robot apareció correctamente en el área de trabajo de la plataforma.</p>
-            
+
             <div className="bg-accent/30 p-4 rounded-lg border border-border mb-4">
               <p className="text-sm"><span className="font-medium">Verificación:</span> Debes visualizar los bloques y la lógica del robot en el área de trabajo de Deriv Bot.</p>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/verify-loading.jpg" 
-                alt="Verificando carga del robot" 
+              <img
+                src="/images/verify-loading.jpg"
+                alt="Verificando carga del robot"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Verificar+Carga";
@@ -305,7 +309,7 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Configura los parámetros</h3>
             <p className="text-muted-foreground mb-4">Ajusta las configuraciones del robot según tu estrategia y gestión de riesgo.</p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div className="bg-accent/30 p-4 rounded-lg border border-border">
                 <h4 className="font-medium mb-2">Meta de Ganancia</h4>
@@ -324,11 +328,11 @@ const InstallationTutorial = () => {
                 <p className="text-sm text-muted-foreground">Define el número de ticks para cada operación según tu estrategia.</p>
               </div>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/configure-parameters.jpg" 
-                alt="Configurando parámetros del robot" 
+              <img
+                src="/images/configure-parameters.jpg"
+                alt="Configurando parámetros del robot"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Configurar+Parámetros";
@@ -346,7 +350,7 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Prueba Primero en Cuenta Demo</h3>
             <p className="text-muted-foreground mb-4">Siempre comienza probando el robot en una cuenta demo antes de usar dinero real.</p>
-            
+
             <div className="bg-accent/30 p-4 rounded-lg border border-border mb-4">
               <h4 className="font-medium mb-2 flex items-center gap-2">
                 <CheckCircle size={16} className="text-green-500" />
@@ -354,7 +358,7 @@ const InstallationTutorial = () => {
               </h4>
               <p className="text-sm text-muted-foreground">Observa si el bot está presentando una secuencia positiva o negativa. Si el robot está con una secuencia positiva, cambia a la cuenta real. Si está negativa, vuelve en otro horario.</p>
             </div>
-            
+
             <div className="flex items-center gap-2 p-4 bg-muted rounded-lg border border-border mb-4">
               <AlertCircle size={18} className="text-amber-500" />
               <div>
@@ -362,11 +366,11 @@ const InstallationTutorial = () => {
                 <p className="text-sm text-muted-foreground">El mercado tiene diferentes momentos de volatilidad durante el día. Algunas horas pueden ser más favorables para el funcionamiento de tu robot.</p>
               </div>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/demo-testing.jpg" 
-                alt="Probando el robot en cuenta demo" 
+              <img
+                src="/images/demo-testing.jpg"
+                alt="Probando el robot en cuenta demo"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Probando+en+Cuenta+Demo";
@@ -384,7 +388,7 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Ejecuta el robot</h3>
             <p className="text-muted-foreground mb-4">Haz clic en el botón "Ejecutar" (o "Run") para iniciar las operaciones automatizadas.</p>
-            
+
             <div className="flex items-center gap-2 p-4 bg-muted rounded-lg border border-border mb-4">
               <AlertCircle size={18} className="text-amber-500" />
               <div>
@@ -392,11 +396,11 @@ const InstallationTutorial = () => {
                 <p className="text-sm text-muted-foreground">Monitorea regularmente el desempeño del robot, incluso en operaciones automatizadas. Está preparado para intervenir si es necesario.</p>
               </div>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/run-bot.jpg" 
-                alt="Ejecutando el robot en la plataforma" 
+              <img
+                src="/images/run-bot.jpg"
+                alt="Ejecutando el robot en la plataforma"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Ejecutar+Robot";
@@ -414,7 +418,7 @@ const InstallationTutorial = () => {
           <div className="bg-card shadow-md rounded-xl p-6 flex-1 border border-border">
             <h3 className="text-xl font-bold mb-2">Monitorea los resultados</h3>
             <p className="text-muted-foreground mb-4">Realiza seguimiento al desempeño del robot y haz ajustes cuando sea necesario.</p>
-            
+
             <div className="bg-accent/30 p-4 rounded-lg border border-border mb-4">
               <h4 className="font-medium mb-2">Consejos para monitoreo eficiente:</h4>
               <ul className="text-sm text-muted-foreground space-y-2">
@@ -436,11 +440,11 @@ const InstallationTutorial = () => {
                 </li>
               </ul>
             </div>
-            
+
             <div className="rounded-lg overflow-hidden border border-border shadow-sm">
-              <img 
-                src="/images/monitor-results.jpg" 
-                alt="Monitoreando resultados del robot" 
+              <img
+                src="/images/monitor-results.jpg"
+                alt="Monitoreando resultados del robot"
                 className="w-full h-auto object-cover"
                 onError={(e) => {
                   e.currentTarget.src = "https://via.placeholder.com/800x400?text=Monitorear+Resultados";
@@ -455,7 +459,7 @@ const InstallationTutorial = () => {
       <div className="mt-12 bg-card p-6 rounded-xl border border-border shadow-md">
         <h2 className="text-2xl font-bold mb-4">Soluciones a Problemas Comunes</h2>
         <p className="text-muted-foreground mb-6">Si has enfrentado problemas durante la instalación, revisa estas soluciones para los errores más comunes:</p>
-        
+
         <div className="space-y-4">
           <div className="p-4 bg-muted rounded-lg border border-border">
             <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
@@ -540,7 +544,7 @@ const InstallationTutorial = () => {
       <div className="mt-12 bg-card p-6 rounded-xl border border-border shadow-md">
         <h2 className="text-2xl font-bold mb-4">¿Necesitas ayuda adicional?</h2>
         <p className="text-muted-foreground mb-6">Nuestro equipo de soporte está listo para ayudarte con cualquier duda o problema que puedas encontrar durante la instalación o uso del robot.</p>
-        
+
         <div className="flex flex-col sm:flex-row gap-4">
           <a href="#" className="bg-primary hover:bg-primary/90 text-black px-6 py-3 rounded-lg transition-colors inline-flex items-center justify-center gap-2">
             <HelpCircle size={18} />

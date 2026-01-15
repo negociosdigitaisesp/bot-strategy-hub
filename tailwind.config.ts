@@ -109,16 +109,77 @@ export default {
 					'50%': {
 						opacity: '0.7'
 					}
+				},
+				'golden-border': {
+					'0%, 100%': {
+						backgroundPosition: '0% 50%'
+					},
+					'50%': {
+						backgroundPosition: '100% 50%'
+					}
+				},
+				'radio-pulse': {
+					'0%': {
+						transform: 'scale(1)',
+						opacity: '1'
+					},
+					'50%': {
+						transform: 'scale(1.5)',
+						opacity: '0.5'
+					},
+					'100%': {
+						transform: 'scale(2)',
+						opacity: '0'
+					}
+				},
+				'ticker-scroll': {
+					'0%': {
+						transform: 'translateX(0)'
+					},
+					'100%': {
+						transform: 'translateX(-50%)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
-				'pulse-glow': 'pulse-glow 2s ease-in-out infinite'
+				'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+				'golden-border': 'golden-border 3s ease infinite',
+				'radio-pulse': 'radio-pulse 1.5s ease-in-out infinite',
+				'ticker-scroll': 'ticker-scroll 30s linear infinite'
 			},
 			fontFamily: {
 				'inter': ['Inter', 'sans-serif'],
+			},
+			colors: {
+				teal: {
+					DEFAULT: '#00ffcc',
+					50: '#e6fffa',
+					100: '#b3ffe8',
+					200: '#80ffd9',
+					300: '#4dffcb',
+					400: '#1affbc',
+					500: '#00ffcc',
+					600: '#00cca3',
+					700: '#00997a',
+					800: '#006652',
+					900: '#003329'
+				},
+				alert: {
+					DEFAULT: '#ff3366',
+					50: '#ffe6ed',
+					100: '#ffb3c6',
+					200: '#ff809f',
+					300: '#ff4d78',
+					400: '#ff1a51',
+					500: '#ff3366',
+					600: '#cc2952',
+					700: '#991f3d',
+					800: '#661429',
+					900: '#330a14'
+				}
 			}
 		}
 	},

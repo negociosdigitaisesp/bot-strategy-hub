@@ -36,17 +36,34 @@ import DoubleCuentas from "./pages/DoubleCuentas";
 import AuraBot from "./pages/AuraBot";
 import RadarApalancamiento from "./pages/RadarApalancamiento";
 import RadarScalping from "./pages/RadarScalping";
+import { DerivProvider } from "./contexts/DerivContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SecurityGate from "./components/SecurityGate";
 import PaginaDeTeste from "./pages/PaginaDeTeste";
 import PaginaBloqueada from "./pages/PaginaBloqueada";
+import DerivConnectionPage from "./pages/DerivConnectionPage";
+import BotAlpha from "./pages/BotAlpha";
+import BotSelection from "./pages/BotSelection";
+import BotSigma from "./pages/BotSigma";
+import GainBot from "./pages/GainBot";
+import BotOmega from "./pages/BotOmega";
+import BotSpeed from "./pages/BotSpeed";
+import BotApalancamiento from "./pages/BotApalancamiento";
+import BotQuantum from "./pages/BotQuantum";
+import SensorExplosivo from "./pages/SensorExplosivo";
+import EfectoMidas from "./pages/EfectoMidas";
+import BugDeriv from "./pages/BugDeriv";
+import { TradingSessionProvider } from "./contexts/TradingSessionContext";
+import { PricingModalProvider } from "./contexts/PricingModalContext";
+import PricingModal from "./components/PricingModal";
+import { FloatingUpgradeButton } from "./components/FloatingUpgradeButton";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  
+
   const toggleSidebar = () => {
     setSidebarCollapsed(prev => !prev);
   };
@@ -56,237 +73,346 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AuthProvider>
-            <Toaster />
-            <Sonner />
-            <div className="min-h-screen bg-background">
-              <Routes>
-                <Route path="/login" element={<Auth />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/deriv/callback" element={<DerivCallback />} />
-                <Route path="/pending-approval" element={<PendingApprovalPage />} />
-                <Route path="/verificando-acesso" element={<VerificandoAcessoPage />} />
-                
-                {/* Rota raiz protegida - agora carrega Library com Sidebar */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <Library />
-                      </main>
-                    </>
-                  } />
-                </Route>
-                
-                {/* Rotas protegidas */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/bot/:id" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <BotDetail />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/installation-tutorial" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <InstallationTutorial />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/mejores-horarios" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <BestHours />
-                      </main>
-                    </>
-                  } />
-                  
+            <DerivProvider>
+              <TradingSessionProvider>
+                <PricingModalProvider>
+                  <Toaster />
+                  <Sonner />
+                  <PricingModal />
+                  <div className="min-h-screen bg-background">
+                    <Routes>
+                      <Route path="/login" element={<Auth />} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
+                      <Route path="/deriv/callback" element={<DerivCallback />} />
+                      <Route path="/pending-approval" element={<PendingApprovalPage />} />
+                      <Route path="/verificando-acesso" element={<VerificandoAcessoPage />} />
 
-                  <Route path="/settings" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <SettingsPage />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/bots-apalancamiento" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <BotsApalancamiento />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/factor50x" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <Factor50XPage />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/risk-management" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <RiskManagement />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/calculadora-riesgo" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <RiskCalculator />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/bk-bot" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <BKBot />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/alfabot" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <AlfaBot />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/tipbot" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <TipBot />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/xtremebot" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <XtremeBot />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/xtrembot" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <GoldBot />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/turbo-ganancia" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <TurboGanancia />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/vip-boster" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <VipBoster />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/goldbot-antirepeticion" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <GoldBotAntiRepeticion />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/bot-del-apalancamiento" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <BotDelApalancamiento />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/double-cuentas" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <DoubleCuentas />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/aura-bot" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <AuraBot />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/sys-monitor-x7" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <RadarApalancamiento />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/radardelapalancamiento" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <RadarApalancamiento />
-                      </main>
-                    </>
-                  } />
-                  
-                  <Route path="/radar-scalping" element={
-                    <>
-                      <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                      <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                        <RadarScalping />
-                      </main>
-                    </>
-                  } />
+                      {/* Rota raiz protegida - agora carrega Library com Sidebar */}
+                      <Route element={<ProtectedRoute />}>
+                        <Route path="/" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <Library />
+                            </main>
+                          </>
+                        } />
+                      </Route>
 
-                </Route>
-                
-                <Route path="/pagina-de-teste" element={<PaginaDeTeste />} />
-                <Route path="/PaginaBloqueada" element={<PaginaBloqueada />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <TelegramFloatingButton />
-            </div>
+                      {/* Rotas protegidas */}
+                      <Route element={<ProtectedRoute />}>
+                        <Route path="/bot/:id" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotDetail />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/installation-tutorial" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <InstallationTutorial />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/mejores-horarios" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BestHours />
+                            </main>
+                          </>
+                        } />
+
+
+                        <Route path="/settings" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <SettingsPage />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bots-apalancamiento" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotsApalancamiento />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/factor50x" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <Factor50XPage />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/risk-management" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <RiskManagement />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/calculadora-riesgo" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <RiskCalculator />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bk-bot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BKBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/alfabot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <AlfaBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/tipbot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <TipBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/xtremebot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <XtremeBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/xtrembot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <GoldBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/turbo-ganancia" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <TurboGanancia />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/vip-boster" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <VipBoster />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/goldbot-antirepeticion" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <GoldBotAntiRepeticion />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bot-del-apalancamiento" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotDelApalancamiento />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/double-cuentas" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <DoubleCuentas />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/aura-bot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <AuraBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/sys-monitor-x7" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <RadarApalancamiento />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/radardelapalancamiento" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <RadarApalancamiento />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bots" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotSelection />
+                            </main>
+                          </>
+                        } />
+
+
+
+                        <Route path="/conectar-deriv" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <DerivConnectionPage />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bot-alpha" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotAlpha />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bot-sigma" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotSigma />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bots/gain" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <GainBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bot-omega" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotOmega />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/speed-bot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotSpeed />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bot-apalancamiento" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotApalancamiento />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/quantum-bot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotQuantum />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/radar-scalping" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <RadarScalping />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/bugderiv" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BugDeriv />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/efecto-midas" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <EfectoMidas />
+                            </main>
+                          </>
+                        } />
+
+                      </Route>
+
+                      <Route path="/pagina-de-teste" element={<PaginaDeTeste />} />
+                      <Route path="/PaginaBloqueada" element={<PaginaBloqueada />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                    <TelegramFloatingButton />
+                    <FloatingUpgradeButton />
+                  </div>
+                </PricingModalProvider>
+              </TradingSessionProvider>
+            </DerivProvider>
           </AuthProvider>
         </TooltipProvider>
       </QueryClientProvider>

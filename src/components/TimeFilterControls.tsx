@@ -41,7 +41,7 @@ const TimeFilterControls: React.FC<Props> = ({ periodoAtual, onPeriodoChange, sh
             📊 Selecciona un Período de Análisis
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Elige el período de tiempo que deseas analizar para ver el ranking de asertividad 
+            Elige el período de tiempo que deseas analizar para ver el ranking de asertividad
             de nuestros bots de trading automatizado.
           </p>
         </div>
@@ -52,38 +52,41 @@ const TimeFilterControls: React.FC<Props> = ({ periodoAtual, onPeriodoChange, sh
         {filterOptions.map((option) => {
           const Icon = option.icon;
           const isActive = periodoAtual === option.value;
-          
+
           return (
             <button
               key={option.value}
               onClick={() => onPeriodoChange(option.value)}
               className={`
                 group relative overflow-hidden rounded-xl border-2 p-6 transition-all duration-300 transform
-                ${isActive 
-                  ? 'border-primary/50 bg-primary/10 shadow-lg shadow-primary/20 scale-105' 
-                  : 'border-border/50 bg-card/30 hover:border-primary/30 hover:bg-primary/5 hover:scale-102'
+                ${isActive
+                  ? 'border-primary/60 bg-primary/10 shadow-xl shadow-primary/25 scale-105 animate-glow-pulse'
+                  : 'border-border/40 bg-card/40 hover:border-primary/40 hover:bg-primary/5 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10'
                 }
-                backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50
+                backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50
                 min-h-[120px] flex flex-col items-center justify-center text-center
               `}
             >
               {/* Glow effect para botão ativo */}
               {isActive && (
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent opacity-50 animate-pulse"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent opacity-60"></div>
               )}
-              
+
+              {/* Shimmer effect on hover */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
               {/* Conteúdo do botão */}
               <div className="relative z-10 flex flex-col items-center gap-3">
                 <div className={`
-                  w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300
-                  ${isActive 
-                    ? 'bg-primary/20 text-primary' 
-                    : 'bg-muted/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
+                  w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300
+                  ${isActive
+                    ? 'bg-primary/25 text-primary shadow-lg shadow-primary/30'
+                    : 'bg-muted/50 text-muted-foreground group-hover:bg-primary/15 group-hover:text-primary group-hover:shadow-md'
                   }
                 `}>
-                  <Icon size={24} />
+                  <Icon size={24} className="transition-transform duration-300 group-hover:scale-110" />
                 </div>
-                
+
                 <div>
                   <div className={`
                     text-lg font-bold transition-colors duration-300
@@ -106,9 +109,11 @@ const TimeFilterControls: React.FC<Props> = ({ periodoAtual, onPeriodoChange, sh
                 </div>
               </div>
 
-              {/* Indicador de seleção */}
+              {/* Indicador de seleção com glow */}
               {isActive && (
-                <div className="absolute top-2 right-2 w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                <div className="absolute top-2 right-2">
+                  <div className="w-3 h-3 bg-primary rounded-full status-online"></div>
+                </div>
               )}
             </button>
           );

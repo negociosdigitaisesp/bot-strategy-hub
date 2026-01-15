@@ -42,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (demoToken && demoToken.includes('demo-token')) {
         setIsOfflineMode(true);
         console.info('🔑 Demo mode active: Simulated authentication enabled');
-        
+
         try {
           // Parse the demo token to get user info
           const tokenData = JSON.parse(demoToken);
@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         console.log('Retrieving Supabase session...');
         const { data, error } = await supabase.auth.getSession();
-        
+
         if (!error && data?.session) {
           console.log('Session retrieved successfully');
           setSession(data.session);
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             console.warn('No active session found');
           }
-          
+
           // If no valid session, check if we have a refresh token to try
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           if (!refreshError && refreshData?.session) {
@@ -102,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('Auth state change event:', event);
-        
+
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           console.log('User signed in or token refreshed');
           if (newSession) {
@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(newSession.user);
           }
         }
-        
+
         setLoading(false);
       }
     );
@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Obtener el token de autenticación actual
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
+
       if (!currentSession?.access_token) {
         throw new Error('No authentication token available');
       }
@@ -146,13 +146,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Usar la nueva función de verificación de status
       const { verificarStatusDoUsuario } = await import('../services/verificarStatusDoUsuario');
       const resultado = await verificarStatusDoUsuario(userId, currentSession.access_token);
-      
+
       if (!resultado.success) {
         throw new Error(resultado.error || 'Failed to verify user status');
       }
-      
+
       return { isActive: resultado.isActive };
-      
+
     } catch (error) {
       console.error('Error in checkUserActiveStatus:', error);
       throw error;
@@ -162,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
-      
+
       // Credenciais de teste para facilitar o acesso
       if (email === 'teste@demo.com' && password === '123456') {
         const mockUser = {
@@ -175,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           aud: 'authenticated',
           created_at: new Date().toISOString()
         } as User;
-        
+
         const mockSession = {
           access_token: `demo-token-${Date.now()}`,
           refresh_token: `demo-refresh-${Date.now()}`,
@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           expires_in: 3600 * 24 * 7, // 7 dias
           token_type: 'bearer'
         } as Session;
-        
+
         localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(mockSession));
         setSession(mockSession);
         setUser(mockUser);
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.success('¡Inicio de sesión exitoso (modo demo)!');
         return { error: null, success: true };
       }
-      
+
       // If in demo mode and we already have a local session, reuse it
       if (isSupabaseDemoMode) {
         const demoToken = localStorage.getItem(DEMO_STORAGE_KEY);
@@ -211,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       }
-      
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -219,13 +219,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Login error:', error);
-        
+
         // Handle common error cases
         if (error.message.includes('Email not confirmed')) {
           toast.error('Por favor, verifique su correo electrónico para activar su cuenta');
           return { error, success: false };
         }
-        
+
         toast.error(`Error al iniciar sesión: ${error.message}`);
         return { error, success: false };
       }
@@ -246,7 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             aud: 'authenticated',
             created_at: new Date().toISOString()
           } as User;
-          
+
           const mockSession = {
             access_token: `demo-token-${Date.now()}`,
             refresh_token: `demo-refresh-${Date.now()}`,
@@ -254,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             expires_in: 3600 * 24 * 7, // 7 días
             token_type: 'bearer'
           } as Session;
-          
+
           localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(mockSession));
           setSession(mockSession);
           setUser(mockUser);
@@ -265,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Try to refresh the session once
           console.log('Attempting to refresh session...');
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          
+
           if (!refreshError && refreshData?.session && refreshData?.user) {
             // Session refreshed successfully
             setSession(refreshData.session);
@@ -274,24 +274,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             toast.success('¡Inicio de sesión exitoso!');
             return { error: null, success: true };
           }
-          
+
           // Check if the account requires email verification
           const { data: userData, error: userError } = await supabase.auth.getUserIdentities();
           if (!userError && userData && userData.identities && userData.identities.length > 0) {
             const identity = userData.identities[0];
             if (identity && !identity.identity_data.email_verified) {
               toast.error('Por favor verifique su correo electrónico para activar su cuenta');
-              return { 
-                error: { message: 'Email verification required' }, 
-                success: false 
+              return {
+                error: { message: 'Email verification required' },
+                success: false
               };
             }
           }
-          
+
           toast.error('Error al iniciar sesión: Sesión o usuario no encontrado');
-          return { 
-            error: { message: 'Auth session or user missing' }, 
-            success: false 
+          return {
+            error: { message: 'Auth session or user missing' },
+            success: false
           };
         }
       }
@@ -300,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(data.session);
       setUser(data.user);
       setIsOfflineMode(false);
-      
+
       toast.success('¡Inicio de sesión exitoso!');
       return { error: null, success: true };
     } catch (error: any) {
@@ -315,7 +315,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, name?: string) => {
     try {
       setLoading(true);
-      
+
       // In demo mode, simply register without requiring confirmation
       if (isSupabaseDemoMode) {
         const { data, error } = await supabase.auth.signUp({
@@ -335,7 +335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // In demo mode, we consider registration successful and direct the user
         toast.success('¡Cuenta creada con éxito! Iniciando sesión...');
         await signIn(email, password);
-        navigate('/verificando-acesso');
+        navigate('/');
         return { error: null, success: true };
       } else {
         // Normal behavior with real Supabase
@@ -374,12 +374,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Check if email confirmation is needed
         if (data?.user?.identities?.length === 0) {
           toast.error('El correo ya está registrado. Intenta iniciar sesión.');
-          return { 
-            error: { message: 'Email already registered' }, 
-            success: false 
+          return {
+            error: { message: 'Email already registered' },
+            success: false
           };
         }
-        
+
         // Add auto-signin attempt for newly registered users
         // This will work if email confirmation is not required in Supabase settings
         if (data?.user) {
@@ -389,7 +389,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Try to sign in automatically
             const signInResult = await signIn(email, password);
             if (signInResult.success) {
-              navigate('/verificando-acesso');
+              navigate('/');
               return { error: null, success: true };
             }
           } else {
@@ -398,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return { error: null, success: true };
           }
         }
-        
+
         return { error: null, success: true };
       }
     } catch (error: any) {
@@ -413,7 +413,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setLoading(true);
-      
+
       // Clear any demo tokens
       if (isOfflineMode) {
         localStorage.removeItem(DEMO_STORAGE_KEY);
@@ -424,14 +424,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate('/login');
         return;
       }
-      
+
       // Regular signout
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         console.error('Error signing out:', error);
         toast.error(`Error al cerrar sesión: ${error.message}`);
-        
+
         // Simulate successful signout even if API fails
         setSession(null);
         setUser(null);
@@ -447,7 +447,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Unexpected error during sign out:', error);
       toast.error(`Error al cerrar sesión: ${error.message}`);
-      
+
       // Fallback signout
       setSession(null);
       setUser(null);

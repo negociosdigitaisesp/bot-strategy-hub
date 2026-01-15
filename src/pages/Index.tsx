@@ -7,6 +7,7 @@ import FilterBar from '../components/FilterBar';
 import PerformanceChart from '../components/PerformanceChart';
 import { bots, dashboardStats, performanceData, filterOptions } from '../lib/mockData';
 import { atualizarRankingBots, verificarAtualizacoesPendentes } from '../services/botRankingService';
+import LiveBotFeed from '../components/LiveBotFeed';
 
 const BotFinderRadar = () => {
   const [isSearching, setIsSearching] = useState(false);
@@ -33,7 +34,7 @@ const BotFinderRadar = () => {
     setShowInitial(false);
     setIsSearching(true);
     setCurrentBotIndex(0);
-    
+
     setTimeout(() => {
       // Usar bots ordenados por accuracy
       const botsToUse = [...bots].sort((a, b) => b.accuracy - a.accuracy);
@@ -47,18 +48,18 @@ const BotFinderRadar = () => {
   const handleDownloadClick = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     console.log("=== BOTÃO DOWNLOAD CLICADO ===");
     console.log("Bot encontrado:", foundBot);
-    
+
     if (!foundBot) {
       alert("Nenhum bot selecionado!");
       return;
     }
-    
+
     console.log("Iniciando download do bot:", foundBot.name);
     alert(`Download iniciado para o bot: ${foundBot.name}`);
-    
+
     // Simula navegação
     try {
       const targetUrl = `/bot/${foundBot.id}`;
@@ -74,29 +75,29 @@ const BotFinderRadar = () => {
   const handleBuscarOtroClick = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     console.log("=== BOTÃO BUSCAR OTRO CLICADO ===");
     console.log("Índice atual:", currentBotIndex);
-    
+
     const botsToUse = [...bots].sort((a, b) => b.accuracy - a.accuracy);
     console.log("Bots disponíveis:", botsToUse.length);
-    
+
     if (botsToUse.length === 0) {
       alert("Não há bots disponíveis!");
       return;
     }
-    
+
     setIsSearching(true);
     setFoundBot(null);
-    
+
     setTimeout(() => {
       const nextIndex = (currentBotIndex + 1) % Math.min(5, botsToUse.length);
       console.log("Próximo índice:", nextIndex);
-      
+
       setCurrentBotIndex(nextIndex);
       setFoundBot(botsToUse[nextIndex]);
       setIsSearching(false);
-      
+
       console.log("Novo bot selecionado:", botsToUse[nextIndex]?.name);
     }, 1200);
   };
@@ -108,7 +109,7 @@ const BotFinderRadar = () => {
       {showParticles && (
         <div className="absolute inset-0 pointer-events-none">
           {[...Array(20)].map((_, i) => (
-            <div 
+            <div
               key={i}
               className="absolute w-1 h-1 bg-primary rounded-full"
               style={{
@@ -132,7 +133,7 @@ const BotFinderRadar = () => {
         </div>
         <div className="flex flex-col items-center justify-center w-full">
           {showInitial && !isSearching && !foundBot ? (
-            <button 
+            <button
               ref={buttonRef}
               onClick={startDetection}
               className="relative bg-gradient-to-r from-primary/80 to-primary hover:from-primary hover:to-primary/90 text-primary-foreground font-bold py-2 md:py-3 px-6 md:px-8 rounded-full shadow-lg transition-all duration-300 flex items-center overflow-hidden group"
@@ -162,7 +163,7 @@ const BotFinderRadar = () => {
               <div className="bg-secondary/80 p-4 md:p-6 rounded-xl backdrop-blur-sm border border-primary/30 flex flex-col md:flex-row items-center relative overflow-hidden w-full max-w-2xl shadow-lg">
                 {/* Background gradient effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
-                
+
                 {/* Left side - Bot accuracy circle */}
                 <div className="flex flex-col items-center mb-4 md:mb-0 md:mr-6">
                   <div className="relative w-24 h-24 md:w-28 md:h-28 mb-2">
@@ -175,7 +176,7 @@ const BotFinderRadar = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Center - Bot information */}
                 <div className="flex-1 text-center md:text-left">
                   <div className="flex items-center justify-center md:justify-start mb-2">
@@ -184,16 +185,16 @@ const BotFinderRadar = () => {
                       {currentBotIndex === 0 ? "Bot más Asertivo" : `Bot #${currentBotIndex + 1} en Ranking`}
                     </span>
                   </div>
-                  
+
                   <h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">{foundBot.name}</h3>
-                  
+
                   <p className="text-sm text-muted-foreground mb-3 max-w-md">
-                    {foundBot.description.length > 120 
-                      ? `${foundBot.description.substring(0, 120)}...` 
+                    {foundBot.description.length > 120
+                      ? `${foundBot.description.substring(0, 120)}...`
                       : foundBot.description
                     }
                   </p>
-                  
+
                   <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                     <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
                       {foundBot.strategy}
@@ -236,25 +237,25 @@ const Index = () => {
       try {
         setIsLoadingRanking(true);
         setRankingError(null);
-        
+
         // Atualizar bots com dados reais do Supabase
         const botsAtualizados = await atualizarRankingBots();
-        
+
         // Ordenar por precisão (accuracy) para manter o ranking correto
         const sorted = botsAtualizados.sort((a, b) => b.accuracy - a.accuracy);
         setSortedBots(sorted);
-        
+
         // Atualizar filteredBots com os dados atualizados
         setFilteredBots(sorted);
-        
+
       } catch (error) {
         setRankingError('Erro ao carregar dados do ranking');
-        
+
         // Fallback para dados locais
         const sorted = [...bots].sort((a, b) => b.accuracy - a.accuracy);
         setSortedBots(sorted);
         setFilteredBots(sorted);
-        
+
       } finally {
         setIsLoadingRanking(false);
       }
@@ -271,7 +272,7 @@ const Index = () => {
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
-    
+
     filterBots(term, currentStrategy, currentAsset, sortBy);
   };
 
@@ -293,23 +294,23 @@ const Index = () => {
   const filterBots = (term: string, strategy: string, asset: string, sort: string) => {
     // Usar sortedBots (com dados do Supabase) em vez de bots estáticos
     const botsToFilter = sortedBots.length > 0 ? sortedBots : bots;
-    
+
     let result = botsToFilter.filter(bot => {
       return (
-        (term === '' || bot.name.toLowerCase().includes(term.toLowerCase()) || 
-         bot.description.toLowerCase().includes(term.toLowerCase())) &&
+        (term === '' || bot.name.toLowerCase().includes(term.toLowerCase()) ||
+          bot.description.toLowerCase().includes(term.toLowerCase())) &&
         (strategy === '' || bot.strategy === strategy) &&
         (asset === '' || bot.tradedAssets.includes(asset))
       );
     });
-    
+
     // Sort the results
     switch (sort) {
       case 'performance':
         result = result.sort((a, b) => b.accuracy - a.accuracy);
         break;
       case 'newest':
-        result = result.sort((a, b) => 
+        result = result.sort((a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         break;
@@ -319,7 +320,7 @@ const Index = () => {
       default:
         break;
     }
-    
+
     // Update rankings based on accuracy after filtering
     if (showRanking) {
       result = [...result].map((bot, index) => ({
@@ -327,7 +328,7 @@ const Index = () => {
         ranking: index + 1
       }));
     }
-    
+
     setFilteredBots(result);
   };
 
@@ -343,34 +344,34 @@ const Index = () => {
           <SearchInput onChange={handleSearch} />
         </div>
       </section>
-      
-      {/* Bot Finder Radar Section */}
+
+      {/* Top Bots Activity Feed - Gamified */}
       <section className="px-6 py-4">
-        <BotFinderRadar />
+        <LiveBotFeed />
       </section>
-      
+
       {/* Stats Cards Section */}
       <section className="px-6 py-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard 
+          <StatCard
             title="Total de Bots"
             value={dashboardStats.totalBots}
             icon={<Bot size={24} />}
             trend={{ value: 8.3, isPositive: true }}
           />
-          <StatCard 
+          <StatCard
             title="Operaciones"
             value={dashboardStats.totalOperations}
             icon={<Clock size={24} />}
             trend={{ value: 12.5, isPositive: true }}
           />
-          <StatCard 
+          <StatCard
             title="Asertividad Media"
             value={`${dashboardStats.averageAccuracy}%`}
             icon={<ChartLine size={24} />}
             trend={{ value: 3.2, isPositive: true }}
           />
-          <StatCard 
+          <StatCard
             title="Usuarios Activos"
             value={dashboardStats.activeUsers}
             icon={<User size={24} />}
@@ -378,7 +379,7 @@ const Index = () => {
           />
         </div>
       </section>
-      
+
       {/* Investment Risk Warning Banner */}
       <section className="px-6 py-4">
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
@@ -386,41 +387,41 @@ const Index = () => {
             <AlertTriangle className="text-red-500 flex-shrink-0" size={20} />
             <div className="text-sm">
               <p className="font-medium text-red-700 dark:text-red-400 mb-1">
-                 AVISO SOBRE RIESGOS DE INVERSIÓN
-               </p>
-               <p className="text-red-600 dark:text-red-300">
-                  Los retornos pasados no garantizan retornos futuros. La negociación de productos financieros complejos, como opciones y derivados, implica un elevado nivel de riesgo y puede resultar en la pérdida de todo el capital invertido. Asegúrese de comprender plenamente los riesgos antes de invertir y nunca arriesgue más dinero del que pueda permitirse perder.
-                </p>
+                AVISO SOBRE RIESGOS DE INVERSIÓN
+              </p>
+              <p className="text-red-600 dark:text-red-300">
+                Los retornos pasados no garantizan retornos futuros. La negociación de productos financieros complejos, como opciones y derivados, implica un elevado nivel de riesgo y puede resultar en la pérdida de todo el capital invertido. Asegúrese de comprender plenamente los riesgos antes de invertir y nunca arriesgue más dinero del que pueda permitirse perder.
+              </p>
             </div>
           </div>
         </div>
       </section>
-      
+
       {/* Charts Section */}
       <section className="px-6 py-4">
         <h2 className="text-xl font-semibold mb-4">Analítica</h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <PerformanceChart 
-            data={performanceData.profitLoss} 
+          <PerformanceChart
+            data={performanceData.profitLoss}
             isPositive={true}
             title="Rendimiento (P&L)"
             yAxisLabel="Valor ($)"
           />
-          <PerformanceChart 
-            data={performanceData.accuracy} 
+          <PerformanceChart
+            data={performanceData.accuracy}
             isPositive={true}
             title="Asertividad"
             yAxisLabel="%"
           />
-          <PerformanceChart 
-            data={performanceData.volatility} 
+          <PerformanceChart
+            data={performanceData.volatility}
             isPositive={false}
             title="Volatilidad"
             yAxisLabel="Índice"
           />
         </div>
       </section>
-      
+
       {/* Bots Library Section */}
       <section className="px-6 py-4">
         <div className="flex justify-between items-center mb-4">
@@ -449,27 +450,27 @@ const Index = () => {
             <label htmlFor="show-ranking" className="text-sm">
               Mostrar Ranking
             </label>
-            <input 
-              type="checkbox" 
-              id="show-ranking" 
-              checked={showRanking} 
-              onChange={() => setShowRanking(!showRanking)} 
+            <input
+              type="checkbox"
+              id="show-ranking"
+              checked={showRanking}
+              onChange={() => setShowRanking(!showRanking)}
               className="rounded border-gray-300 text-primary focus:ring-primary"
             />
           </div>
         </div>
-        
-        <FilterBar 
+
+        <FilterBar
           strategies={filterOptions.strategies}
           assets={filterOptions.assets}
           onStrategyChange={handleStrategyChange}
           onAssetChange={handleAssetChange}
           onSortChange={handleSortChange}
         />
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredBots.map(bot => (
-            <BotCard 
+            <BotCard
               key={bot.id}
               id={bot.id}
               name={bot.name}
