@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
+import { useMarketingMode } from '../hooks/useMarketingMode';
 import { usePricingModal } from '../contexts/PricingModalContext';
 import { RealAccountLockModal } from './RealAccountLockModal';
 import {
@@ -31,6 +32,7 @@ interface AccountSwitcherProps {
 export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, className }) => {
     const { account, token, connect, disconnect, isConnecting } = useDeriv();
     const { isFree, isPro } = useFreemiumLimiter();
+    const { isMarketingMode, getAccountTypeDisplay, getCurrencySymbol, getDisplayBalance, getDisplayLoginId, overrides } = useMarketingMode();
     const { openPricingModal } = usePricingModal();
     const [isOpen, setIsOpen] = useState(false);
     const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
@@ -74,11 +76,15 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
     // Configuração visual baseada no tipo de conta ativa
     const activeIsReal = account ? isRealAccount(account.loginid) : false;
 
-    const triggerStyles = activeIsReal
+    // Marketing mode: force display as Real if enabled
+    const forceRealColors = isMarketingMode && overrides.forceRealAccount;
+    const displayAsReal = forceRealColors || activeIsReal;
+
+    const triggerStyles = displayAsReal
         ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
         : "border-cyan-500/30 text-cyan-400 bg-cyan-500/5 hover:bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.1)]";
 
-    const iconStyles = activeIsReal
+    const iconStyles = displayAsReal
         ? "bg-emerald-500/20 text-emerald-400"
         : "bg-cyan-500/20 text-cyan-400";
 
@@ -87,11 +93,15 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
         return Number(val).toLocaleString('es-LA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
+    // Get currency symbol for marketing mode
+    const currencySymbol = getCurrencySymbol();
+
     const handleSwitchAccount = async (acc: SavedAccount) => {
         // Check if trying to switch to Real account while on Free plan
         const targetIsReal = isRealAccount(acc.loginid);
 
-        if (targetIsReal && isFree) {
+        // Marketing mode bypasses all restrictions
+        if (!isMarketingMode && targetIsReal && isFree) {
             // Block the switch and show modal
             setIsOpen(false);
             setShowRealLockModal(true);
@@ -124,6 +134,13 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
         }
     };
 
+    // Get display balance for marketing mode
+    const getBalanceDisplay = (balance: string | number) => {
+        const realBalance = Number(balance);
+        const displayBal = getDisplayBalance(realBalance);
+        return formatBalance(displayBal);
+    };
+
     return (
         <>
             <div className={cn("relative w-full max-w-sm", className)} ref={dropdownRef}>
@@ -142,7 +159,7 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                             account ? iconStyles : "bg-white/5 text-slate-500"
                         )}>
                             {account ? (
-                                activeIsReal ? <DollarSign size={20} className="drop-shadow-glow" /> : <Gamepad2 size={20} />
+                                displayAsReal ? <DollarSign size={20} className="drop-shadow-glow" /> : <Gamepad2 size={20} />
                             ) : (
                                 <Wallet size={20} />
                             )}
@@ -151,7 +168,7 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                         {/* Info Texto */}
                         <div className="flex flex-col items-start">
                             <span className="text-[10px] uppercase tracking-widest opacity-70 font-bold">
-                                {account ? (activeIsReal ? 'Cuenta Real' : 'Cuenta Demo') : 'Sin Conexión'}
+                                {account ? getAccountTypeDisplay(activeIsReal) : 'Sin Conexión'}
                             </span>
                             <span className={cn(
                                 "text-lg font-mono font-bold leading-none tracking-tight",
@@ -159,8 +176,8 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                             )}>
                                 {account ? (
                                     <>
-                                        <span className="opacity-60 text-sm mr-1">$</span>
-                                        {formatBalance(account.balance)}
+                                        <span className="opacity-60 text-sm mr-1">{currencySymbol}</span>
+                                        {getBalanceDisplay(account.balance)}
                                     </>
                                 ) : (
                                     '---'
@@ -173,7 +190,7 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                     <div className="flex items-center gap-2">
                         {account && (
                             <span className="hidden sm:inline-block text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded text-white/40 border border-white/5">
-                                {account.loginid}
+                                {getDisplayLoginId(account.loginid)}
                             </span>
                         )}
                         <ChevronDown
@@ -186,7 +203,7 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                     {account && (
                         <div className={cn(
                             "absolute inset-0 rounded-full blur-xl opacity-20 -z-10 transition-opacity",
-                            activeIsReal ? "bg-emerald-500" : "bg-cyan-500",
+                            displayAsReal ? "bg-emerald-500" : "bg-cyan-500",
                             isOpen ? "opacity-40" : "opacity-0 group-hover:opacity-30"
                         )}></div>
                     )}
@@ -218,7 +235,11 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                         {savedAccounts.map((acc, index) => {
                             const isReal = isRealAccount(acc.loginid);
                             const isActive = account?.loginid === acc.loginid;
-                            const isLocked = isReal && isFree; // Real accounts locked for free users
+                            // Marketing mode bypasses lock
+                            const isLocked = !isMarketingMode && isReal && isFree;
+
+                            // For marketing mode, always show as Real if forceRealAccount is true
+                            const showAsReal = (isMarketingMode && overrides.forceRealAccount) || isReal;
 
                             return (
                                 <div
@@ -235,12 +256,12 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                                     <div className="flex items-center gap-3">
                                         <div className={cn(
                                             "relative w-8 h-8 rounded-lg flex items-center justify-center border transition-colors",
-                                            isReal
+                                            showAsReal
                                                 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
                                                 : "bg-cyan-500/10 border-cyan-500/20 text-cyan-500",
-                                            isActive && (isReal ? "bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.2)]")
+                                            isActive && (showAsReal ? "bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.2)]")
                                         )}>
-                                            {isReal ? <DollarSign size={14} /> : <Gamepad2 size={14} />}
+                                            {showAsReal ? <DollarSign size={14} /> : <Gamepad2 size={14} />}
                                             {/* Lock indicator for Real accounts on Free plan */}
                                             {isLocked && (
                                                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center border border-slate-900">
@@ -253,9 +274,9 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                                             <div className="flex items-center gap-2">
                                                 <span className={cn(
                                                     "font-bold text-sm",
-                                                    isReal ? "text-emerald-100" : "text-cyan-100"
+                                                    showAsReal ? "text-emerald-100" : "text-cyan-100"
                                                 )}>
-                                                    {isReal ? 'Cuenta Real' : 'Cuenta Demo'}
+                                                    {getAccountTypeDisplay(isReal)}
                                                 </span>
                                                 {isActive && <Check size={12} className="text-white/50" />}
                                                 {isLocked && (
@@ -265,9 +286,9 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                                                <span className="opacity-70">{acc.loginid}</span>
+                                                <span className="opacity-70">{getDisplayLoginId(acc.loginid)}</span>
                                                 <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                                                <span>{acc.balance ? `$${formatBalance(acc.balance)}` : '---'}</span>
+                                                <span>{acc.balance ? `${currencySymbol}${formatBalance(acc.balance)}` : '---'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -284,7 +305,7 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                                     {isActive && (
                                         <div className={cn(
                                             "absolute left-0 top-3 bottom-3 w-1 rounded-r-full",
-                                            isReal ? "bg-emerald-500 box-shadow-glow-emerald" : "bg-cyan-500 box-shadow-glow-cyan"
+                                            showAsReal ? "bg-emerald-500 box-shadow-glow-emerald" : "bg-cyan-500 box-shadow-glow-cyan"
                                         )}></div>
                                     )}
                                 </div>
@@ -295,7 +316,8 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                     {/* Botão Nova Conta */}
                     <button
                         onClick={() => {
-                            if (isFree) {
+                            // Marketing mode bypasses restrictions
+                            if (!isMarketingMode && isFree) {
                                 openPricingModal();
                             } else {
                                 setIsOpen(false);

@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { useTradingSession } from '../contexts/TradingSessionContext';
+import { useRiskSystem } from './useRiskSystem';
 import { toast } from 'sonner';
 
-// --- TIPOS ---
+// --- TYPES ---
 interface BotConfig {
     stake: number;
     stopLoss: number;
@@ -11,60 +12,56 @@ interface BotConfig {
     useMartingale: boolean;
 }
 
+type Parity = 'even' | 'odd';
+type OperationMode = 'ping-pong' | 'sequencia' | 'espera';
+type SnapbackPattern = 'none' | 'even' | 'odd';
+
 interface BotStats {
     wins: number;
     losses: number;
     totalProfit: number;
     currentStake: number;
     martingaleLevel: number;
-    entriesFiltered: number;  // Entradas bloqueadas por fricción
-    entriesExecuted: number;  // Entradas ejecutadas
-    trendBlocked: number;     // Bloqueadas por tendencia
+    switchRate: number;
+    snapbacksTriggered: number;
+    cycleResets: number;
+    signalsTriggered: number;
 }
 
 interface LogEntry {
     id: string;
     time: string;
     message: string;
-    type: 'info' | 'success' | 'error' | 'warning' | 'friction' | 'blocked' | 'entry' | 'trend';
+    type: 'info' | 'success' | 'error' | 'warning' | 'even' | 'odd' | 'blocked' | 'mode' | 'snapback' | 'cycle';
 }
 
-// Resultado del análisis de fricción
-interface FrictionResult {
-    shouldEnter: boolean;
-    reason: string;
-    lastDigit: number;
-    contractType?: 'DIGITEVEN' | 'DIGITODD';
-    blockedByTrend?: boolean;
-}
-
-// Tipo de tendencia del tick
-type TickDirection = 'green' | 'red' | 'neutral';
-
 // ============================================================================
-// DIGITAL FRICTION CONSTANTS - CONFIGURACIÓN ÓPTIMA
+// CHAMELEON ADAPTIVE CONFIG - CYCLE ANALYSIS MODE
 // ============================================================================
-const FRICTION_CONFIG = {
-    SYMBOL: 'R_100',                    // Volatility 100 (1s) - Máxima velocidad
+const CHAMELEON_CONFIG = {
+    SYMBOL: 'R_100',
     SYMBOL_NAME: 'Volatility 100 (1s)',
-    SEQUENCE_LENGTH: 2,                 // Solo 2 dígitos = Alta frecuencia
-    MARTINGALE_FACTOR: 2.0,             // Factor Martingale
-    MAX_MARTINGALE_LEVELS: 4,           // 4 niveles (filtro confiable)
 
-    // DÍGITOS CON ALTA FRICCIÓN (Buena repulsión)
-    HIGH_FRICTION_EVEN: [6, 8],         // Pares que repelen bien
-    HIGH_FRICTION_ODD: [1, 3],          // Impares que repelen bien
+    // CYCLE ANALYSIS
+    HISTORY_SIZE: 50,                    // 50 ticks for switch rate calculation
 
-    // DÍGITOS PEGAJOSOS (Alto riesgo de repetición)
-    STICKY_EVEN: [0, 2, 4],             // Pares pegajosos
-    STICKY_ODD: [5, 7, 9],              // Impares pegajosos
+    // MODE THRESHOLDS
+    PING_PONG_THRESHOLD: 55,             // Switch Rate > 55% = Ping-Pong Mode
+    SEQUENCIA_THRESHOLD: 45,             // Switch Rate < 45% = Sequência Mode
+    STRONG_SEQUENCIA_THRESHOLD: 70,      // Sequência > 70% = Override Snapback
+
+    // RISK MANAGEMENT
+    MARTINGALE_FACTOR: 2.1,              // x2.1 per loss
+    MAX_MARTINGALE_LEVELS: 4,
+    CONSECUTIVE_LOSS_FOR_REANALYSIS: 2,  // 2 losses = force cycle reanalysis
 };
 
 export const useBugDeriv = () => {
     const { socket, isConnected } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
+    const { isEnabled: riskEnabled, checkSafetyLock, settings: riskSettings } = useRiskSystem();
 
-    // Estado del Bot
+    // Bot State
     const [isRunning, setIsRunning] = useState(false);
     const [stats, setStats] = useState<BotStats>({
         wins: 0,
@@ -72,36 +69,34 @@ export const useBugDeriv = () => {
         totalProfit: 0,
         currentStake: 0.35,
         martingaleLevel: 0,
-        entriesFiltered: 0,
-        entriesExecuted: 0,
-        trendBlocked: 0,
+        switchRate: 50,
+        snapbacksTriggered: 0,
+        cycleResets: 0,
+        signalsTriggered: 0,
     });
     const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [lastDigits, setLastDigits] = useState<number[]>([]);
 
-    // Estado de Fricción
-    const [frictionStatus, setFrictionStatus] = useState<'waiting' | 'analyzing' | 'blocked' | 'entering'>('waiting');
-    const [lastAnalyzedDigit, setLastAnalyzedDigit] = useState<number | null>(null);
-    const [sequenceType, setSequenceType] = useState<'even' | 'odd' | null>(null);
+    // Cycle Analysis State
+    const [switchRate, setSwitchRate] = useState<number>(50);
+    const [currentMode, setCurrentMode] = useState<OperationMode>('espera');
+    const [snapbackPattern, setSnapbackPattern] = useState<SnapbackPattern>('none');
+    const [lastParity, setLastParity] = useState<Parity | null>(null);
+    const [isReanalyzing, setIsReanalyzing] = useState<boolean>(false);
 
-    // Estado de Tendencia de Tick (NUEVO)
-    const [tickDirection, setTickDirection] = useState<TickDirection>('neutral');
-
-    // Código "hacker" stream
-    const [codeStream, setCodeStream] = useState<string[]>([]);
-
-    // Referencias
+    // Refs
     const configRef = useRef<BotConfig | null>(null);
     const initialStakeRef = useRef<number>(0.35);
     const currentStakeRef = useRef<number>(0.35);
     const isWaitingForContractRef = useRef<boolean>(false);
-    const lastDigitsRef = useRef<number[]>([]);
-    const lastPricesRef = useRef<number[]>([]);  // Para análisis de vector
-    const martingaleLevelRef = useRef<number>(0);
     const isRunningRef = useRef<boolean>(false);
-    const entriesFilteredRef = useRef<number>(0);
-    const entriesExecutedRef = useRef<number>(0);
-    const trendBlockedRef = useRef<number>(0);
+
+    // Data Buffers
+    const parityHistoryRef = useRef<Parity[]>([]);      // 50 tick parity history
+    const last3ParitiesRef = useRef<Parity[]>([]);      // Last 3 for snapback detection
+
+    // Risk Management Refs
+    const martingaleLevelRef = useRef<number>(0);
+    const consecutiveLossesRef = useRef<number>(0);
 
     // --- HELPERS ---
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -114,126 +109,136 @@ export const useBugDeriv = () => {
         setLogs(prev => [...prev.slice(-80), newLog]);
     }, []);
 
-    // Genera código "hacker" aleatorio
-    const generateHackerCode = useCallback(() => {
-        const codes = [
-            `0x${Math.random().toString(16).substr(2, 8).toUpperCase()}`,
-            `SCAN::${Math.floor(Math.random() * 999).toString().padStart(3, '0')}`,
-            `FRIC_${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
-            `>>TICK_${Date.now().toString().slice(-6)}`,
-            `[${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}${Math.floor(Math.random() * 10)}]`,
-            `HASH:${Math.random().toString(36).substr(2, 6)}`,
-            `SIG_${Math.floor(Math.random() * 100)}.${Math.floor(Math.random() * 100)}`,
-            `MEM:0x${Math.random().toString(16).substr(2, 4)}`,
-        ];
-        return codes[Math.floor(Math.random() * codes.length)];
+    // --- CORE: Get Parity from Tick ---
+    const getParityFromTick = useCallback((quote: number): Parity => {
+        const lastDigit = Math.floor(quote * 100) % 10;
+        return lastDigit % 2 === 0 ? 'even' : 'odd';
     }, []);
 
-    // --- NUEVO: ANÁLISIS DE VETOR DE TICK ---
-    const analyzeTickDirection = useCallback((prices: number[]): TickDirection => {
-        if (prices.length < 2) return 'neutral';
+    // --- CORE: Calculate Switch Rate ---
+    const calculateSwitchRate = useCallback((history: Parity[]): number => {
+        if (history.length < 2) return 50;
 
-        const prevPrice = prices[prices.length - 2];
-        const currentPrice = prices[prices.length - 1];
-
-        if (currentPrice > prevPrice) return 'green';  // Subida
-        if (currentPrice < prevPrice) return 'red';    // Queda
-        return 'neutral';
-    }, []);
-
-    // --- CORE: DETECTOR DE SECUENCIA (2 dígitos iguales) ---
-    const detectSequence = useCallback((digits: number[]): { detected: boolean; isEven: boolean; lastDigit: number } => {
-        if (digits.length < FRICTION_CONFIG.SEQUENCE_LENGTH) {
-            return { detected: false, isEven: false, lastDigit: -1 };
-        }
-
-        const last2 = digits.slice(-2);
-        const d1 = last2[0];
-        const d2 = last2[1];
-
-        // Ambos pares?
-        if (d1 % 2 === 0 && d2 % 2 === 0) {
-            return { detected: true, isEven: true, lastDigit: d2 };
-        }
-
-        // Ambos impares?
-        if (d1 % 2 !== 0 && d2 % 2 !== 0) {
-            return { detected: true, isEven: false, lastDigit: d2 };
-        }
-
-        return { detected: false, isEven: false, lastDigit: d2 };
-    }, []);
-
-    // --- CORE: FILTRO DE FRICCIÓN DIGITAL + VETOR ---
-    const analyzeFriction = useCallback((isEvenSequence: boolean, lastDigit: number, direction: TickDirection): FrictionResult => {
-        if (isEvenSequence) {
-            // Secuencia de PARES -> Buscamos entrar en ÍMPAR
-            if (FRICTION_CONFIG.HIGH_FRICTION_EVEN.includes(lastDigit)) {
-                // NOVO FILTRO: Para entrar ÍMPAR após pares [6,8], tick deve ser RED ou NEUTRAL
-                // Se for GREEN (subindo), pares altos podem repetir
-                if (direction === 'green') {
-                    return {
-                        shouldEnter: false,
-                        reason: `🚫 Bloqueio: Tendencia Contra a Aposta [${lastDigit}] ↑ Verde`,
-                        lastDigit,
-                        blockedByTrend: true,
-                    };
-                }
-                return {
-                    shouldEnter: true,
-                    reason: `⚡ FRICCIÓN [${lastDigit}] + Vector ${direction === 'red' ? '↓' : '—'} → ÍMPAR`,
-                    lastDigit,
-                    contractType: 'DIGITODD',
-                };
-            } else {
-                return {
-                    shouldEnter: false,
-                    reason: `🚫 Ignorado: Dígito Pegajoso [${lastDigit}]`,
-                    lastDigit,
-                };
-            }
-        } else {
-            // Secuencia de ÍMPARES -> Buscamos entrar en PAR
-            if (FRICTION_CONFIG.HIGH_FRICTION_ODD.includes(lastDigit)) {
-                // NOVO FILTRO: Para entrar PAR após impares [1,3], tick deve ser GREEN ou NEUTRAL
-                // Se for RED (descendo), ímpares baixos podem repetir
-                if (direction === 'red') {
-                    return {
-                        shouldEnter: false,
-                        reason: `🚫 Bloqueio: Tendencia Contra a Aposta [${lastDigit}] ↓ Rojo`,
-                        lastDigit,
-                        blockedByTrend: true,
-                    };
-                }
-                return {
-                    shouldEnter: true,
-                    reason: `⚡ FRICCIÓN [${lastDigit}] + Vector ${direction === 'green' ? '↑' : '—'} → PAR`,
-                    lastDigit,
-                    contractType: 'DIGITEVEN',
-                };
-            } else {
-                return {
-                    shouldEnter: false,
-                    reason: `🚫 Ignorado: Dígito Pegajoso [${lastDigit}]`,
-                    lastDigit,
-                };
+        let switches = 0;
+        for (let i = 1; i < history.length; i++) {
+            if (history[i] !== history[i - 1]) {
+                switches++;
             }
         }
+
+        return (switches / (history.length - 1)) * 100;
     }, []);
 
-    // --- EJECUTAR TRADE ---
-    const executeTrade = useCallback((contractType: 'DIGITEVEN' | 'DIGITODD') => {
-        if (!socket || isWaitingForContractRef.current || !isRunningRef.current) return;
+    // --- CORE: Determine Mode ---
+    const determineMode = useCallback((rate: number): OperationMode => {
+        if (rate > CHAMELEON_CONFIG.PING_PONG_THRESHOLD) {
+            return 'ping-pong';
+        } else if (rate < CHAMELEON_CONFIG.SEQUENCIA_THRESHOLD) {
+            return 'sequencia';
+        }
+        return 'espera';
+    }, []);
 
-        isWaitingForContractRef.current = true;
-        const stake = currentStakeRef.current;
+    // --- CORE: Detect Snapback Pattern (2-1) ---
+    const detectSnapback = useCallback((last3: Parity[]): SnapbackPattern => {
+        if (last3.length < 3) return 'none';
+
+        const [first, second, third] = last3;
+
+        // [PAR] -> [PAR] -> [ÍMPAR] = Apostar PAR
+        if (first === 'even' && second === 'even' && third === 'odd') {
+            return 'even';
+        }
+
+        // [ÍMPAR] -> [ÍMPAR] -> [PAR] = Apostar ÍMPAR
+        if (first === 'odd' && second === 'odd' && third === 'even') {
+            return 'odd';
+        }
+
+        return 'none';
+    }, []);
+
+    // --- CORE: Determine Entry ---
+    const determineEntry = useCallback((
+        mode: OperationMode,
+        rate: number,
+        snapback: SnapbackPattern,
+        currentParity: Parity
+    ): { shouldEnter: boolean; betOn: Parity | null; reason: string } => {
+
+        // ESPERA Mode - Block entries
+        if (mode === 'espera') {
+            return { shouldEnter: false, betOn: null, reason: 'Analisando Definição de Ciclo...' };
+        }
+
+        // SEQUÊNCIA Mode - Strong trend override snapback
+        if (mode === 'sequencia') {
+            const repetitionRate = 100 - rate; // Inverse of switch rate
+
+            // Strong Sequência (> 70% repetition) - Ignore snapback, follow trend
+            if (repetitionRate > CHAMELEON_CONFIG.STRONG_SEQUENCIA_THRESHOLD) {
+                return {
+                    shouldEnter: true,
+                    betOn: currentParity,
+                    reason: `🚂 SEQUÊNCIA FORTE (${repetitionRate.toFixed(0)}%) >> ${currentParity === 'even' ? 'PAR' : 'ÍMPAR'}`
+                };
+            }
+
+            // Normal Sequência - Check snapback first
+            if (snapback !== 'none') {
+                return {
+                    shouldEnter: true,
+                    betOn: snapback,
+                    reason: `🎯 SNAPBACK >> ${snapback === 'even' ? 'PAR' : 'ÍMPAR'}`
+                };
+            }
+
+            // No snapback - follow repetition
+            return {
+                shouldEnter: true,
+                betOn: currentParity,
+                reason: `🚂 SEQUÊNCIA >> ${currentParity === 'even' ? 'PAR' : 'ÍMPAR'}`
+            };
+        }
+
+        // PING-PONG Mode - Bet on inversion
+        if (mode === 'ping-pong') {
+            // Check snapback first (has priority in non-strong modes)
+            if (snapback !== 'none') {
+                return {
+                    shouldEnter: true,
+                    betOn: snapback,
+                    reason: `🎯 SNAPBACK >> ${snapback === 'even' ? 'PAR' : 'ÍMPAR'}`
+                };
+            }
+
+            // Ping-pong logic: bet on opposite
+            const betOn: Parity = currentParity === 'even' ? 'odd' : 'even';
+            return {
+                shouldEnter: true,
+                betOn,
+                reason: `🏓 PING-PONG >> ${betOn === 'even' ? 'PAR' : 'ÍMPAR'}`
+            };
+        }
+
+        return { shouldEnter: false, betOn: null, reason: 'No signal' };
+    }, []);
+
+    // --- EXECUTE TRADE ---
+    const executeTrade = useCallback((betOn: Parity, reason: string) => {
+        if (!socket || !isRunningRef.current) return;
+        // Note: isWaitingForContractRef is now set in processTick BEFORE calling this function
+
+        // Round stake to 2 decimal places to satisfy Deriv API requirements
+        const stake = Math.round(currentStakeRef.current * 100) / 100;
+        const contractType = betOn === 'even' ? 'DIGITEVEN' : 'DIGITODD';
 
         const request = {
             buy: 1,
             price: stake,
             parameters: {
                 contract_type: contractType,
-                symbol: FRICTION_CONFIG.SYMBOL,
+                symbol: CHAMELEON_CONFIG.SYMBOL,
                 duration: 1,
                 duration_unit: 't',
                 basis: 'stake',
@@ -244,75 +249,103 @@ export const useBugDeriv = () => {
 
         socket.send(JSON.stringify(request));
 
-        // Incrementar entradas ejecutadas
-        entriesExecutedRef.current += 1;
-        setStats(prev => ({ ...prev, entriesExecuted: entriesExecutedRef.current }));
+        setStats(prev => ({
+            ...prev,
+            signalsTriggered: prev.signalsTriggered + 1,
+        }));
 
-        addLog(`🎯 ORDEN ENVIADA: ${contractType === 'DIGITEVEN' ? 'PAR' : 'ÍMPAR'} | Stake: $${stake.toFixed(2)} | Gale: ${martingaleLevelRef.current}`, 'entry');
+        addLog(reason, betOn === 'even' ? 'even' : 'odd');
     }, [socket, addLog]);
 
-    // --- PROCESAR TICK ---
-    const processTick = useCallback((digit: number, price: number) => {
+    // --- FORCE CYCLE REANALYSIS ---
+    const forceCycleReanalysis = useCallback(() => {
+        setIsReanalyzing(true);
+        parityHistoryRef.current = [];
+        last3ParitiesRef.current = [];
+        setSwitchRate(50);
+        setCurrentMode('espera');
+        setSnapbackPattern('none');
+
+        setStats(prev => ({ ...prev, cycleResets: prev.cycleResets + 1 }));
+        addLog(`🔄 CICLO REINICIADO - Reanalisando 50 ticks...`, 'cycle');
+
+        setTimeout(() => setIsReanalyzing(false), 100);
+    }, [addLog]);
+
+    // --- PROCESS TICK ---
+    const processTick = useCallback((quote: number) => {
         if (!isRunningRef.current || isWaitingForContractRef.current) return;
 
-        // Actualizar stream de dígitos
-        lastDigitsRef.current = [...lastDigitsRef.current, digit].slice(-50);
-        setLastDigits(lastDigitsRef.current);
+        // Get parity from tick
+        const parity = getParityFromTick(quote);
+        setLastParity(parity);
 
-        // Actualizar precios para análisis de vector
-        lastPricesRef.current = [...lastPricesRef.current, price].slice(-10);
+        // Update history buffers
+        parityHistoryRef.current = [...parityHistoryRef.current, parity].slice(-CHAMELEON_CONFIG.HISTORY_SIZE);
+        last3ParitiesRef.current = [...last3ParitiesRef.current, parity].slice(-3);
 
-        // Analizar dirección del tick
-        const direction = analyzeTickDirection(lastPricesRef.current);
-        setTickDirection(direction);
-
-        // Generar código hacker
-        setCodeStream(prev => [...prev.slice(-15), generateHackerCode()]);
-
-        // Detectar secuencia de 2
-        const sequence = detectSequence(lastDigitsRef.current);
-
-        if (!sequence.detected) {
-            setFrictionStatus('waiting');
-            setSequenceType(null);
+        // Need minimum data for analysis
+        if (parityHistoryRef.current.length < 10) {
+            addLog(`📊 Coletando dados... ${parityHistoryRef.current.length}/${CHAMELEON_CONFIG.HISTORY_SIZE}`, 'info');
             return;
         }
 
-        // Secuencia detectada - Analizar fricción + vector
-        setFrictionStatus('analyzing');
-        setSequenceType(sequence.isEven ? 'even' : 'odd');
-        setLastAnalyzedDigit(sequence.lastDigit);
+        // Calculate Switch Rate
+        const rate = calculateSwitchRate(parityHistoryRef.current);
+        setSwitchRate(rate);
+        setStats(prev => ({ ...prev, switchRate: rate }));
 
-        const friction = analyzeFriction(sequence.isEven, sequence.lastDigit, direction);
+        // Determine Mode
+        const mode = determineMode(rate);
+        if (mode !== currentMode) {
+            setCurrentMode(mode);
+            const modeNames = {
+                'ping-pong': '🏓 PING-PONG',
+                'sequencia': '🚂 SEQUÊNCIA',
+                'espera': '✋ ESPERA'
+            };
+            addLog(`Modo: ${modeNames[mode]} (Switch: ${rate.toFixed(1)}%)`, 'mode');
+        }
 
-        if (friction.shouldEnter && friction.contractType) {
-            // FRICCIÓN ALTA + VECTOR OK - ENTRAR
-            setFrictionStatus('entering');
-            addLog(friction.reason, 'friction');
-
-            // Ejecutar inmediatamente (< 100ms)
-            setTimeout(() => {
-                executeTrade(friction.contractType!);
-            }, 50);
-        } else {
-            // BLOQUEADO
-            setFrictionStatus('blocked');
-
-            if (friction.blockedByTrend) {
-                // Bloqueado por tendencia
-                trendBlockedRef.current += 1;
-                setStats(prev => ({ ...prev, trendBlocked: trendBlockedRef.current }));
-                addLog(friction.reason, 'trend');
-            } else {
-                // Bloqueado por dígito pegajoso
-                entriesFilteredRef.current += 1;
-                setStats(prev => ({ ...prev, entriesFiltered: entriesFilteredRef.current }));
-                addLog(friction.reason, 'blocked');
+        // Detect Snapback
+        const snapback = detectSnapback(last3ParitiesRef.current);
+        if (snapback !== snapbackPattern) {
+            setSnapbackPattern(snapback);
+            if (snapback !== 'none') {
+                setStats(prev => ({ ...prev, snapbacksTriggered: prev.snapbacksTriggered + 1 }));
+                addLog(`🎯 Snapback detectado: ${snapback === 'even' ? 'PAR' : 'ÍMPAR'}`, 'snapback');
             }
         }
-    }, [detectSequence, analyzeFriction, analyzeTickDirection, executeTrade, addLog, generateHackerCode]);
 
-    // --- PROCESAR RESULTADO DEL CONTRATO ---
+        // Determine entry
+        const { shouldEnter, betOn, reason } = determineEntry(mode, rate, snapback, parity);
+
+        if (shouldEnter && betOn) {
+            // RISK SYSTEM CHECK: Verify safety locks before trading
+            if (riskEnabled) {
+                const safetyCheck = checkSafetyLock(stats.totalProfit);
+                if (!safetyCheck.allowed) {
+                    addLog(`🛑 ${safetyCheck.reason}`, 'warning');
+                    // Stop the bot when limit reached
+                    isRunningRef.current = false;
+                    setIsRunning(false);
+                    toast.warning(safetyCheck.reason);
+                    return;
+                }
+            }
+
+            // CRITICAL FIX: Set waiting flag IMMEDIATELY to prevent double entries
+            isWaitingForContractRef.current = true;
+            executeTrade(betOn, reason);
+        } else if (mode === 'espera') {
+            // Log blocked entry occasionally
+            if (Math.random() < 0.1) {
+                addLog(`✋ Bloqueado: ${reason}`, 'blocked');
+            }
+        }
+    }, [getParityFromTick, calculateSwitchRate, determineMode, detectSnapback, determineEntry, executeTrade, addLog, currentMode, snapbackPattern, riskEnabled, checkSafetyLock, stats.totalProfit]);
+
+    // --- PROCESS CONTRACT RESULT ---
     const processContractResult = useCallback((result: { profit: number; status: string }) => {
         if (!configRef.current) return;
 
@@ -327,40 +360,38 @@ export const useBugDeriv = () => {
                 totalProfit: prev.totalProfit + result.profit,
             };
 
-            // Actualizar estadísticas globales
             updateStats(result.profit, isWin);
 
-            // Verificar Stop Loss / Take Profit
-            if (newStats.totalProfit <= -config.stopLoss) {
-                addLog(`🛑 STOP LOSS alcanzado: -$${config.stopLoss.toFixed(2)}`, 'error');
-                toast.error('Stop Loss alcanzado');
-                stopBot();
-                return newStats;
-            }
-
-            if (newStats.totalProfit >= config.takeProfit) {
-                addLog(`🏆 TAKE PROFIT alcanzado: +$${config.takeProfit.toFixed(2)}`, 'success');
-                toast.success('¡Take Profit alcanzado!');
-                stopBot();
-                return newStats;
-            }
-
-            // Martingale Logic
+            // Risk Management
             if (isWin) {
-                // Reset al stake inicial
                 currentStakeRef.current = initialStakeRef.current;
                 martingaleLevelRef.current = 0;
-                addLog(`✅ WIN +$${result.profit.toFixed(2)} | Stake reset: $${currentStakeRef.current.toFixed(2)}`, 'success');
+                consecutiveLossesRef.current = 0;
+                addLog(`✅ WIN +$${result.profit.toFixed(2)} | Reset`, 'success');
+
+                // Trigger Profit Notification
+                if ((window as any).showProfitNotification) {
+                    (window as any).showProfitNotification('Bug Deriv', result.profit);
+                }
             } else {
-                if (config.useMartingale && martingaleLevelRef.current < FRICTION_CONFIG.MAX_MARTINGALE_LEVELS) {
-                    martingaleLevelRef.current += 1;
-                    currentStakeRef.current = initialStakeRef.current * Math.pow(FRICTION_CONFIG.MARTINGALE_FACTOR, martingaleLevelRef.current);
-                    addLog(`❌ LOSS -$${Math.abs(result.profit).toFixed(2)} | Gale ${martingaleLevelRef.current}: $${currentStakeRef.current.toFixed(2)}`, 'error');
-                } else {
-                    // Max martingale o sin martingale - reset
+                consecutiveLossesRef.current += 1;
+
+                // Check for Cycle Reanalysis Trigger (2 consecutive losses)
+                if (consecutiveLossesRef.current >= CHAMELEON_CONFIG.CONSECUTIVE_LOSS_FOR_REANALYSIS) {
+                    addLog(`⚠️ 2 LOSSES CONSECUTIVOS - Forçando reanálise!`, 'warning');
+                    forceCycleReanalysis();
                     currentStakeRef.current = initialStakeRef.current;
                     martingaleLevelRef.current = 0;
-                    addLog(`❌ LOSS -$${Math.abs(result.profit).toFixed(2)} | Max Gale - Reset`, 'error');
+                    consecutiveLossesRef.current = 0;
+                } else if (config.useMartingale && martingaleLevelRef.current < CHAMELEON_CONFIG.MAX_MARTINGALE_LEVELS) {
+                    martingaleLevelRef.current += 1;
+                    // Round to 2 decimal places to satisfy Deriv API requirements
+                    currentStakeRef.current = Math.round(initialStakeRef.current * Math.pow(CHAMELEON_CONFIG.MARTINGALE_FACTOR, martingaleLevelRef.current) * 100) / 100;
+                    addLog(`❌ LOSS | Gale ${martingaleLevelRef.current}: $${currentStakeRef.current.toFixed(2)}`, 'error');
+                } else {
+                    currentStakeRef.current = initialStakeRef.current;
+                    martingaleLevelRef.current = 0;
+                    addLog(`❌ LOSS | Max Gale - Reset`, 'error');
                 }
             }
 
@@ -372,112 +403,82 @@ export const useBugDeriv = () => {
         });
 
         isWaitingForContractRef.current = false;
-        setFrictionStatus('waiting');
-    }, [updateStats, addLog]);
+    }, [updateStats, addLog, forceCycleReanalysis]);
 
-    // --- MENSAJE HANDLER ---
+    // --- MESSAGE HANDLER ---
     const handleMessage = useCallback((event: MessageEvent) => {
         if (!isRunningRef.current) return;
 
         try {
             const data = JSON.parse(event.data);
 
-            // Procesar ticks
             if (data.msg_type === 'tick' && data.tick) {
-                const price = data.tick.quote;
-                const digit = parseInt(price.toString().slice(-1));
-                processTick(digit, price);
+                processTick(data.tick.quote);
             }
 
-            // Procesar compra
             if (data.msg_type === 'buy' && data.buy) {
-                const contractId = data.buy.contract_id;
-                addLog(`📝 Contrato abierto: ${contractId}`, 'info');
-
-                // Suscribirse al contrato
                 socket?.send(JSON.stringify({
                     proposal_open_contract: 1,
-                    contract_id: contractId,
+                    contract_id: data.buy.contract_id,
                     subscribe: 1,
                 }));
             }
 
-            // Error en compra
             if (data.msg_type === 'buy' && data.error) {
-                addLog(`❌ Error: ${data.error.message}`, 'error');
+                addLog(`ERROR: ${data.error.message}`, 'error');
                 isWaitingForContractRef.current = false;
             }
 
-            // Procesar resultado del contrato
             if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
                 const contract = data.proposal_open_contract;
                 if (contract.is_sold) {
-                    const profit = parseFloat(contract.profit);
-                    processContractResult({ profit, status: contract.status });
-
-                    // Cancelar suscripción
-                    if (contract.id) {
-                        socket?.send(JSON.stringify({ forget: contract.id }));
-                    }
+                    processContractResult({ profit: parseFloat(contract.profit), status: contract.status });
+                    if (contract.id) socket?.send(JSON.stringify({ forget: contract.id }));
                 }
             }
         } catch (error) {
-            console.error('Error procesando mensaje:', error);
+            console.error('Error:', error);
         }
     }, [socket, processTick, processContractResult, addLog]);
 
     // --- START BOT ---
     const startBot = useCallback((config: BotConfig) => {
         if (!isConnected || !socket) {
-            toast.error('Conecte su cuenta Deriv primero');
+            toast.error('Connect Deriv first');
             return false;
         }
 
-        // Inicializar
         configRef.current = config;
         initialStakeRef.current = config.stake;
         currentStakeRef.current = config.stake;
         martingaleLevelRef.current = 0;
+        consecutiveLossesRef.current = 0;
         isWaitingForContractRef.current = false;
-        lastDigitsRef.current = [];
-        lastPricesRef.current = [];
-        entriesFilteredRef.current = 0;
-        entriesExecutedRef.current = 0;
-        trendBlockedRef.current = 0;
+        parityHistoryRef.current = [];
+        last3ParitiesRef.current = [];
         isRunningRef.current = true;
 
         setIsRunning(true);
+        setSwitchRate(50);
+        setCurrentMode('espera');
+        setSnapbackPattern('none');
+        setIsReanalyzing(false);
         setStats({
-            wins: 0,
-            losses: 0,
-            totalProfit: 0,
-            currentStake: config.stake,
-            martingaleLevel: 0,
-            entriesFiltered: 0,
-            entriesExecuted: 0,
-            trendBlocked: 0,
+            wins: 0, losses: 0, totalProfit: 0,
+            currentStake: config.stake, martingaleLevel: 0,
+            switchRate: 50, snapbacksTriggered: 0,
+            cycleResets: 0, signalsTriggered: 0,
         });
         setLogs([]);
-        setLastDigits([]);
-        setCodeStream([]);
-        setFrictionStatus('waiting');
-        setTickDirection('neutral');
 
-        // Registrar bot activo
-        setActiveBot('Bug Deriv [Friction+Vector]');
+        setActiveBot('Bug Deriv [Chameleon]');
 
-        addLog(`🚀 DIGITAL FRICTION + VECTOR PROTOCOL INICIADO`, 'friction');
-        addLog(`📊 Activo: ${FRICTION_CONFIG.SYMBOL_NAME}`, 'info');
-        addLog(`🎯 Filtro Fricción: [6,8,1,3] = ENTRADA | [0,2,4,5,7,9] = BLOQUEADO`, 'info');
-        addLog(`📈 Filtro Vector: Pares→Verde=BLOQ | Ímpares→Rojo=BLOQ`, 'info');
-        addLog(`💰 Stake: $${config.stake.toFixed(2)} | Gale: ${config.useMartingale ? `2.0x (Max ${FRICTION_CONFIG.MAX_MARTINGALE_LEVELS})` : 'OFF'}`, 'info');
+        addLog(`🦎 CHAMELEON ADAPTIVE MODE ATIVADO`, 'mode');
+        addLog(`📊 Análise de Ciclo: ${CHAMELEON_CONFIG.HISTORY_SIZE} ticks`, 'info');
+        addLog(`🏓 Ping-Pong: >${CHAMELEON_CONFIG.PING_PONG_THRESHOLD}% | 🚂 Sequência: <${CHAMELEON_CONFIG.SEQUENCIA_THRESHOLD}%`, 'info');
+        addLog(`🛡️ Martingale: x${CHAMELEON_CONFIG.MARTINGALE_FACTOR} | Reanálise: ${CHAMELEON_CONFIG.CONSECUTIVE_LOSS_FOR_REANALYSIS} losses`, 'info');
 
-        // Suscribirse a ticks
-        socket.send(JSON.stringify({
-            ticks: FRICTION_CONFIG.SYMBOL,
-            subscribe: 1,
-        }));
-
+        socket.send(JSON.stringify({ ticks: CHAMELEON_CONFIG.SYMBOL, subscribe: 1 }));
         socket.addEventListener('message', handleMessage);
         return true;
     }, [isConnected, socket, handleMessage, addLog, setActiveBot]);
@@ -486,7 +487,6 @@ export const useBugDeriv = () => {
     const stopBot = useCallback(() => {
         isRunningRef.current = false;
         setIsRunning(false);
-        setFrictionStatus('waiting');
 
         if (socket) {
             socket.removeEventListener('message', handleMessage);
@@ -494,29 +494,23 @@ export const useBugDeriv = () => {
         }
 
         setActiveBot(null);
-        addLog(`⏹️ Bot detenido. Filtradas: ${entriesFilteredRef.current} | Tendencia: ${trendBlockedRef.current} | Ejecutadas: ${entriesExecutedRef.current}`, 'warning');
+        addLog(`⏹️ Protocolo encerrado`, 'warning');
     }, [socket, handleMessage, addLog, setActiveBot]);
 
-    // Cleanup on unmount
     useEffect(() => {
-        return () => {
-            if (isRunningRef.current) {
-                stopBot();
-            }
-        };
+        return () => { if (isRunningRef.current) stopBot(); };
     }, []);
 
     return {
         isRunning,
         stats,
         logs,
-        lastDigits,
-        frictionStatus,
-        lastAnalyzedDigit,
-        sequenceType,
-        tickDirection,
-        codeStream,
-        frictionConfig: FRICTION_CONFIG,
+        switchRate,
+        currentMode,
+        snapbackPattern,
+        lastParity,
+        isReanalyzing,
+        chameleonConfig: CHAMELEON_CONFIG,
         startBot,
         stopBot,
     };

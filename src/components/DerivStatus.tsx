@@ -1,11 +1,20 @@
 import React from 'react';
 import { useDeriv } from '../contexts/DerivContext';
+import { useMarketingMode } from '../hooks/useMarketingMode';
 import { Wifi, WifiOff, Loader2, User, DollarSign } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 
 export const DerivStatus = () => {
     const { isConnected, isConnecting, account } = useDeriv();
+    const {
+        isMarketingMode,
+        getAccountTypeDisplay,
+        getCurrencySymbol,
+        getDisplayBalance,
+        getDisplayLoginId,
+        overrides
+    } = useMarketingMode();
 
     // Disconnected state
     if (!isConnected && !isConnecting) {
@@ -49,7 +58,21 @@ export const DerivStatus = () => {
 
     // Connected state
     const loginId = account?.loginid || '';
-    const displayName = loginId ? `Cuenta ${loginId}` : 'Cuenta Deriv';
+    const isRealAccount = loginId.startsWith('CR');
+
+    // Marketing mode: convert CR to VR for display
+    const displayLoginId = getDisplayLoginId(loginId);
+
+    // Marketing mode: force display as Real account if enabled
+    const accountTypeDisplay = getAccountTypeDisplay(isRealAccount);
+    const forceRealColors = isMarketingMode && overrides.forceRealAccount;
+
+    // Get display balance (fake or real)
+    const realBalance = account ? parseFloat(account.balance) : 0;
+    const displayBalance = getDisplayBalance(realBalance);
+
+    // Currency symbol based on marketing settings
+    const currencySymbol = getCurrencySymbol();
 
     return (
         <div className="w-full p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20">
@@ -75,13 +98,14 @@ export const DerivStatus = () => {
                     <span
                         className={cn(
                             "text-xs font-bold uppercase tracking-wider",
-                            loginId.startsWith('CR') ? "text-emerald-400" : "text-cyan-400"
+                            // Always show emerald for marketing mode with forceRealAccount
+                            forceRealColors || isRealAccount ? "text-emerald-400" : "text-cyan-400"
                         )}
                     >
-                        {loginId.startsWith('CR') ? 'Cuenta Real' : 'Cuenta Demo'}
+                        {accountTypeDisplay}
                     </span>
                 </div>
-                <span className="text-[10px] text-white/50 font-mono tracking-wider ml-5">{loginId}</span>
+                <span className="text-[10px] text-white/50 font-mono tracking-wider ml-5">{displayLoginId}</span>
             </div>
 
             {/* Balance display */}
@@ -98,8 +122,8 @@ export const DerivStatus = () => {
                             <span className="block text-xl font-black font-mono text-white leading-none">
                                 {account ? (
                                     <>
-                                        <span className="text-emerald-400">$ </span>
-                                        <span>{parseFloat(account.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-emerald-400">{currencySymbol}</span>
+                                        <span>{displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </>
                                 ) : (
                                     <span className="text-white/30">---</span>

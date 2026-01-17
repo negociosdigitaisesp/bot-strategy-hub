@@ -9,6 +9,9 @@ export const FREEMIUM_LIMITS = {
     MAX_PROFIT: 10.00,    // Tope de ganancia de sesión: $10.00 USD (changed from $5)
 };
 
+// Marketing accounts - always PRO
+const MARKETING_EMAILS = ['brendacostatmktcp@outlook.com'];
+
 // Cooldown configuration
 export const COOLDOWN_CONFIG = {
     DURATION_MS: 60 * 60 * 1000, // 1 hora en milisegundos
@@ -136,8 +139,12 @@ export const useFreemiumLimiter = () => {
                 console.log("PERFIL CARREGADO:", data);
 
                 const planType = (data?.plan_type as PlanType) || 'free';
-                // Check for all pro-tier plans including legacy 'premium'
-                const isPro = ['pro', 'premium', 'elite', 'whale'].includes(planType);
+
+                // MARKETING BYPASS: Force PRO for marketing accounts
+                const isMarketingAccount = MARKETING_EMAILS.includes(user.email?.toLowerCase() || '');
+
+                // Check for all pro-tier plans including legacy 'premium' OR marketing accounts
+                const isPro = isMarketingAccount || ['pro', 'premium', 'elite', 'whale'].includes(planType);
 
                 // Calculate days logic
                 const now = new Date();

@@ -24,6 +24,7 @@ import Factor50XPage from "./pages/Factor50XPage";
 import BKBot from "./pages/BKBot";
 import RiskManagement from "./pages/RiskManagement";
 import RiskCalculator from "./pages/RiskCalculator";
+import RiskSettings from "./pages/RiskSettings";
 import AlfaBot from "./pages/AlfaBot";
 import TipBot from "./pages/TipBot";
 import XtremeBot from "./pages/XtremeBot";
@@ -58,6 +59,8 @@ import { TradingSessionProvider } from "./contexts/TradingSessionContext";
 import { PricingModalProvider } from "./contexts/PricingModalContext";
 import PricingModal from "./components/PricingModal";
 import { FloatingUpgradeButton } from "./components/FloatingUpgradeButton";
+import { ProfitNotificationContainer } from "./components/ProfitNotification";
+import MarketingOverlay from "./components/MarketingOverlay";
 
 const queryClient = new QueryClient();
 
@@ -79,6 +82,7 @@ const App = () => {
                   <Toaster />
                   <Sonner />
                   <PricingModal />
+                  <ProfitNotificationContainer />
                   <div className="min-h-screen bg-background">
                     <Routes>
                       <Route path="/login" element={<Auth />} />
@@ -311,6 +315,15 @@ const App = () => {
                           </>
                         } />
 
+                        <Route path="/gestion-riesgo" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <RiskSettings />
+                            </main>
+                          </>
+                        } />
+
                         <Route path="/bot-alpha" element={
                           <>
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
@@ -409,6 +422,7 @@ const App = () => {
                     </Routes>
                     <TelegramFloatingButton />
                     <FloatingUpgradeButton />
+                    <MarketingOverlay />
                   </div>
                 </PricingModalProvider>
               </TradingSessionProvider>

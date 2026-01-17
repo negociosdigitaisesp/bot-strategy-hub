@@ -19,13 +19,17 @@ import {
     Target,
     Calculator,
     Plug,
-    Coins
+    Coins,
+    ShieldCheck,
+    Bug,
+    Infinity
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { DerivStatus } from './DerivStatus';
 import { supabase } from '../lib/supabaseClient';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
+import { useMarketingMode } from '../hooks/useMarketingMode';
 import { PlanBadge } from './PlanBadge';
 
 interface SidebarProps {
@@ -43,6 +47,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
 
     // Get plan details
     const { isPro, daysLeft, planType } = useFreemiumLimiter();
+    const { isMarketingMode, showTraderDiamondBadge } = useMarketingMode();
 
     // Detectar se é mobile
     useEffect(() => {
@@ -123,6 +128,14 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             description: 'Conecte su cuenta'
         },
         {
+            name: 'Gestión del Riesgo',
+            icon: <ShieldCheck size={20} />,
+            path: '/gestion-riesgo',
+            isImportant: true,
+            requiresUpgrade: false,
+            description: 'Protección inteligente'
+        },
+        {
             name: 'Ranking del Asertividad',
             icon: <BookOpen size={20} />,
             path: '/',
@@ -153,6 +166,14 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             isImportant: false,
             requiresUpgrade: true,
             description: 'Shadow Mode - Digit Differs'
+        },
+        {
+            name: 'Bot Sigma',
+            icon: <Target size={20} />,
+            path: '/bot-sigma',
+            isImportant: false,
+            requiresUpgrade: false,
+            description: 'Ley de los Grandes Números'
         },
         {
             name: 'Mejores Horarios',
@@ -237,12 +258,12 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                     "flex items-center gap-3 transition-all duration-300",
                                     collapsed && !isMobile && "justify-center"
                                 )}>
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-primary/30 rounded-full blur-md" />
+                                    <div className="relative group">
+                                        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 rounded-lg blur-md opacity-75 group-hover:opacity-100 transition duration-500" />
                                         <img
                                             src="/lovable-uploads/65acdf4d-abfd-4e5a-b2c2-27c297ceb7c6.png"
                                             alt="Million Bots Logo"
-                                            className="relative w-9 h-9 rounded-full border border-primary/40 shadow-lg"
+                                            className="relative w-10 h-10 object-contain drop-shadow-[0_0_12px_rgba(16,185,129,0.5)]"
                                         />
                                     </div>
                                     {(!collapsed || isMobile) && (
@@ -407,7 +428,15 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                         </span>
                                         {/* Subtle License Status Widget - REPLACED WITH PREMIUM BADGE */}
                                         <div className="mt-2">
-                                            <PlanBadge planType={planType} daysLeft={daysLeft} />
+                                            {showTraderDiamondBadge ? (
+                                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30">
+                                                    <Crown size={12} className="text-amber-400" />
+                                                    <span className="text-[10px] font-bold text-amber-300">Trader Diamond</span>
+                                                    <Infinity size={12} className="text-amber-400" />
+                                                </div>
+                                            ) : (
+                                                <PlanBadge planType={planType} daysLeft={daysLeft} />
+                                            )}
                                         </div>
                                     </div>
                                 )}
