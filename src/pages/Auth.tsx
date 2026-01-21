@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, ShieldCheck, Zap, TrendingUp, Award, Users } from "lucide-react";
+import useReferral from "@/hooks/useReferral";
 
 const Auth = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +20,9 @@ const Auth = () => {
     const { signIn, signUp, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const prefersReducedMotion = useReducedMotion();
+
+    // Capture referral code from URL query params if present
+    useReferral();
 
     useEffect(() => {
         if (isAuthenticated) {

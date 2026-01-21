@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     Activity,
     TrendingUp,
@@ -14,16 +14,16 @@ import {
     Play,
     Square,
     Settings2,
-    Power,
     ArrowLeft,
     Wifi,
     WifiOff,
-    RefreshCw,
-    Train,
-    Hand,
-    Repeat,
-    Circle,
-    ShieldAlert
+    Shield,
+    ShieldCheck,
+    Gauge,
+    Bug,
+    ChevronUp,
+    ChevronDown,
+    Minus,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -37,27 +37,29 @@ import RecentGainsTicker from '../components/RecentGainsTicker';
 
 const BugDeriv = () => {
     const navigate = useNavigate();
-    const { isConnected, account } = useDeriv();
+    const { isConnected } = useDeriv();
     const {
         isRunning,
         stats,
         logs,
-        switchRate,
-        currentMode,
-        snapbackPattern,
-        lastParity,
-        isReanalyzing,
-        chameleonConfig,
+        priceHistory,
+        safetyFactor,
+        fortressConfig,
         startBot,
         stopBot,
+        updateSafetyFactor,
     } = useBugDeriv();
 
     const [stake, setStake] = useState<string>(() => localStorage.getItem('bugderiv_stake') || '1.00');
     const [stopLoss, setStopLoss] = useState<string>(() => localStorage.getItem('bugderiv_stoploss') || '50.00');
     const [takeProfit, setTakeProfit] = useState<string>(() => localStorage.getItem('bugderiv_takeprofit') || '20.00');
     const [useMartingale, setUseMartingale] = useState<boolean>(() => localStorage.getItem('bugderiv_martingale') !== 'false');
+    const [localSafetyFactor, setLocalSafetyFactor] = useState<number>(() =>
+        parseFloat(localStorage.getItem('bugderiv_safetyfactor') || '1.2')
+    );
 
     const logsContainerRef = useRef<HTMLDivElement>(null);
+    const chartRef = useRef<HTMLCanvasElement>(null);
 
     const { isFree, checkStakeLimit, isLimitReached, currentProfit } = useFreemiumLimiter();
     const [showLimitModal, setShowLimitModal] = useState(false);
@@ -75,7 +77,8 @@ const BugDeriv = () => {
         localStorage.setItem('bugderiv_stoploss', stopLoss);
         localStorage.setItem('bugderiv_takeprofit', takeProfit);
         localStorage.setItem('bugderiv_martingale', String(useMartingale));
-    }, [stake, stopLoss, takeProfit, useMartingale]);
+        localStorage.setItem('bugderiv_safetyfactor', String(localSafetyFactor));
+    }, [stake, stopLoss, takeProfit, useMartingale, localSafetyFactor]);
 
     useEffect(() => {
         if (logsContainerRef.current) {
@@ -83,10 +86,147 @@ const BugDeriv = () => {
         }
     }, [logs]);
 
+    // --- DRAW CHART ---
+    useEffect(() => {
+        const canvas = chartRef.current;
+        if (!canvas || priceHistory.length < 2) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+
+        const width = rect.width;
+        const height = rect.height;
+        const padding = 10;
+
+        // Clear
+        ctx.fillStyle = '#0a0c10';
+        ctx.fillRect(0, 0, width, height);
+
+        // Get price range
+        const prices = priceHistory.map(p => p.price);
+        const barriers = priceHistory.filter(p => p.barrier).map(p => p.barrier as number);
+        const allValues = [...prices, ...barriers];
+        const minPrice = Math.min(...allValues);
+        const maxPrice = Math.max(...allValues);
+        const priceRange = maxPrice - minPrice || 1;
+
+        const scaleY = (price: number) => {
+            return height - padding - ((price - minPrice) / priceRange) * (height - padding * 2);
+        };
+
+        const scaleX = (index: number) => {
+            return padding + (index / (priceHistory.length - 1)) * (width - padding * 2);
+        };
+
+        // Draw grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = padding + (i / 4) * (height - padding * 2);
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(width - padding, y);
+            ctx.stroke();
+        }
+
+        // Draw barrier line (dashed)
+        if (barriers.length > 0) {
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            let started = false;
+            priceHistory.forEach((point, i) => {
+                if (point.barrier) {
+                    const x = scaleX(i);
+                    const y = scaleY(point.barrier);
+                    if (!started) {
+                        ctx.moveTo(x, y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Draw price line
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        priceHistory.forEach((point, i) => {
+            const x = scaleX(i);
+            const y = scaleY(point.price);
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Draw current price point
+        if (priceHistory.length > 0) {
+            const lastPoint = priceHistory[priceHistory.length - 1];
+            const x = scaleX(priceHistory.length - 1);
+            const y = scaleY(lastPoint.price);
+
+            ctx.fillStyle = '#22d3ee';
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Glow effect
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, 15);
+            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.5)');
+            gradient.addColorStop(1, 'rgba(34, 211, 238, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw "Safe Zone" area between price and barrier
+        if (priceHistory.length > 1 && barriers.length > 0) {
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+            ctx.beginPath();
+
+            // Price line forward
+            priceHistory.forEach((point, i) => {
+                const x = scaleX(i);
+                const y = scaleY(point.price);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+
+            // Barrier line backward
+            for (let i = priceHistory.length - 1; i >= 0; i--) {
+                const point = priceHistory[i];
+                if (point.barrier) {
+                    const x = scaleX(i);
+                    const y = scaleY(point.barrier);
+                    ctx.lineTo(x, y);
+                }
+            }
+
+            ctx.closePath();
+            ctx.fill();
+        }
+
+    }, [priceHistory]);
+
     const handleToggleBot = () => {
         if (isRunning) {
             stopBot();
-            toast.info('Protocolo Encerrado');
+            toast.info('Fortress Desativada');
         } else {
             if (!isConnected) {
                 toast.error('Conecte sua conta Deriv primeiro');
@@ -110,9 +250,10 @@ const BugDeriv = () => {
                 stopLoss: parseFloat(stopLoss),
                 takeProfit: parseFloat(takeProfit),
                 useMartingale,
+                safetyFactor: localSafetyFactor,
             });
 
-            if (success) toast.success('🦎 Chameleon Mode Ativado!');
+            if (success) toast.success('🛡️ Bug Deriv Ativado!');
         }
     };
 
@@ -121,177 +262,179 @@ const BugDeriv = () => {
             case 'success': return <CheckCircle2 size={13} className="text-emerald-400" />;
             case 'error': return <XCircle size={13} className="text-rose-400" />;
             case 'warning': return <AlertCircle size={13} className="text-amber-400" />;
-            case 'even': return <Circle size={13} className="text-cyan-400" fill="currentColor" />;
-            case 'odd': return <Circle size={13} className="text-violet-400" />;
-            case 'mode': return <Repeat size={13} className="text-amber-400" />;
-            case 'snapback': return <Target size={13} className="text-orange-400" />;
-            case 'cycle': return <RefreshCw size={13} className="text-cyan-400" />;
-            case 'blocked': return <Hand size={13} className="text-slate-500" />;
+            case 'higher': return <ChevronUp size={13} className="text-cyan-400" />;
+            case 'lower': return <ChevronDown size={13} className="text-violet-400" />;
+            case 'volatility': return <Activity size={13} className="text-amber-400" />;
+            case 'trend': return <TrendingUp size={13} className="text-emerald-400" />;
+            case 'blocked': return <Minus size={13} className="text-slate-500" />;
             default: return <ArrowRight size={13} className="text-slate-500" />;
         }
     };
 
-    // --- MODE INDICATOR ---
-    const ModeIndicator = () => {
-        const modeConfig = {
-            'ping-pong': {
-                icon: <RefreshCw size={24} className="text-cyan-400" />,
-                label: 'PING-PONG',
-                sublabel: 'Alternância Alta - Apostando Inversão',
-                color: 'cyan',
-                bgClass: 'bg-cyan-500/10 border-cyan-500/30',
-                textClass: 'text-cyan-400'
-            },
-            'sequencia': {
-                icon: <Train size={24} className="text-amber-400" />,
-                label: 'SEQUÊNCIA',
-                sublabel: 'Tendência Forte - Seguindo Repetição',
-                color: 'amber',
-                bgClass: 'bg-amber-500/10 border-amber-500/30',
-                textClass: 'text-amber-400'
-            },
-            'espera': {
-                icon: <Hand size={24} className="text-slate-400" />,
-                label: 'ESPERA',
-                sublabel: 'Analisando Definição de Ciclo...',
-                color: 'slate',
-                bgClass: 'bg-slate-500/10 border-slate-500/30',
-                textClass: 'text-slate-400'
-            }
-        };
-
-        const config = modeConfig[currentMode];
+    // --- TREND INDICATOR ---
+    const TrendIndicator = () => {
+        const direction = stats.trendDirection;
+        const isUp = direction === 'up';
+        const isDown = direction === 'down';
+        const isNeutral = direction === 'neutral';
 
         return (
             <div className={cn(
                 "relative p-4 rounded-xl border transition-all duration-300",
-                config.bgClass,
-                isReanalyzing && "animate-pulse"
+                isUp && "bg-emerald-500/10 border-emerald-500/30",
+                isDown && "bg-rose-500/10 border-rose-500/30",
+                isNeutral && "bg-slate-500/10 border-slate-500/30"
             )}>
                 <div className="flex items-center gap-4">
                     <div className={cn(
                         "w-14 h-14 rounded-xl flex items-center justify-center",
-                        `bg-${config.color}-500/20`
+                        isUp && "bg-emerald-500/20",
+                        isDown && "bg-rose-500/20",
+                        isNeutral && "bg-slate-500/20"
                     )}>
-                        {config.icon}
+                        {isUp && <TrendingUp size={28} className="text-emerald-400" />}
+                        {isDown && <TrendingDown size={28} className="text-rose-400" />}
+                        {isNeutral && <Minus size={28} className="text-slate-400" />}
                     </div>
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
-                            <span className={cn("text-lg font-bold font-mono", config.textClass)}>
-                                {config.label}
+                            <span className={cn(
+                                "text-lg font-bold font-mono",
+                                isUp && "text-emerald-400",
+                                isDown && "text-rose-400",
+                                isNeutral && "text-slate-400"
+                            )}>
+                                {isUp && 'HIGHER 🔼'}
+                                {isDown && 'LOWER 🔽'}
+                                {isNeutral && 'AGUARDANDO ⏸️'}
                             </span>
-                            {currentMode === 'ping-pong' && <span className="text-lg">🏓</span>}
-                            {currentMode === 'sequencia' && <span className="text-lg">🚂</span>}
-                            {currentMode === 'espera' && <span className="text-lg">✋</span>}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{config.sublabel}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            {isUp && 'Tendência de Alta - Barreira Inferior'}
+                            {isDown && 'Tendência de Baixa - Barreira Superior'}
+                            {isNeutral && 'Analisando Micro-Tendência...'}
+                        </p>
                     </div>
                 </div>
             </div>
         );
     };
 
-    // --- SWITCH RATE GAUGE ---
-    const SwitchRateGauge = () => {
-        const isPingPong = switchRate > chameleonConfig.PING_PONG_THRESHOLD;
-        const isSequencia = switchRate < chameleonConfig.SEQUENCIA_THRESHOLD;
-        const repetitionRate = 100 - switchRate;
+    // --- VOLATILITY GAUGE ---
+    const VolatilityGauge = () => {
+        const avgVol = stats.avgVolatility;
+        const offset = Math.abs(stats.barrierOffset);
+        const probability = stats.successProbability;
 
         return (
             <div className="bg-black/40 rounded-xl border border-white/5 p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Switch Rate</span>
-                    <span className={cn(
-                        "text-2xl font-mono font-bold",
-                        isPingPong ? "text-cyan-400" : isSequencia ? "text-amber-400" : "text-slate-400"
-                    )}>
-                        {switchRate.toFixed(1)}%
+                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                        Volatilidade ATR
+                    </span>
+                    <span className="text-lg font-mono font-bold text-amber-400">
+                        {avgVol.toFixed(4)}
                     </span>
                 </div>
 
-                {/* Main Progress Bar */}
-                <div className="relative h-4 bg-slate-800 rounded-full overflow-hidden">
-                    {/* Zone Backgrounds */}
-                    <div className="absolute inset-0 flex">
-                        <div className="w-[45%] bg-amber-900/30" />
-                        <div className="w-[10%] bg-slate-700/30" />
-                        <div className="flex-1 bg-cyan-900/30" />
-                    </div>
-
-                    {/* Needle */}
+                {/* Volatility Bar */}
+                <div className="relative h-3 bg-slate-800 rounded-full overflow-hidden mb-4">
                     <div
-                        className={cn(
-                            "absolute top-0 bottom-0 w-1.5 rounded-full shadow-lg transition-all duration-300 z-10",
-                            isPingPong ? "bg-cyan-400 shadow-cyan-500/50" :
-                                isSequencia ? "bg-amber-400 shadow-amber-500/50" : "bg-slate-400"
-                        )}
-                        style={{ left: `calc(${switchRate}% - 3px)` }}
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, avgVol * 10000)}%` }}
                     />
-
-                    {/* Threshold Lines */}
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-slate-500/50" style={{ left: '45%' }} />
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-slate-500/50" style={{ left: '55%' }} />
                 </div>
 
-                <div className="flex justify-between mt-2 text-[9px] font-mono">
-                    <span className="text-amber-400/60">🚂 SEQUÊNCIA</span>
-                    <span className="text-slate-500">NEUTRO</span>
-                    <span className="text-cyan-400/60">🏓 PING-PONG</span>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white/5 rounded-lg p-2 text-center">
+                        <span className="text-[9px] text-slate-500 block">Offset</span>
+                        <span className="text-sm font-mono font-bold text-cyan-400">
+                            {offset.toFixed(4)}
+                        </span>
+                    </div>
+                    <div className="bg-white/5 rounded-lg p-2 text-center">
+                        <span className="text-[9px] text-slate-500 block">Safety Factor</span>
+                        <span className="text-sm font-mono font-bold text-violet-400">
+                            {safetyFactor.toFixed(1)}x
+                        </span>
+                    </div>
                 </div>
             </div>
         );
     };
 
-    // --- SNAPBACK PATTERN DISPLAY ---
-    const SnapbackDisplay = () => {
-        const last3 = logs
-            .filter(l => l.type === 'even' || l.type === 'odd')
-            .slice(-3)
-            .map(l => l.type as 'even' | 'odd');
+    // --- PROBABILITY DISPLAY ---
+    const ProbabilityDisplay = () => {
+        const probability = stats.successProbability;
+        const barrier = stats.currentBarrier;
+        const price = stats.currentPrice;
 
-        while (last3.length < 3) {
-            last3.unshift('even'); // Placeholder
-        }
+        const getColor = (prob: number) => {
+            if (prob >= 85) return 'text-emerald-400';
+            if (prob >= 70) return 'text-cyan-400';
+            if (prob >= 55) return 'text-amber-400';
+            return 'text-slate-400';
+        };
 
         return (
             <div className="bg-black/40 rounded-xl border border-white/5 p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Últimas Paridades</span>
-                    {snapbackPattern !== 'none' && (
-                        <span className="px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-[9px] font-bold text-orange-400 animate-pulse">
-                            🎯 SNAPBACK
-                        </span>
-                    )}
+                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                        Probabilidade de Êxito
+                    </span>
+                    <ShieldCheck size={16} className="text-emerald-400" />
                 </div>
 
-                <div className="flex items-center gap-3 justify-center">
-                    <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold font-mono border-2 transition-all",
-                        lastParity === 'even'
-                            ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
-                            : "bg-violet-500/20 border-violet-500/50 text-violet-400"
-                    )}>
-                        {lastParity === 'even' ? 'P' : 'I'}
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 mt-3">
-                    <span className="text-[9px] text-slate-500">Último:</span>
-                    <span className={cn(
-                        "text-xs font-mono font-bold",
-                        lastParity === 'even' ? "text-cyan-400" : "text-violet-400"
-                    )}>
-                        {lastParity === 'even' ? 'PAR' : 'ÍMPAR'}
+                <div className="text-center mb-4">
+                    <span className={cn("text-4xl font-mono font-bold", getColor(probability))}>
+                        {probability.toFixed(0)}%
                     </span>
                 </div>
 
-                {snapbackPattern !== 'none' && (
-                    <div className="mt-3 p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-center">
-                        <span className="text-[10px] font-mono text-orange-400">
-                            Gatilho: Apostar {snapbackPattern === 'even' ? 'PAR' : 'ÍMPAR'}
-                        </span>
+                {/* Probability Ring */}
+                <div className="relative w-24 h-24 mx-auto mb-4">
+                    <svg className="w-full h-full transform -rotate-90">
+                        <circle
+                            cx="48"
+                            cy="48"
+                            r="40"
+                            fill="none"
+                            stroke="rgba(255,255,255,0.1)"
+                            strokeWidth="8"
+                        />
+                        <circle
+                            cx="48"
+                            cy="48"
+                            r="40"
+                            fill="none"
+                            stroke="url(#probGradient)"
+                            strokeWidth="8"
+                            strokeLinecap="round"
+                            strokeDasharray={`${probability * 2.51} 251`}
+                            className="transition-all duration-500"
+                        />
+                        <defs>
+                            <linearGradient id="probGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stopColor="#22d3ee" />
+                                <stop offset="100%" stopColor="#10b981" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <Shield size={32} className="text-emerald-400/50" />
                     </div>
-                )}
+                </div>
+
+                <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                        <span className="text-slate-500">Preço Atual</span>
+                        <span className="text-cyan-400">{price.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-slate-500">Barreira</span>
+                        <span className="text-amber-400">{barrier.toFixed(4)}</span>
+                    </div>
+                </div>
             </div>
         );
     };
@@ -300,7 +443,8 @@ const BugDeriv = () => {
         <div className="min-h-screen bg-[#080a0e] text-slate-200">
             <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]" />
-                <div className="absolute top-0 left-0 w-full h-[300px] bg-emerald-600/5 blur-[120px]" />
+                <div className="absolute top-0 left-0 w-full h-[300px] bg-cyan-600/5 blur-[120px]" />
+                <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-amber-600/5 blur-[120px]" />
             </div>
 
             <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto space-y-5">
@@ -313,29 +457,27 @@ const BugDeriv = () => {
                             <ArrowLeft size={20} className="text-slate-400" />
                         </button>
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                                <span className="text-xl">🦎</span>
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center relative">
+                                <Shield size={24} className="text-cyan-400" />
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                                    <Bug size={12} className="text-amber-400" />
+                                </div>
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                                     Bug Deriv
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-widest">
-                                        Chameleon
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">
+                                        Quant Shield
                                     </span>
                                 </h1>
-                                <p className="text-xs text-slate-500 font-mono">Even/Odd Adaptive | Ciclo: {chameleonConfig.HISTORY_SIZE} ticks</p>
+                                <p className="text-xs text-slate-500 font-mono">
+                                    Volatility Barrier | Higher/Lower | {fortressConfig.SYMBOL_NAME}
+                                </p>
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {isReanalyzing && (
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 animate-pulse">
-                                <RefreshCw size={14} className="text-cyan-400 animate-spin" />
-                                <span className="text-xs font-mono font-bold text-cyan-400">Reanalisando</span>
-                            </div>
-                        )}
-
                         <div className={cn(
                             "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono",
                             isConnected ? "bg-emerald-950/30 border-emerald-500/30 text-emerald-400" : "bg-rose-950/30 border-rose-500/30 text-rose-400"
@@ -352,7 +494,7 @@ const BugDeriv = () => {
                     {/* Left: Controls */}
                     <div className="lg:col-span-3 space-y-4">
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
-                            <div className="flex items-center gap-2 mb-5 text-emerald-400">
+                            <div className="flex items-center gap-2 mb-5 text-cyan-400">
                                 <Settings2 size={16} />
                                 <span className="text-xs font-bold uppercase tracking-widest">Parâmetros</span>
                             </div>
@@ -367,8 +509,29 @@ const BugDeriv = () => {
                                             value={stake}
                                             onChange={(e) => setStake(e.target.value)}
                                             disabled={isRunning}
-                                            className="w-full bg-black/20 border border-white/10 rounded-lg py-2.5 pl-6 pr-3 text-sm font-mono focus:border-emerald-500/50 focus:outline-none"
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg py-2.5 pl-6 pr-3 text-sm font-mono focus:border-cyan-500/50 focus:outline-none"
                                         />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-2 block">
+                                        Safety Factor: {localSafetyFactor.toFixed(1)}x
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min={fortressConfig.MIN_SAFETY_FACTOR}
+                                        max={fortressConfig.MAX_SAFETY_FACTOR}
+                                        step="0.1"
+                                        value={localSafetyFactor}
+                                        onChange={(e) => setLocalSafetyFactor(parseFloat(e.target.value))}
+                                        disabled={isRunning}
+                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                                    />
+                                    <div className="flex justify-between text-[9px] text-slate-600 mt-1">
+                                        <span>0.5x</span>
+                                        <span>1.2x</span>
+                                        <span>3.0x</span>
                                     </div>
                                 </div>
 
@@ -398,12 +561,12 @@ const BugDeriv = () => {
                                 <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                                     <div>
                                         <span className="text-xs font-medium text-slate-200 block">Martingale</span>
-                                        <span className="text-[9px] text-slate-500">{chameleonConfig.MARTINGALE_FACTOR}x | Max {chameleonConfig.MAX_MARTINGALE_LEVELS}</span>
+                                        <span className="text-[9px] text-slate-500">{fortressConfig.MARTINGALE_FACTOR}x | Max {fortressConfig.MAX_MARTINGALE_LEVELS}</span>
                                     </div>
                                     <button
                                         onClick={() => setUseMartingale(!useMartingale)}
                                         disabled={isRunning}
-                                        className={cn("w-8 h-4 rounded-full relative transition-colors", useMartingale ? "bg-emerald-500" : "bg-slate-700")}
+                                        className={cn("w-8 h-4 rounded-full relative transition-colors", useMartingale ? "bg-cyan-500" : "bg-slate-700")}
                                     >
                                         <div className={cn("absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all", useMartingale ? "left-4.5" : "left-0.5")} />
                                     </button>
@@ -416,7 +579,7 @@ const BugDeriv = () => {
                                     "w-full mt-5 py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2",
                                     isRunning
                                         ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                        : "bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/20"
+                                        : "bg-gradient-to-r from-cyan-500 to-emerald-500 text-white shadow-lg shadow-cyan-500/20"
                                 )}
                             >
                                 {isRunning ? <><Square size={14} fill="currentColor" /> PARAR</> : <><Play size={14} fill="currentColor" /> INICIAR</>}
@@ -425,39 +588,65 @@ const BugDeriv = () => {
                             {isFree && <div className="mt-4"><FreemiumProgressBar currentProfit={currentProfit} /></div>}
                         </div>
 
-                        {/* Risk Info */}
-                        <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-4">
+                        {/* Shield Info */}
+                        <div className="bg-cyan-900/10 border border-cyan-500/20 rounded-xl p-4">
                             <div className="flex items-start gap-2">
-                                <ShieldAlert size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                                <Shield size={16} className="text-cyan-400 shrink-0 mt-0.5" />
                                 <div>
-                                    <h4 className="text-xs font-bold text-emerald-300 mb-1">Gestão Inteligente</h4>
-                                    <p className="text-[10px] text-emerald-200/60 leading-relaxed">
-                                        Reanálise forçada após 2 losses consecutivos. O bot detecta mudanças de ciclo automaticamente.
+                                    <h4 className="text-xs font-bold text-cyan-300 mb-1">Escudo Matemático</h4>
+                                    <p className="text-[10px] text-cyan-200/60 leading-relaxed">
+                                        A barreira dinâmica é calculada usando volatilidade real (ATR) multiplicada pelo Safety Factor. Quanto maior o fator, mais segura a aposta.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Center: Mode + Gauges */}
+                    {/* Center: Chart + Trend */}
                     <div className="lg:col-span-6 space-y-4">
-                        {/* Mode Indicator */}
+                        {/* Price Chart */}
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Repeat size={16} className="text-emerald-400" />
-                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Modo Atual</span>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <BarChart3 size={16} className="text-cyan-400" />
+                                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Gráfico de Preço</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[9px] font-mono">
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-3 h-0.5 bg-cyan-400 rounded" />
+                                        <span className="text-slate-500">Preço</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-3 h-0.5 bg-amber-400 rounded" style={{ borderStyle: 'dashed' }} />
+                                        <span className="text-slate-500">Barreira</span>
+                                    </div>
+                                </div>
                             </div>
-                            <ModeIndicator />
+                            <div className="relative h-[200px] bg-[#0a0c10] rounded-lg overflow-hidden">
+                                <canvas
+                                    ref={chartRef}
+                                    className="w-full h-full"
+                                    style={{ width: '100%', height: '100%' }}
+                                />
+                                {priceHistory.length < 2 && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-slate-600 text-sm">Aguardando dados...</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Gauges */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <SwitchRateGauge />
-                            <SnapbackDisplay />
+                        {/* Trend Indicator */}
+                        <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Target size={16} className="text-cyan-400" />
+                                <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Direção Atual</span>
+                            </div>
+                            <TrendIndicator />
                         </div>
 
                         {/* Logs */}
-                        <div className="bg-[#0c0e14] border border-white/5 rounded-2xl overflow-hidden flex flex-col h-[260px]">
+                        <div className="bg-[#0c0e14] border border-white/5 rounded-2xl overflow-hidden flex flex-col h-[200px]">
                             <div className="p-3 border-b border-white/5 flex items-center gap-2">
                                 <Activity size={14} className="text-slate-500" />
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Log de Atividade</span>
@@ -476,12 +665,12 @@ const BugDeriv = () => {
                                             <span className={cn(
                                                 log.type === 'error' && "text-rose-400",
                                                 log.type === 'success' && "text-emerald-400",
-                                                log.type === 'odd' && "text-violet-300",
-                                                log.type === 'even' && "text-cyan-300",
-                                                log.type === 'mode' && "text-amber-400",
-                                                log.type === 'snapback' && "text-orange-400",
-                                                log.type === 'cycle' && "text-cyan-400",
+                                                log.type === 'higher' && "text-cyan-400",
+                                                log.type === 'lower' && "text-violet-400",
+                                                log.type === 'volatility' && "text-amber-400",
+                                                log.type === 'trend' && "text-emerald-400",
                                                 log.type === 'blocked' && "text-slate-500",
+                                                log.type === 'warning' && "text-amber-400",
                                                 log.type === 'info' && "text-slate-400"
                                             )}>{log.message}</span>
                                         </div>
@@ -491,8 +680,12 @@ const BugDeriv = () => {
                         </div>
                     </div>
 
-                    {/* Right: Stats */}
+                    {/* Right: Gauges + Stats */}
                     <div className="lg:col-span-3 space-y-4">
+                        <VolatilityGauge />
+                        <ProbabilityDisplay />
+
+                        {/* Stats Card */}
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-4">Performance</span>
 
@@ -518,23 +711,12 @@ const BugDeriv = () => {
 
                                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/5">
                                     <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Switch Rate</span>
-                                        <div className="text-lg font-mono text-cyan-400">{stats.switchRate.toFixed(1)}%</div>
+                                        <span className="text-[10px] text-slate-500 block mb-1">Stake Atual</span>
+                                        <div className="text-lg font-mono text-cyan-400">${stats.currentStake.toFixed(2)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Snapbacks</span>
-                                        <div className="text-lg font-mono text-orange-400">{stats.snapbacksTriggered}</div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/5">
-                                    <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Sinais</span>
-                                        <div className="text-lg font-mono text-emerald-400">{stats.signalsTriggered}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Ciclo Resets</span>
-                                        <div className="text-lg font-mono text-amber-400">{stats.cycleResets}</div>
+                                        <span className="text-[10px] text-slate-500 block mb-1">Gale Level</span>
+                                        <div className="text-lg font-mono text-amber-400">{stats.martingaleLevel}</div>
                                     </div>
                                 </div>
                             </div>

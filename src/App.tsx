@@ -55,6 +55,8 @@ import BotQuantum from "./pages/BotQuantum";
 import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
 import BugDeriv from "./pages/BugDeriv";
+import ReferralLanding from "./pages/ReferralLanding";
+import AffiliateDashboard from "./pages/AffiliateDashboard";
 import { TradingSessionProvider } from "./contexts/TradingSessionContext";
 import { PricingModalProvider } from "./contexts/PricingModalContext";
 import PricingModal from "./components/PricingModal";
@@ -90,6 +92,7 @@ const App = () => {
                       <Route path="/deriv/callback" element={<DerivCallback />} />
                       <Route path="/pending-approval" element={<PendingApprovalPage />} />
                       <Route path="/verificando-acesso" element={<VerificandoAcessoPage />} />
+                      <Route path="/ref/:code" element={<ReferralLanding />} />
 
                       {/* Rota raiz protegida - agora carrega Library com Sidebar */}
                       <Route element={<ProtectedRoute />}>
@@ -410,6 +413,15 @@ const App = () => {
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                               <EfectoMidas />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/programa-socios" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <AffiliateDashboard />
                             </main>
                           </>
                         } />

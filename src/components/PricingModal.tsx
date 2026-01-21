@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Zap, Crown, Flame, Sparkles, Shield, ArrowRight } from 'lucide-react';
 import { usePricingModal } from '../contexts/PricingModalContext';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 interface PricingCardProps {
     title: string;
@@ -15,6 +17,7 @@ interface PricingCardProps {
     isPopular?: boolean;
     isLifetime?: boolean;
     delay?: number;
+    affiliateId?: string | null;
 }
 
 const PricingCard: React.FC<PricingCardProps> = ({
@@ -29,9 +32,18 @@ const PricingCard: React.FC<PricingCardProps> = ({
     isPopular = false,
     isLifetime = false,
     delay = 0,
+    affiliateId,
 }) => {
     const handleCheckout = () => {
-        window.open(checkoutUrl, '_blank');
+        // Build URL with affiliate tracking if available
+        let url = checkoutUrl;
+        if (affiliateId) {
+            // Hotmart uses 'sck' (source key) for affiliate tracking
+            const separator = url.includes('?') ? '&' : '?';
+            url = `${url}${separator}sck=${affiliateId}`;
+            console.log('[Checkout] Affiliate tracking added:', affiliateId);
+        }
+        window.open(url, '_blank');
     };
 
     return (
@@ -144,6 +156,34 @@ const PricingCard: React.FC<PricingCardProps> = ({
 
 const PricingModal: React.FC = () => {
     const { isOpen, closePricingModal } = usePricingModal();
+    const { user } = useAuth();
+    const [affiliateId, setAffiliateId] = useState<string | null>(null);
+
+    // Fetch affiliate ID from user's referred_by
+    useEffect(() => {
+        const fetchAffiliateId = async () => {
+            if (!user?.id) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('referred_by')
+                    .eq('id', user.id)
+                    .single();
+
+                if (!error && data?.referred_by) {
+                    setAffiliateId(data.referred_by);
+                    console.log('[PricingModal] Affiliate ID loaded:', data.referred_by);
+                }
+            } catch (err) {
+                console.error('[PricingModal] Error fetching affiliate:', err);
+            }
+        };
+
+        if (isOpen) {
+            fetchAffiliateId();
+        }
+    }, [user?.id, isOpen]);
 
     // Close on Escape key
     useEffect(() => {
@@ -301,6 +341,7 @@ const PricingModal: React.FC = () => {
                                         key={plan.title}
                                         {...plan}
                                         delay={index * 0.08}
+                                        affiliateId={affiliateId}
                                     />
                                 ))}
                             </div>

@@ -22,7 +22,8 @@ import {
     Coins,
     ShieldCheck,
     Bug,
-    Infinity
+    Infinity,
+    Handshake
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -190,6 +191,14 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             isImportant: false,
             requiresUpgrade: false,
             description: 'Guía paso a paso'
+        },
+        {
+            name: 'Programa de Socios',
+            icon: <Handshake size={20} />,
+            path: '/programa-socios',
+            isImportant: false,
+            requiresUpgrade: false,
+            description: 'Gana 60% de comisión'
         },
         {
             name: 'Configuración',

@@ -4,6 +4,7 @@ import { supabase, isSupabaseDemoMode } from '../lib/supabaseClient';
 import { Session, User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { getReferralCodeFromStorage, lookupAffiliateId } from '../hooks/useReferral';
 
 // Constante para la clave de almacenamiento local
 const DEMO_STORAGE_KEY = 'supabase.auth.token';
@@ -353,15 +354,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         if (!error && data.user) {
-          const profileData = {
+          // --- AFFILIATE TRACKING ---
+          let referredBy: string | null = null;
+          const referralCode = getReferralCodeFromStorage();
+          if (referralCode) {
+            console.log('[SignUp] Found referral code:', referralCode);
+            referredBy = await lookupAffiliateId(referralCode);
+            if (referredBy) {
+              console.log('[SignUp] Resolved affiliate ID:', referredBy);
+            }
+          }
+
+          const profileData: any = {
             id: data.user.id,
             full_name: name || email.split('@')[0],
-            is_active: false
+            is_active: false,
           };
+
+          // Add referred_by if we found a valid affiliate
+          if (referredBy) {
+            profileData.referred_by = referredBy;
+          }
+
           const { error: profileError } = await supabase.from('profiles').insert(profileData);
           if (profileError) {
             console.error('Error inserting profile:', profileError);
             toast.error('Cuenta creada, pero error al guardar el nombre. Contacte soporte.');
+          } else {
+            // Clear referral code after successful signup
+            localStorage.removeItem('million_referral_code');
+            document.cookie = 'million_ref=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
           }
         }
 
