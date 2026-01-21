@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Copy, Check, DollarSign, Users, TrendingUp, Wallet, Handshake, ExternalLink, Sparkles, Gift, ArrowRight, Shield, Zap } from 'lucide-react';
+import { Copy, Check, DollarSign, Users, TrendingUp, Wallet, Handshake, ExternalLink, Sparkles, Gift, ArrowRight, Shield, Zap, Clock, Lock } from 'lucide-react';
 import { useAffiliate } from '../hooks/useAffiliate';
 import { WithdrawalModal } from '../components/WithdrawalModal';
 import { toast } from 'sonner';
 
 const AffiliateDashboard = () => {
-    const { affiliateCode, affiliateBalance, totalEarnings, referredCount, isLoading, refreshData } = useAffiliate();
+    const { affiliateCode, affiliateBalance, pendingBalance, totalEarnings, referredCount, isLoading, refreshData } = useAffiliate();
     const [copied, setCopied] = useState(false);
     const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
     const prefersReducedMotion = useReducedMotion();
@@ -158,8 +158,8 @@ const AffiliateDashboard = () => {
                     </div>
                 </motion.div>
 
-                {/* Stats Grid - Clean & Minimal */}
-                <motion.div variants={fadeIn} className="grid grid-cols-3 gap-2 md:gap-4">
+                {/* Stats Grid - NOW WITH 4 COLUMNS for PENDING */}
+                <motion.div variants={fadeIn} className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
                     {[
                         {
                             label: 'Comisiones',
@@ -174,6 +174,13 @@ const AffiliateDashboard = () => {
                             sublabel: 'Socios activos',
                             icon: Users,
                             color: 'blue'
+                        },
+                        {
+                            label: 'Pendiente',
+                            value: `$${pendingBalance.toFixed(2)}`,
+                            sublabel: 'En espera (20d)',
+                            icon: Clock,
+                            color: 'amber'
                         },
                         {
                             label: 'Disponible',
@@ -204,6 +211,27 @@ const AffiliateDashboard = () => {
                         </motion.div>
                     ))}
                 </motion.div>
+
+                {/* IMPORTANT NOTICE - Pending Balance Explanation */}
+                {pendingBalance > 0 && (
+                    <motion.div variants={fadeIn}>
+                        <div className="relative p-4 md:p-5 rounded-xl bg-amber-950/20 border border-amber-500/30 overflow-hidden">
+                            <div className="flex gap-3">
+                                <Lock size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <h4 className="text-sm font-semibold text-amber-300 mb-1">Saldo Pendiente de Liberación</h4>
+                                    <p className="text-xs text-amber-200/70 leading-relaxed">
+                                        Tu comisión de <strong className="text-amber-300">${pendingBalance.toFixed(2)} USD</strong> está temporalmente bloqueada por seguridad.
+                                        Se liberará automáticamente después de <strong className="text-amber-300">20 días</strong> desde la fecha de venta.
+                                    </p>
+                                    <p className="text-[10px] text-amber-300/50 mt-2">
+                                        ℹ️ <strong>¿Por qué?</strong> Protección contra reembolsos. Si el cliente solicita devolución dentro de ese período, evitamos pérdidas para ambos.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Withdrawal Section - Premium */}
                 <motion.div variants={fadeIn}>
@@ -283,11 +311,11 @@ const AffiliateDashboard = () => {
                             </li>
                             <li className="flex gap-2">
                                 <span className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] flex items-center justify-center flex-shrink-0">3</span>
-                                Recibes 60% de comisión
+                                Recibes 60% (bloqueado 20d)
                             </li>
                             <li className="flex gap-2">
                                 <span className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] flex items-center justify-center flex-shrink-0">4</span>
-                                Retira a partir de $20
+                                Después de 20 días, retira
                             </li>
                         </ol>
                     </div>

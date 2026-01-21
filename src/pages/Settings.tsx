@@ -11,17 +11,29 @@ import {
   Upload,
   Clock,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Settings2,
+  CreditCard,
+  DollarSign,
+  Check,
+  TrendingUp,
+  TrendingDown,
+  Percent,
+  Wallet,
+  Bell,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { useMarketingMode } from '../hooks/useMarketingMode';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabaseClient';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
 import { usePricingModal } from '../contexts/PricingModalContext';
 import { Calendar } from 'lucide-react';
 
-type SettingsTab = 'cuenta';
+type SettingsTab = 'cuenta' | 'marketing';
 
 const SettingsPage = () => {
   const { user } = useAuth();
@@ -30,6 +42,21 @@ const SettingsPage = () => {
   // Freemium details
   const { planType, isPro, daysLeft, daysActive, expirationDate: hookExpirationDate } = useFreemiumLimiter();
   const { openPricingModal } = usePricingModal();
+
+  // Marketing Mode
+  const {
+    isMarketingMode,
+    overrides,
+    setFakeProfit,
+    setFakeWins,
+    setFakeLosses,
+    setFakeWinRate,
+    setFakeBalance,
+    toggleFakeNotifications,
+    setCurrencyDisplay,
+    toggleForceRealAccount,
+    resetOverrides
+  } = useMarketingMode();
 
   // Active tab state
   const [activeTab, setActiveTab] = useState<SettingsTab>('cuenta');
@@ -643,6 +670,199 @@ const SettingsPage = () => {
           </div>
         );
 
+      case 'marketing':
+        if (!isMarketingMode) return null;
+        return (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="border rounded-xl shadow-sm overflow-hidden bg-card border-purple-500/20">
+              <div className="p-5 border-b bg-purple-500/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg">
+                    <Sparkles className="text-white" size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Marketing Mode</h2>
+                    <p className="text-xs text-purple-500 font-medium">DEMO CONTROL CENTER</p>
+                  </div>
+                </div>
+                <div className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-500 border border-purple-500/20 font-mono">
+                  MKT ONLY
+                </div>
+              </div>
+
+              <div className="p-6 space-y-8">
+                {/* Account Type Control */}
+                <div>
+                  <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+                    <CreditCard size={16} className="text-primary" />
+                    Tipo de Cuenta
+                  </h3>
+                  <div className="p-4 bg-muted/30 rounded-lg border flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium block">Demo → Real</span>
+                      <span className="text-xs text-muted-foreground">Siempre mostrar como Cuenta Real (incluso en Demo)</span>
+                    </div>
+                    <button
+                      onClick={toggleForceRealAccount}
+                      className={cn(
+                        "relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/50",
+                        overrides.forceRealAccount ? "bg-emerald-500" : "bg-muted-foreground/30"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+                        overrides.forceRealAccount ? "left-6" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Currency Control */}
+                <div>
+                  <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+                    <DollarSign size={16} className="text-primary" />
+                    Moneda Visual
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setCurrencyDisplay('USD')}
+                      className={cn(
+                        "p-4 rounded-xl border flex flex-col items-center gap-2 transition-all hover:bg-muted/50",
+                        overrides.currencyDisplay === 'USD'
+                          ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-600"
+                          : "bg-card hover:border-primary/50"
+                      )}
+                    >
+                      <span className="text-xl font-bold">$ USD</span>
+                      {overrides.currencyDisplay === 'USD' && <Check size={16} />}
+                    </button>
+                    <button
+                      onClick={() => setCurrencyDisplay('USDT')}
+                      className={cn(
+                        "p-4 rounded-xl border flex flex-col items-center gap-2 transition-all hover:bg-muted/50",
+                        overrides.currencyDisplay === 'USDT'
+                          ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600"
+                          : "bg-card hover:border-primary/50"
+                      )}
+                    >
+                      <span className="text-xl font-bold">USDT</span>
+                      {overrides.currencyDisplay === 'USDT' && <Check size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats Control */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <Settings2 size={16} className="text-primary" />
+                      Estadísticas Fake
+                    </h3>
+                    <button
+                      onClick={resetOverrides}
+                      className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      Resetear valores
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                        <DollarSign size={12} /> Lucro Total
+                      </label>
+                      <input
+                        type="number"
+                        value={overrides.fakeProfit}
+                        onChange={(e) => setFakeProfit(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-background border rounded-md p-2 font-mono text-emerald-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                        <Wallet size={12} /> Balance
+                      </label>
+                      <input
+                        type="number"
+                        value={overrides.fakeBalance}
+                        onChange={(e) => setFakeBalance(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-background border rounded-md p-2 font-mono text-cyan-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                        <TrendingUp size={12} /> Wins
+                      </label>
+                      <input
+                        type="number"
+                        value={overrides.fakeWins}
+                        onChange={(e) => setFakeWins(parseInt(e.target.value) || 0)}
+                        className="w-full bg-background border rounded-md p-2 font-mono text-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                        <TrendingDown size={12} /> Losses
+                      </label>
+                      <input
+                        type="number"
+                        value={overrides.fakeLosses}
+                        onChange={(e) => setFakeLosses(parseInt(e.target.value) || 0)}
+                        className="w-full bg-background border rounded-md p-2 font-mono text-rose-500"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                        <Percent size={12} /> Win Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={overrides.fakeWinRate}
+                        onChange={(e) => setFakeWinRate(parseFloat(e.target.value) || 0)}
+                        className="w-full bg-background border rounded-md p-2 font-mono text-amber-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notifications Toggle */}
+                <div className="p-4 bg-muted/30 rounded-lg border flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                      <Bell size={16} className="text-purple-500" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium block">Notificaciones Fake</span>
+                      <span className="text-xs text-muted-foreground">Simular notificaciones de ganancia</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={toggleFakeNotifications}
+                    className={cn(
+                      "relative w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/50",
+                      overrides.showFakeNotifications ? "bg-purple-500" : "bg-muted-foreground/30"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+                      overrides.showFakeNotifications ? "left-6" : "left-1"
+                    )} />
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -739,6 +959,31 @@ const SettingsPage = () => {
               </div>
             </div>
           </div>
+
+          {isMarketingMode && (
+            <div className="mt-6 border border-purple-500/30 rounded-xl overflow-hidden bg-card shadow-lg shadow-purple-500/5">
+              <div className="p-4 border-b border-purple-500/20 bg-gradient-to-r from-purple-500/10 to-transparent">
+                <h2 className="text-lg font-semibold text-purple-400 flex items-center gap-2">
+                  <Sparkles size={18} />
+                  Marketing
+                </h2>
+              </div>
+              <div className="p-1.5">
+                <button
+                  onClick={() => setActiveTab('marketing')}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-3 rounded-md transition-all duration-200",
+                    activeTab === 'marketing'
+                      ? "bg-purple-500/10 text-purple-500 font-medium translate-x-1 border border-purple-500/20"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Settings2 size={18} />
+                  <span>Configuración Demo</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Main content */}

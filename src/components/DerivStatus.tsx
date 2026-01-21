@@ -1,7 +1,8 @@
 import React from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { useMarketingMode } from '../hooks/useMarketingMode';
-import { Wifi, WifiOff, Loader2, User, DollarSign } from 'lucide-react';
+import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
+import { Wifi, WifiOff, Loader2, User, DollarSign, Gem } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Link } from 'react-router-dom';
 
@@ -13,15 +14,23 @@ export const DerivStatus = () => {
         getCurrencySymbol,
         getDisplayBalance,
         getDisplayLoginId,
-        overrides
+        overrides,
+        showTraderDiamondBadge
     } = useMarketingMode();
+
+    // Get plan type to determine if user is Diamante/Vitalicio
+    const { planType } = useFreemiumLimiter();
+    const isDiamante = showTraderDiamondBadge || ['whale', 'vitalicio', 'elite'].includes((planType || '').toLowerCase());
 
     // Disconnected state
     if (!isConnected && !isConnecting) {
         return (
             <Link
                 to="/conectar-deriv"
-                className="w-full p-4 rounded-2xl bg-gradient-to-br from-red-500/10 via-red-500/5 to-transparent border border-red-500/20 hover:border-red-500/30 transition-all duration-200 group"
+                className={cn(
+                    "w-full p-4 rounded-2xl bg-gradient-to-br from-red-500/10 via-red-500/5 to-transparent border hover:border-red-500/30 transition-all duration-200 group",
+                    isDiamante ? "border-purple-500/20 shadow-none hover:bg-purple-500/5" : "border-red-500/20"
+                )}
             >
                 <div className="flex items-center gap-3 mb-3">
                     <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20">
@@ -42,7 +51,10 @@ export const DerivStatus = () => {
     // Connecting state
     if (isConnecting) {
         return (
-            <div className="w-full p-4 rounded-2xl bg-gradient-to-br from-yellow-500/10 via-yellow-500/5 to-transparent border border-yellow-500/20">
+            <div className={cn(
+                "w-full p-4 rounded-2xl bg-gradient-to-br from-yellow-500/10 via-yellow-500/5 to-transparent border",
+                isDiamante ? "border-purple-500/20 shadow-none" : "border-yellow-500/20"
+            )}>
                 <div className="flex items-center gap-3 mb-3">
                     <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                         <Loader2 size={20} className="text-yellow-500 animate-spin" />
@@ -75,31 +87,59 @@ export const DerivStatus = () => {
     const currencySymbol = getCurrencySymbol();
 
     return (
-        <div className="w-full p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20">
+        <div className={cn(
+            "w-full p-4 rounded-2xl bg-gradient-to-br transition-all duration-300",
+            isDiamante
+                ? "from-purple-500/10 via-purple-500/5 to-transparent border border-purple-500/20"
+                : "from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20"
+        )}>
             {/* Header with connection status */}
             <div className="flex items-center gap-3 mb-4">
-                <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-                    <Wifi size={20} className="text-emerald-400" />
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-background"></span>
+                <div className={cn(
+                    "relative flex items-center justify-center w-10 h-10 rounded-xl border",
+                    isDiamante
+                        ? "bg-purple-500/10 border-purple-500/20"
+                        : "bg-emerald-500/20 border-emerald-500/30"
+                )}>
+                    <Wifi size={20} className={isDiamante ? "text-purple-400" : "text-emerald-400"} />
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span className={cn(
+                            "animate-ping absolute inline-flex h-full w-full rounded-full opacity-50",
+                            isDiamante ? "bg-purple-400" : "bg-emerald-400"
+                        )}></span>
+                        <span className={cn(
+                            "relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-background",
+                            isDiamante ? "bg-purple-500" : "bg-emerald-500"
+                        )}></span>
                     </span>
                 </div>
                 <div className="flex-1">
-                    <span className="block text-sm font-bold text-emerald-400">Deriv Conectado</span>
-                    <span className="block text-[10px] text-emerald-400/50 uppercase tracking-wider">En línea</span>
+                    <span className={cn(
+                        "block text-sm font-bold",
+                        isDiamante ? "text-purple-400" : "text-emerald-400"
+                    )}>Deriv Conectado</span>
+                    <span className={cn(
+                        "block text-[10px] uppercase tracking-wider",
+                        isDiamante ? "text-purple-400/50" : "text-emerald-400/50"
+                    )}>En línea</span>
                 </div>
             </div>
 
             {/* Account info */}
             <div className="flex flex-col gap-1 mb-3 px-3 py-2 rounded-lg bg-white/5">
                 <div className="flex items-center gap-2">
-                    <User size={12} className="text-white/40" />
+                    {/* Use Gem icon for Diamante users, User icon for others */}
+                    {isDiamante ? (
+                        <Gem size={12} className="text-purple-400" />
+                    ) : (
+                        <User size={12} className="text-white/40" />
+                    )}
                     <span
                         className={cn(
                             "text-xs font-bold uppercase tracking-wider",
-                            // Always show emerald for marketing mode with forceRealAccount
-                            forceRealColors || isRealAccount ? "text-emerald-400" : "text-cyan-400"
+                            // Purple for Diamante, emerald for real, cyan for demo
+                            isDiamante ? "text-purple-400" :
+                                forceRealColors || isRealAccount ? "text-emerald-400" : "text-cyan-400"
                         )}
                     >
                         {accountTypeDisplay}
@@ -109,11 +149,19 @@ export const DerivStatus = () => {
             </div>
 
             {/* Balance display */}
-            <div className="px-3 py-3 rounded-xl bg-gradient-to-r from-emerald-500/5 to-transparent border border-emerald-500/10">
+            <div className={cn(
+                "px-3 py-3 rounded-xl bg-gradient-to-r border",
+                isDiamante
+                    ? "from-purple-500/5 to-transparent border-purple-500/10"
+                    : "from-emerald-500/5 to-transparent border-emerald-500/10"
+            )}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                            <DollarSign size={16} className="text-emerald-400" />
+                        <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center",
+                            isDiamante ? "bg-purple-500/10" : "bg-emerald-500/10"
+                        )}>
+                            <DollarSign size={16} className={isDiamante ? "text-purple-400" : "text-emerald-400"} />
                         </div>
                         <div>
                             <span className="block text-[10px] text-white/40 font-medium uppercase tracking-wider leading-none mb-1">
@@ -122,7 +170,7 @@ export const DerivStatus = () => {
                             <span className="block text-xl font-black font-mono text-white leading-none">
                                 {account ? (
                                     <>
-                                        <span className="text-emerald-400">{currencySymbol}</span>
+                                        <span className={isDiamante ? "text-purple-400" : "text-emerald-400"}>{currencySymbol}</span>
                                         <span>{displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </>
                                 ) : (

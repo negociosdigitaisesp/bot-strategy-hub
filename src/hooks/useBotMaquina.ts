@@ -46,6 +46,7 @@ export const useBotMaquina = () => {
     const currentStakeRef = useRef<number>(0);
     const isWaitingForContractRef = useRef<boolean>(false);
     const lastDigitsRef = useRef<number[]>([]);
+    const totalProfitRef = useRef<number>(0);
 
     // Helper to add log
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -158,6 +159,8 @@ export const useBotMaquina = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: initialStakeRef.current,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 } else {
                     // LOSS - Apply Martingale
                     const lossAmount = Math.abs(profit);
@@ -173,26 +176,26 @@ export const useBotMaquina = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: newStake,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 }
 
+
                 // Check Stop Loss / Take Profit
-                setStats(prev => {
-                    if (configRef.current) {
-                        if (prev.totalProfit >= configRef.current.takeProfit) {
-                            addLog(`🏆 ¡META ALCANZADA! +$${prev.totalProfit.toFixed(2)}`, 'success');
-                            toast.success('¡Take Profit alcanzado!');
-                            stopBot();
-                            return prev;
-                        }
-                        if (prev.totalProfit <= -configRef.current.stopLoss) {
-                            addLog(`🛑 STOP LOSS activado. -$${Math.abs(prev.totalProfit).toFixed(2)}`, 'error');
-                            toast.error('Stop Loss activado');
-                            stopBot();
-                            return prev;
-                        }
+                if (configRef.current) {
+                    if (totalProfitRef.current >= configRef.current.takeProfit) {
+                        addLog(`🏆 ¡META ALCANZADA! +$${totalProfitRef.current.toFixed(2)}`, 'success');
+                        toast.success('¡Take Profit alcanzado!');
+                        stopBot();
+                        return;
                     }
-                    return prev;
-                });
+                    if (totalProfitRef.current <= -configRef.current.stopLoss) {
+                        addLog(`🛑 STOP LOSS activado. -$${Math.abs(totalProfitRef.current).toFixed(2)}`, 'error');
+                        toast.error('Stop Loss activado');
+                        stopBot();
+                        return;
+                    }
+                }
             }
         }
 
@@ -229,21 +232,6 @@ export const useBotMaquina = () => {
         // Notify Global Session
         setActiveBot('Maquina del Ganancias');
 
-        // Add message listener
-        socket.addEventListener('message', handleMessage);
-
-        // First, forget all tick subscriptions
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-
-        // Then subscribe to ticks
-        setTimeout(() => {
-            const tickRequest = {
-                ticks: config.symbol || 'R_75',
-                subscribe: 1,
-            };
-            socket.send(JSON.stringify(tickRequest));
-        }, 100);
-
         addLog(`🚀 Maquina del Ganancias iniciado en ${config.symbol || 'R_75'}`, 'success');
         addLog(`💰 Stake: $${config.stake} | TP: $${config.takeProfit} | SL: $${config.stopLoss}`, 'info');
         addLog(`📊 Estrategia: 3 PARES → DIGITODD | 3 IMPARES → DIGITEVEN`, 'info');
@@ -252,12 +240,33 @@ export const useBotMaquina = () => {
 
         setIsRunning(true);
         return true;
-    }, [socket, isConnected, handleMessage, addLog, setActiveBot]);
+    }, [socket, isConnected, addLog, setActiveBot]);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        const config = configRef.current;
+        const symbol = config?.symbol || 'R_75';
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     // Stop the bot
     const stopBot = useCallback(() => {
         if (socket) {
-            socket.removeEventListener('message', handleMessage);
+            socket.send(JSON.stringify({ forget_all: 'ticks' }));
         }
 
         setActiveBot(null);

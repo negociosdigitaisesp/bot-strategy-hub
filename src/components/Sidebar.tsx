@@ -23,7 +23,8 @@ import {
     ShieldCheck,
     Bug,
     Infinity,
-    Handshake
+    Handshake,
+    Gem
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -408,12 +409,16 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                         )}
                                     </div>
 
-                                    {/* Pro Badge - Crown */}
-                                    {isPro && (
+                                    {/* Pro Badge - Crown or Diamond */}
+                                    {showTraderDiamondBadge ? (
+                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full border-2 border-sidebar shadow-lg flex items-center justify-center">
+                                            <Gem size={10} className="text-purple-100" />
+                                        </div>
+                                    ) : isPro ? (
                                         <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full border-2 border-sidebar shadow-lg flex items-center justify-center">
                                             <Crown size={10} className="text-amber-100" />
                                         </div>
-                                    )}
+                                    ) : null}
 
                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-sidebar shadow-sm" />
                                 </div>
@@ -438,10 +443,9 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                         {/* Subtle License Status Widget - REPLACED WITH PREMIUM BADGE */}
                                         <div className="mt-2">
                                             {showTraderDiamondBadge ? (
-                                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30">
-                                                    <Crown size={12} className="text-amber-400" />
-                                                    <span className="text-[10px] font-bold text-amber-300">Trader Diamond</span>
-                                                    <Infinity size={12} className="text-amber-400" />
+                                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 w-full max-w-[180px]">
+                                                    <Gem size={14} className="text-purple-400 shrink-0" />
+                                                    <span className="text-xs font-bold text-purple-400 truncate">Diamante Vitalicio</span>
                                                 </div>
                                             ) : (
                                                 <PlanBadge planType={planType} daysLeft={daysLeft} />

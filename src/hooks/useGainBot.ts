@@ -48,6 +48,7 @@ export const useGainBot = () => {
     const countLossRef = useRef<number>(0);
     const nextTradeRef = useRef<string>('OVER 2');
     const binaryToolRef = useRef<string>('Instagram - @miguelltrader'); // Initial value from XML
+    const totalProfitRef = useRef<number>(0);
 
     const isWaitingForContractRef = useRef<boolean>(false);
 
@@ -67,10 +68,9 @@ export const useGainBot = () => {
 
     // Stop Bot Logic - Defined early
     const stopBot = useCallback(() => {
-        if (socket && handleMessageRef.current) {
-            socket.removeEventListener('message', handleMessageRef.current);
+        // Listener removal handled by useEffect cleanup
+        if (socket) {
             socket.send(JSON.stringify({ forget_all: 'ticks' }));
-            handleMessageRef.current = null;
         }
 
         setActiveBot(null);
@@ -237,10 +237,10 @@ export const useGainBot = () => {
 
                 if (currentStakeRef.current < 0.35) currentStakeRef.current = 0.35;
 
-                if (stats.totalProfit + profit >= (configRef.current?.takeProfit || 100)) {
+                if (totalProfitRef.current >= (configRef.current?.takeProfit || 100)) {
                     addLog(`🏆 TAKE PROFIT ALCANZADO`, 'success');
                     stopBot();
-                } else if (stats.totalProfit + profit <= -(configRef.current?.stopLoss || 100)) {
+                } else if (totalProfitRef.current <= -(configRef.current?.stopLoss || 100)) {
                     addLog(`🛑 STOP LOSS ALCANZADO`, 'error');
                     stopBot();
                 }
@@ -252,6 +252,8 @@ export const useGainBot = () => {
                     totalProfit: prev.totalProfit + profit,
                     currentStake: currentStakeRef.current,
                 }));
+
+                totalProfitRef.current = prev.totalProfit + profit;
             }
         }
 
@@ -286,31 +288,39 @@ export const useGainBot = () => {
         setLogs([]);
         setActiveBot('Gain Bot');
 
-        socket.addEventListener('message', handleMessage);
-
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-        setTimeout(() => {
-            socket.send(JSON.stringify({
-                ticks: 'R_100',
-                subscribe: 1
-            }));
-        }, 100);
-
-        addLog('🚀 Gain Bot Iniciado (R_100)', 'success');
         addLog(`💰 Stake Inicial: $${config.stake} | Split: ${config.martingaleSplit}`, 'info');
         setIsRunning(true);
         return true;
 
-    }, [socket, handleMessage, addLog, setActiveBot]);
+    }, [addLog, setActiveBot]);
 
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        handleMessageRef.current = onMessage; // Update ref for cleanup logic if used elsewhere
+        socket.addEventListener('message', onMessage);
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: 'R_100',
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+            handleMessageRef.current = null;
+        };
+    }, [isRunning, socket, handleMessage]);
+
+    // Cleanup on unmount
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (handleMessageRef.current && socket) {
-                socket.removeEventListener('message', handleMessageRef.current);
-            }
+            // Cleanup handled by socket effect
         };
-    }, [socket]);
+    }, []);
 
     return { isRunning, stats, logs, startBot, stopBot };
 };

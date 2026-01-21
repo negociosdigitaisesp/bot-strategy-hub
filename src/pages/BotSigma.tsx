@@ -30,7 +30,8 @@ import {
     Terminal,
     Code,
     Cpu,
-    Database
+    Database,
+    Pause
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -50,12 +51,6 @@ const BotSigma = () => {
         isRunning,
         stats,
         logs,
-        saturationPercent,
-        dominantSide,
-        semaphore,
-        consecutiveCount,
-        lastSequence,
-        filterStatus,
         startBot,
         stopBot,
     } = useBotSigma();
@@ -134,252 +129,124 @@ const BotSigma = () => {
         }
     };
 
-    // --- SATURATION GAUGE (Hacker Style) ---
-    const SaturationGauge = () => {
-        const evenPercent = dominantSide === 'even' ? saturationPercent : 100 - saturationPercent;
-        const oddPercent = 100 - evenPercent;
-        const isSaturated = saturationPercent >= 55;
+    // --- TREND STATUS (New v3) ---
+    const TrendStatusPanel = () => {
+        const lastParity = stats.lastParity;
+        const consecutive = stats.consecutiveCount || 0;
+        const isPingPong = stats.isPingPong || false;
+        const isOnCooldown = stats.isOnCooldown || false;
+        const trendStrength = stats.trendStrength;
 
         return (
             <div className="bg-black/40 rounded-xl border border-white/5 p-4">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-                        <Database size={12} className="inline mr-1.5" />
-                        Saturación 100 Ticks
+                        <TrendingUp size={12} className="inline mr-1.5" />
+                        Tendencia Actual
                     </span>
-                    <span className={cn(
-                        "text-2xl font-mono font-bold",
-                        isSaturated ? "text-purple-400" : "text-slate-400"
-                    )}>
-                        {saturationPercent.toFixed(1)}%
-                    </span>
+                    {consecutive >= 3 && !isPingPong && !isOnCooldown && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-bold text-emerald-400 animate-pulse">
+                            🎯 SEÑAL ACTIVA
+                        </span>
+                    )}
                 </div>
 
-                {/* Main Progress Bar */}
-                <div className="relative h-4 bg-slate-800 rounded-full overflow-hidden">
-                    {/* Zone Backgrounds */}
-                    <div className="absolute inset-0 flex">
-                        <div className="w-[45%] bg-cyan-900/30" />
-                        <div className="w-[10%] bg-slate-700/30" />
-                        <div className="flex-1 bg-violet-900/30" />
+                {/* Sequence Counter & Strength */}
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase mb-1">Secuencia</div>
+                        <div className={cn(
+                            "text-xl font-mono font-bold",
+                            consecutive >= 3 ? "text-emerald-400" : "text-slate-400"
+                        )}>
+                            {consecutive}/3
+                        </div>
                     </div>
-
-                    {/* Needle */}
-                    <div
-                        className={cn(
-                            "absolute top-0 bottom-0 w-1.5 rounded-full shadow-lg transition-all duration-300 z-10",
-                            isSaturated ? "bg-purple-400 shadow-purple-500/50" : "bg-slate-400"
-                        )}
-                        style={{ left: `calc(${saturationPercent}% - 3px)` }}
-                    />
-
-                    {/* Threshold Lines */}
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-slate-500/50" style={{ left: '45%' }} />
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-amber-500/50" style={{ left: '55%' }} />
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-purple-500/50" style={{ left: '60%' }} />
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase mb-1">Fuerza</div>
+                        <div className={cn(
+                            "text-sm font-mono font-bold flex items-center justify-center h-[28px]",
+                            trendStrength === 'strong' ? "text-emerald-400" :
+                                trendStrength === 'medium' ? "text-amber-400" : "text-slate-500"
+                        )}>
+                            {trendStrength === 'strong' ? 'FUERTE' :
+                                trendStrength === 'medium' ? 'MEDIA' : '--'}
+                        </div>
+                    </div>
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase mb-1">Último</div>
+                        <div className={cn(
+                            "text-xl font-mono font-bold",
+                            lastParity === 'even' ? "text-cyan-400" : lastParity === 'odd' ? "text-violet-400" : "text-slate-400"
+                        )}>
+                            {lastParity === 'even' ? 'PAR' : lastParity === 'odd' ? 'IMP' : '--'}
+                        </div>
+                    </div>
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5 text-center">
+                        <div className="text-[9px] text-slate-500 uppercase mb-1">Estado</div>
+                        <div className={cn(
+                            "text-lg font-mono font-bold flex items-center justify-center h-[28px]",
+                            isOnCooldown ? "text-amber-400" : isPingPong ? "text-rose-400" : "text-emerald-400"
+                        )}>
+                            {isOnCooldown ? <Pause size={18} /> : isPingPong ? <ShieldAlert size={18} /> : <CheckCircle2 size={18} />}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex justify-between mt-2 text-[9px] font-mono">
-                    <span className="text-cyan-400/60">PAR {evenPercent.toFixed(0)}%</span>
-                    <span className="text-amber-400/60">55%</span>
-                    <span className="text-violet-400/60">IMPAR {oddPercent.toFixed(0)}%</span>
+                {/* Status Messages */}
+                <div className={cn(
+                    "p-3 rounded-lg text-center text-sm font-mono",
+                    isOnCooldown ? "bg-amber-950/30 border border-amber-500/20 text-amber-400" :
+                        isPingPong ? "bg-rose-950/30 border border-rose-500/20 text-rose-400" :
+                            consecutive >= 3 ? "bg-emerald-950/30 border border-emerald-500/20 text-emerald-400" :
+                                "bg-slate-900/50 border border-white/5 text-slate-400"
+                )}>
+                    {isOnCooldown && <>⏸️ PAUSA: Esperando nuevo patrón (Reset)...</>}
+                    {!isOnCooldown && isPingPong && <>🚫 PING-PONG: Mercado alternante. Bloqueado.</>}
+                    {!isOnCooldown && !isPingPong && consecutive >= 3 && <>📈 TENDENCIA CONFIRMADA: Apostando {lastParity === 'even' ? 'PAR' : 'IMPAR'}</>}
+                    {!isOnCooldown && !isPingPong && consecutive < 3 && <>🔍 Analizando tendencia...</>}
                 </div>
             </div>
         );
     };
 
-    // --- SEMAPHORE DISPLAY (Hacker Style) ---
-    const SemaphoreDisplay = () => (
-        <div className="bg-black/40 rounded-xl border border-white/5 p-4">
-            <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-                    <Cpu size={12} className="inline mr-1.5" />
-                    Trigger de Exaustão
-                </span>
-                {semaphore === 'green' && (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[9px] font-bold text-emerald-400 animate-pulse">
-                        🎯 ENTRADA
-                    </span>
-                )}
-            </div>
-
-            {/* Sequence Display */}
-            <div className="flex items-center gap-3">
-                {/* Traffic Light */}
-                <div className="flex flex-col items-center gap-1.5 p-3 bg-slate-900/50 rounded-lg border border-white/5">
-                    <motion.div
-                        className={cn("w-5 h-5 rounded-full border-2",
-                            semaphore === 'red' ? 'bg-rose-500 border-rose-400 shadow-lg shadow-rose-500/50' : 'bg-rose-500/10 border-rose-500/20'
-                        )}
-                        animate={{ scale: semaphore === 'red' ? [1, 1.15, 1] : 1 }}
-                        transition={{ repeat: semaphore === 'red' ? Infinity : 0, duration: 0.6 }}
-                    />
-                    <motion.div
-                        className={cn("w-5 h-5 rounded-full border-2",
-                            semaphore === 'yellow' ? 'bg-amber-500 border-amber-400 shadow-lg shadow-amber-500/50' : 'bg-amber-500/10 border-amber-500/20'
-                        )}
-                        animate={{ scale: semaphore === 'yellow' ? [1, 1.15, 1] : 1 }}
-                        transition={{ repeat: semaphore === 'yellow' ? Infinity : 0, duration: 0.6 }}
-                    />
-                    <motion.div
-                        className={cn("w-5 h-5 rounded-full border-2",
-                            semaphore === 'green' ? 'bg-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/50' : 'bg-emerald-500/10 border-emerald-500/20'
-                        )}
-                        animate={{ scale: semaphore === 'green' ? [1, 1.15, 1] : 1 }}
-                        transition={{ repeat: semaphore === 'green' ? Infinity : 0, duration: 0.6 }}
-                    />
-                </div>
-
-                {/* Sequence Boxes */}
-                <div className="flex-1">
-                    <div className="text-[9px] text-slate-500 mb-2 font-mono">Secuencia: {consecutiveCount}/4</div>
-                    <div className="flex gap-2">
-                        {lastSequence.map((p, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                transition={{ delay: i * 0.1 }}
-                                className={cn(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-mono border-2 transition-all",
-                                    p === 'even'
-                                        ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
-                                        : "bg-violet-500/20 border-violet-500/50 text-violet-400"
-                                )}
-                            >
-                                {p === 'even' ? 'P' : 'I'}
-                            </motion.div>
-                        ))}
-                        {Array(4 - lastSequence.length).fill(0).map((_, i) => (
-                            <div
-                                key={`empty-${i}`}
-                                className="w-10 h-10 rounded-lg border-2 border-dashed border-white/10 flex items-center justify-center"
-                            >
-                                <Code size={14} className="text-white/10" />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Status Badge */}
-                <div className={cn(
-                    "px-3 py-2 rounded-lg text-xs font-bold font-mono",
-                    semaphore === 'green' ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-                        semaphore === 'yellow' ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" :
-                            semaphore === 'red' ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" :
-                                "bg-slate-800 text-slate-400 border border-white/5"
-                )}>
-                    {semaphore === 'green' ? '🟢 GO' :
-                        semaphore === 'yellow' ? '🟡 WAIT' :
-                            semaphore === 'red' ? '🔴 STOP' : '⚪ IDLE'}
-                </div>
-            </div>
-        </div>
-    );
-
-    // --- FILTERS PANEL (Hacker Style) ---
-    const FiltersPanel = () => (
+    // --- STRATEGY INFO PANEL ---
+    const StrategyInfoPanel = () => (
         <div className="bg-black/40 rounded-xl border border-white/5 p-4">
             <div className="flex items-center gap-2 mb-3">
-                <Shield size={14} className="text-purple-400" />
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Filtros de Seguridad</span>
+                <Target size={14} className="text-purple-400" />
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Estrategia v3 (Trend Strict)</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-                {/* Edge Filter */}
-                <div className={cn(
-                    "p-3 rounded-lg border flex items-center gap-3",
-                    filterStatus.edge.passed
-                        ? "bg-emerald-950/30 border-emerald-500/20"
-                        : "bg-rose-950/30 border-rose-500/20"
-                )}>
-                    <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        filterStatus.edge.passed ? "bg-emerald-500/20" : "bg-rose-500/20"
-                    )}>
-                        <Bug size={16} className={filterStatus.edge.passed ? "text-emerald-400" : "text-rose-400"} />
+            <div className="space-y-3">
+                <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold mb-1">
+                        <TrendingUp size={14} />
+                        Trigger: 3 Dígitos
                     </div>
-                    <div>
-                        <div className="text-[10px] font-mono font-bold text-slate-300">BORDA</div>
-                        <div className={cn(
-                            "text-[9px] font-mono",
-                            filterStatus.edge.passed ? "text-emerald-400" : "text-rose-400"
-                        )}>
-                            {filterStatus.edge.passed ? '✓ Limpio' : '✗ 0/9 detect'}
-                        </div>
-                    </div>
+                    <p className="text-[10px] text-slate-400">
+                        3 dígitos iguales consecutivos (ej: P, P, P) + Validación de Fuerza de Tendencia.
+                    </p>
                 </div>
 
-                {/* HFT Filter */}
-                <div className={cn(
-                    "p-3 rounded-lg border flex items-center gap-3",
-                    filterStatus.hft.passed
-                        ? "bg-emerald-950/30 border-emerald-500/20"
-                        : "bg-rose-950/30 border-rose-500/20"
-                )}>
-                    <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        filterStatus.hft.passed ? "bg-emerald-500/20" : "bg-rose-500/20"
-                    )}>
-                        <Zap size={16} className={filterStatus.hft.passed ? "text-emerald-400" : "text-rose-400"} />
+                <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-2 text-amber-400 text-xs font-bold mb-1">
+                        <Shield size={14} />
+                        Filtro Contextual
                     </div>
-                    <div>
-                        <div className="text-[10px] font-mono font-bold text-slate-300">HFT</div>
-                        <div className={cn(
-                            "text-[9px] font-mono",
-                            filterStatus.hft.passed ? "text-emerald-400" : "text-rose-400"
-                        )}>
-                            {filterStatus.hft.passed ? '✓ Normal' : '✗ >70% switch'}
-                        </div>
-                    </div>
+                    <p className="text-[10px] text-slate-400">
+                        Analiza la ruptura anterior. Evita entrar en tenencias débiles o ruido de mercado.
+                    </p>
                 </div>
 
-                {/* Friction Filter */}
-                <div className={cn(
-                    "p-3 rounded-lg border flex items-center gap-3",
-                    filterStatus.friction.passed
-                        ? "bg-emerald-950/30 border-emerald-500/20"
-                        : "bg-rose-950/30 border-rose-500/20"
-                )}>
-                    <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        filterStatus.friction.passed ? "bg-emerald-500/20" : "bg-rose-500/20"
-                    )}>
-                        <Activity size={16} className={filterStatus.friction.passed ? "text-emerald-400" : "text-rose-400"} />
+                <div className="p-3 bg-slate-900/50 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-2 text-violet-400 text-xs font-bold mb-1">
+                        <Sparkles size={14} />
+                        Smart Recovery (Max 4)
                     </div>
-                    <div>
-                        <div className="text-[10px] font-mono font-bold text-slate-300">FRICCIÓN</div>
-                        <div className={cn(
-                            "text-[9px] font-mono",
-                            filterStatus.friction.passed ? "text-emerald-400" : "text-rose-400"
-                        )}>
-                            {filterStatus.friction.passed ? '✓ Homogéneo' : '✗ Interrupt'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Trend Filter */}
-                <div className={cn(
-                    "p-3 rounded-lg border flex items-center gap-3",
-                    filterStatus.trend.passed
-                        ? "bg-emerald-950/30 border-emerald-500/20"
-                        : "bg-rose-950/30 border-rose-500/20"
-                )}>
-                    <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        filterStatus.trend.passed ? "bg-emerald-500/20" : "bg-rose-500/20"
-                    )}>
-                        <TrendingUp size={16} className={filterStatus.trend.passed ? "text-emerald-400" : "text-rose-400"} />
-                    </div>
-                    <div>
-                        <div className="text-[10px] font-mono font-bold text-slate-300">TREND</div>
-                        <div className={cn(
-                            "text-[9px] font-mono",
-                            filterStatus.trend.passed ? "text-emerald-400" : "text-rose-400"
-                        )}>
-                            {filterStatus.trend.passed ? '✓ Estable' : '✗ >70% sat'}
-                        </div>
-                    </div>
+                    <p className="text-[10px] text-slate-400">
+                        Pausa OBLIGATORIA tras Loss. Espera nueva secuencia para recuperar. Max 4 Gales.
+                    </p>
                 </div>
             </div>
         </div>
@@ -404,16 +271,16 @@ const BotSigma = () => {
                         </button>
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                                <span className="text-xl">🎰</span>
+                                <span className="text-xl">📈</span>
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                                     Bot Sigma
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase tracking-widest">
-                                        LGN
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-widest">
+                                        v3
                                     </span>
                                 </h1>
-                                <p className="text-xs text-slate-500 font-mono">Ley Grandes Números | 100 ticks</p>
+                                <p className="text-xs text-slate-500 font-mono">Trend Following | Smart Recovery</p>
                             </div>
                         </div>
                     </div>
@@ -481,8 +348,8 @@ const BotSigma = () => {
 
                                 <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                                     <div>
-                                        <span className="text-xs font-medium text-slate-200 block">Martingale</span>
-                                        <span className="text-[9px] text-slate-500">x2.1 por pérdida</span>
+                                        <span className="text-xs font-medium text-slate-200 block">Smart Martingale</span>
+                                        <span className="text-[9px] text-slate-500">x2.1 + pausa en loss</span>
                                     </div>
                                     <button
                                         onClick={() => setUseMartingale(!useMartingale)}
@@ -547,12 +414,12 @@ const BotSigma = () => {
                                         "text-xl font-mono font-bold",
                                         stats.totalProfit >= 0 ? "text-emerald-400" : "text-rose-400"
                                     )}>
-                                        ${stats.totalProfit.toFixed(2)}
+                                        ${(stats.totalProfit || 0).toFixed(2)}
                                     </div>
                                 </div>
                                 <div className="p-3 bg-black/30 rounded-lg border border-white/5">
-                                    <div className="text-[9px] text-slate-500 uppercase">Blocked</div>
-                                    <div className="text-xl font-mono font-bold text-orange-400">{stats.signalsBlocked}</div>
+                                    <div className="text-[9px] text-slate-500 uppercase">Gale</div>
+                                    <div className="text-xl font-mono font-bold text-purple-400">{stats.martingaleLevel || 0}</div>
                                 </div>
                             </div>
                         </div>
@@ -560,9 +427,8 @@ const BotSigma = () => {
 
                     {/* Center: Analysis */}
                     <div className="lg:col-span-5 space-y-4">
-                        <SaturationGauge />
-                        <SemaphoreDisplay />
-                        <FiltersPanel />
+                        <TrendStatusPanel />
+                        <StrategyInfoPanel />
                     </div>
 
                     {/* Right: Logs */}

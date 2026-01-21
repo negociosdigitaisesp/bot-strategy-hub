@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 interface AffiliateData {
     affiliateCode: string | null;
     affiliateBalance: number;
+    pendingBalance: number;  // New: blocked balance (20 day hold)
     totalEarnings: number;
     referredCount: number;
     isLoading: boolean;
@@ -15,6 +16,7 @@ export const useAffiliate = () => {
     const [data, setData] = useState<AffiliateData>({
         affiliateCode: null,
         affiliateBalance: 0,
+        pendingBalance: 0,
         totalEarnings: 0,
         referredCount: 0,
         isLoading: true,
@@ -25,6 +27,7 @@ export const useAffiliate = () => {
             setData({
                 affiliateCode: null,
                 affiliateBalance: 0,
+                pendingBalance: 0,
                 totalEarnings: 0,
                 referredCount: 0,
                 isLoading: false,
@@ -37,7 +40,7 @@ export const useAffiliate = () => {
                 // Fetch user's affiliate data
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
-                    .select('affiliate_code, affiliate_balance, total_earnings')
+                    .select('affiliate_code, affiliate_balance, pending_balance, total_earnings')
                     .eq('id', user.id)
                     .single();
 
@@ -60,6 +63,7 @@ export const useAffiliate = () => {
                 setData({
                     affiliateCode: profile.affiliate_code,
                     affiliateBalance: profile.affiliate_balance || 0,
+                    pendingBalance: profile.pending_balance || 0,
                     totalEarnings: profile.total_earnings || 0,
                     referredCount: count || 0,
                     isLoading: false,
@@ -107,7 +111,7 @@ export const useAffiliate = () => {
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('affiliate_code, affiliate_balance, total_earnings')
+            .select('affiliate_code, affiliate_balance, pending_balance, total_earnings')
             .eq('id', user.id)
             .single();
 
@@ -120,6 +124,7 @@ export const useAffiliate = () => {
             setData({
                 affiliateCode: profile.affiliate_code,
                 affiliateBalance: profile.affiliate_balance || 0,
+                pendingBalance: profile.pending_balance || 0,
                 totalEarnings: profile.total_earnings || 0,
                 referredCount: count || 0,
                 isLoading: false,

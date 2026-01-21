@@ -46,6 +46,7 @@ export const useBotSpeed = () => {
     const multiplierRef = useRef<number>(1); // Current martingale multiplier
     const isWaitingForContractRef = useRef<boolean>(false);
     const subscriptionIdRef = useRef<string | null>(null);
+    const totalProfitRef = useRef<number>(0);
 
     // Helper to add log
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -142,6 +143,8 @@ export const useBotSpeed = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: initialStakeRef.current,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 } else {
                     // LOSS - Classic Martingale: multiply stake by martingaleSize
                     const lossAmount = Math.abs(profit);
@@ -159,26 +162,26 @@ export const useBotSpeed = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: nextStake,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 }
 
+
                 // Check Stop Loss / Take Profit
-                setStats(prev => {
-                    if (configRef.current) {
-                        if (prev.totalProfit >= configRef.current.takeProfit) {
-                            addLog(`🏆 ¡META ALCANZADA! +$${prev.totalProfit.toFixed(2)}`, 'success');
-                            toast.success('¡Take Profit alcanzado!');
-                            stopBot();
-                            return prev;
-                        }
-                        if (prev.totalProfit <= -configRef.current.stopLoss) {
-                            addLog(`🛑 STOP LOSS activado. -$${Math.abs(prev.totalProfit).toFixed(2)}`, 'error');
-                            toast.error('Stop Loss activado');
-                            stopBot();
-                            return prev;
-                        }
+                if (configRef.current) {
+                    if (totalProfitRef.current >= configRef.current.takeProfit) {
+                        addLog(`🏆 ¡META ALCANZADA! +$${totalProfitRef.current.toFixed(2)}`, 'success');
+                        toast.success('¡Take Profit alcanzado!');
+                        stopBot();
+                        return;
                     }
-                    return prev;
-                });
+                    if (totalProfitRef.current <= -configRef.current.stopLoss) {
+                        addLog(`🛑 STOP LOSS activado. -$${Math.abs(totalProfitRef.current).toFixed(2)}`, 'error');
+                        toast.error('Stop Loss activado');
+                        stopBot();
+                        return;
+                    }
+                }
             }
         }
 
@@ -212,36 +215,37 @@ export const useBotSpeed = () => {
         });
         setLogs([]);
 
-        // Add message listener
-        socket.addEventListener('message', handleMessage);
-
-        // First, forget all tick subscriptions
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-
-        // Then subscribe to ticks after a short delay
-        setTimeout(() => {
-            const tickRequest = {
-                ticks: config.symbol || 'R_75',
-                subscribe: 1,
-            };
-            socket.send(JSON.stringify(tickRequest));
-        }, 100);
-
-        addLog(`🚀 Speed Bot iniciado en ${config.symbol || 'R_75'}`, 'success');
-        addLog(`💰 Stake: $${config.stake} | TP: $${config.takeProfit} | SL: $${config.stopLoss}`, 'info');
-        addLog(`📊 Estrategia: DIGITOVER > ${config.prediction || 1} (Automático)`, 'info');
-        addLog(`📈 Martingale: x${config.martingaleSize || 2} en pérdida`, 'info');
         addLog(`⚡ Modo automático - Operando continuamente...`, 'warning');
 
         setIsRunning(true);
         return true;
-    }, [socket, handleMessage, addLog]);
+    }, [addLog]);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        const config = configRef.current;
+        const symbol = config?.symbol || 'R_75';
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     // Stop the bot
     const stopBot = useCallback(() => {
         if (socket) {
-            socket.removeEventListener('message', handleMessage);
-
+            // Unsubscribe from ticks
             if (subscriptionIdRef.current) {
                 socket.send(JSON.stringify({ forget: subscriptionIdRef.current }));
             }

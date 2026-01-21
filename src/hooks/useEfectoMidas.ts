@@ -65,6 +65,7 @@ export const useEfectoMidas = () => {
     const lastPricesRef = useRef<number[]>([]);
     const consecutiveLossesRef = useRef<number>(0);
     const tickSubscriptionIdRef = useRef<string | null>(null);
+    const totalProfitRef = useRef<number>(0);
 
     // Sonido de moneda de oro
     const playGoldCoinSound = useCallback(() => {
@@ -313,13 +314,16 @@ export const useEfectoMidas = () => {
                     currentStakeRef.current = initialStakeRef.current;
                     consecutiveLossesRef.current = 0;
 
-                    setStats(prev => ({
-                        ...prev,
-                        wins: prev.wins + 1,
-                        totalProfit: prev.totalProfit + profit,
-                        currentStake: initialStakeRef.current,
-                        consecutiveLosses: 0,
-                    }));
+                    setStats(prev => {
+                        totalProfitRef.current = prev.totalProfit + profit;
+                        return {
+                            ...prev,
+                            wins: prev.wins + 1,
+                            totalProfit: prev.totalProfit + profit,
+                            currentStake: initialStakeRef.current,
+                            consecutiveLosses: 0,
+                        };
+                    });
                 } else {
                     // LOSS - Check Martingale
                     const lossAmount = Math.abs(profit);
@@ -346,13 +350,16 @@ export const useEfectoMidas = () => {
 
                     currentStakeRef.current = newStake;
 
-                    setStats(prev => ({
-                        ...prev,
-                        losses: prev.losses + 1,
-                        totalProfit: prev.totalProfit + profit,
-                        currentStake: newStake,
-                        consecutiveLosses: prev.consecutiveLosses + 1,
-                    }));
+                    setStats(prev => {
+                        totalProfitRef.current = prev.totalProfit + profit;
+                        return {
+                            ...prev,
+                            losses: prev.losses + 1,
+                            totalProfit: prev.totalProfit + profit,
+                            currentStake: newStake,
+                            consecutiveLosses: prev.consecutiveLosses + 1,
+                        };
+                    });
                 }
 
                 // Verificar Stop Loss / Take Profit
@@ -420,20 +427,7 @@ export const useEfectoMidas = () => {
         // Notificar sesión global
         setActiveBot('Efecto Midas');
 
-        // Agregar listener de mensajes
-        socket.addEventListener('message', handleMessage);
-
-        // Primero, olvidar todas las suscripciones de ticks
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-
-        // Luego suscribirse a ticks
-        setTimeout(() => {
-            const tickRequest = {
-                ticks: config.symbol || '1HZ100V',
-                subscribe: 1,
-            };
-            socket.send(JSON.stringify(tickRequest));
-        }, 100);
+        // Subscription is now handled by useEffect
 
         addLog(`⚡ PROTOCOLO MIDAS ACTIVADO`, 'gold');
         addLog(`🎯 Activo: ${config.symbol || '1HZ100V'} (Volatility 100 1s)`, 'info');
@@ -447,8 +441,8 @@ export const useEfectoMidas = () => {
 
     // Detener el bot
     const stopBot = useCallback(() => {
+        // Listener removal handled by useEffect cleanup
         if (socket) {
-            socket.removeEventListener('message', handleMessage);
             socket.send(JSON.stringify({ forget_all: 'ticks' }));
         }
 
@@ -460,13 +454,36 @@ export const useEfectoMidas = () => {
     }, [socket, handleMessage, addLog, setActiveBot]);
 
     // Limpiar al desmontar
+    // Limpiar al desmontar
     useEffect(() => {
         return () => {
-            if (isRunning) {
-                stopBot();
+            if (isRunningRef.current) { // Check ref instead of state to avoid deps
+                // We don't call stopBot here because it might trigger state updates on unmounted component
+                // Just ensure clean up happens via socket management
             }
         };
-    }, [isRunning, stopBot]);
+    }, []);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        const config = configRef.current;
+        const symbol = config?.symbol || '1HZ100V';
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     return {
         isRunning,

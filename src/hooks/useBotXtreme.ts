@@ -44,6 +44,7 @@ export const useBotXtreme = () => {
     const initialStakeRef = useRef<number>(0);
     const currentStakeRef = useRef<number>(0);
     const isWaitingForContractRef = useRef<boolean>(false);
+    const totalProfitRef = useRef<number>(0);
 
     // Fixed strategy values (hidden from user)
     const TRIGGER_DIGIT = 5;
@@ -131,6 +132,8 @@ export const useBotXtreme = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: initialStakeRef.current,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 } else {
                     // LOSS - Apply Martingale (stake + loss * 2)
                     const lossAmount = Math.abs(profit);
@@ -147,26 +150,26 @@ export const useBotXtreme = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: newStake,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 }
 
+
                 // Check Stop Loss / Take Profit
-                setStats(prev => {
-                    if (configRef.current) {
-                        if (prev.totalProfit >= configRef.current.takeProfit) {
-                            addLog(`🏆 ¡META ALCANZADA! +$${prev.totalProfit.toFixed(2)}`, 'success');
-                            toast.success('¡Take Profit alcanzado!');
-                            stopBot();
-                            return prev;
-                        }
-                        if (prev.totalProfit <= -configRef.current.stopLoss) {
-                            addLog(`🛑 STOP LOSS activado. -$${Math.abs(prev.totalProfit).toFixed(2)}`, 'error');
-                            toast.error('Stop Loss activado');
-                            stopBot();
-                            return prev;
-                        }
+                if (configRef.current) {
+                    if (totalProfitRef.current >= configRef.current.takeProfit) {
+                        addLog(`🏆 ¡META ALCANZADA! +$${totalProfitRef.current.toFixed(2)}`, 'success');
+                        toast.success('¡Take Profit alcanzado!');
+                        stopBot();
+                        return;
                     }
-                    return prev;
-                });
+                    if (totalProfitRef.current <= -configRef.current.stopLoss) {
+                        addLog(`🛑 STOP LOSS activado. -$${Math.abs(totalProfitRef.current).toFixed(2)}`, 'error');
+                        toast.error('Stop Loss activado');
+                        stopBot();
+                        return;
+                    }
+                }
             }
         }
 
@@ -202,35 +205,37 @@ export const useBotXtreme = () => {
         // Notify Global Session
         setActiveBot('Xtreme Bot');
 
-        // Add message listener
-        socket.addEventListener('message', handleMessage);
-
-        // First, forget all tick subscriptions
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-
-        // Then subscribe to ticks
-        setTimeout(() => {
-            const tickRequest = {
-                ticks: config.symbol || 'R_100',
-                subscribe: 1,
-            };
-            socket.send(JSON.stringify(tickRequest));
-        }, 100);
-
-        addLog(`🚀 Xtreme Bot iniciado en ${config.symbol || 'R_100'}`, 'success');
-        addLog(`💰 Stake: $${config.stake} | TP: $${config.takeProfit} | SL: $${config.stopLoss}`, 'info');
-        addLog(`📊 Estrategia: DIGITDIFF cuando dígito = ${TRIGGER_DIGIT}`, 'info');
-        addLog(`📈 Martingale: stake + (pérdida × 2)`, 'info');
         addLog(`⏳ Esperando dígito ${TRIGGER_DIGIT}...`, 'info');
 
         setIsRunning(true);
         return true;
-    }, [socket, isConnected, handleMessage, addLog, setActiveBot]);
+    }, [addLog, setActiveBot]);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        const config = configRef.current;
+        const symbol = config?.symbol || 'R_100';
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     // Stop the bot
     const stopBot = useCallback(() => {
         if (socket) {
-            socket.removeEventListener('message', handleMessage);
+            socket.send(JSON.stringify({ forget_all: 'ticks' }));
         }
 
         setActiveBot(null);

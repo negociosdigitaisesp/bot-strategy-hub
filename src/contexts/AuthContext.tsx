@@ -339,49 +339,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate('/');
         return { error: null, success: true };
       } else {
+        // --- GET REFERRAL CODE BEFORE SIGNUP ---
+        const referralCode = getReferralCodeFromStorage();
+        console.log('[SignUp] Referral code from storage:', referralCode);
+
         // Normal behavior with real Supabase
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            // Fix: ensure the correct redirect URL format matches your app's route
             emailRedirectTo: `${window.location.origin}/auth/callback`,
             data: {
-              // Add additional user metadata if needed
-              full_name: name || email.split('@')[0]
+              full_name: name || email.split('@')[0],
+              referral_code: referralCode || null  // Pass referral code in metadata
             }
           }
         });
 
         if (!error && data.user) {
+          console.log('[SignUp] User created:', data.user.id);
+
           // --- AFFILIATE TRACKING ---
           let referredBy: string | null = null;
-          const referralCode = getReferralCodeFromStorage();
+
           if (referralCode) {
-            console.log('[SignUp] Found referral code:', referralCode);
+            console.log('[SignUp] Looking up affiliate ID for code:', referralCode);
             referredBy = await lookupAffiliateId(referralCode);
             if (referredBy) {
-              console.log('[SignUp] Resolved affiliate ID:', referredBy);
+              console.log('[SignUp] ✅ Resolved affiliate ID:', referredBy);
+            } else {
+              console.warn('[SignUp] ⚠️ Affiliate code not found in database:', referralCode);
             }
           }
 
+          // Try to INSERT profile first (in case trigger didn't create it)
           const profileData: any = {
             id: data.user.id,
             full_name: name || email.split('@')[0],
             is_active: false,
           };
 
-          // Add referred_by if we found a valid affiliate
           if (referredBy) {
             profileData.referred_by = referredBy;
           }
 
-          const { error: profileError } = await supabase.from('profiles').insert(profileData);
-          if (profileError) {
-            console.error('Error inserting profile:', profileError);
-            toast.error('Cuenta creada, pero error al guardar el nombre. Contacte soporte.');
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert(profileData)
+            .select()
+            .single();
+
+          if (insertError) {
+            // If INSERT failed (likely due to trigger already creating profile), try UPDATE
+            if (insertError.code === '23505') {
+              console.log('[SignUp] Profile already exists (via trigger), updating with referred_by...');
+
+              const updateData: any = {
+                full_name: name || email.split('@')[0],
+              };
+
+              if (referredBy) {
+                updateData.referred_by = referredBy;
+              }
+
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update(updateData)
+                .eq('id', data.user.id);
+
+              if (updateError) {
+                console.error('[SignUp] ❌ Error updating profile:', updateError);
+                toast.error('Cuenta creada, pero error al guardar datos. Contacte soporte.');
+              } else {
+                console.log('[SignUp] ✅ Profile updated successfully with referred_by:', referredBy);
+                // Clear referral code after successful save
+                localStorage.removeItem('million_referral_code');
+                document.cookie = 'million_ref=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+              }
+            } else {
+              console.error('[SignUp] ❌ Error inserting profile:', insertError);
+              toast.error('Cuenta creada, pero error al guardar el nombre. Contacte soporte.');
+            }
           } else {
-            // Clear referral code after successful signup
+            console.log('[SignUp] ✅ Profile inserted successfully with referred_by:', referredBy);
+            // Clear referral code after successful save
             localStorage.removeItem('million_referral_code');
             document.cookie = 'million_ref=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
           }

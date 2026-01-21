@@ -52,6 +52,7 @@ export const useBotApalancamiento = () => {
     const tradingOptionRef = useRef<number>(0); // 0 = UNDER, 1 = OVER
     const tradesCounterRef = useRef<number>(0);
     const isWaitingForContractRef = useRef<boolean>(false);
+    const totalProfitRef = useRef<number>(0);
 
     // Helper to add log
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -188,6 +189,8 @@ export const useBotApalancamiento = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: initialStakeRef.current,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 } else {
                     // LOSS - Martingale
                     const lossAmount = Math.abs(profit);
@@ -214,26 +217,26 @@ export const useBotApalancamiento = () => {
                         totalProfit: prev.totalProfit + profit,
                         currentStake: currentStakeRef.current,
                     }));
+
+                    totalProfitRef.current = prev.totalProfit + profit;
                 }
 
+
                 // Check Stop Loss / Take Profit
-                setStats(prev => {
-                    if (configRef.current) {
-                        if (prev.totalProfit >= configRef.current.takeProfit) {
-                            addLog(`🏆 ¡META ALCANZADA! +$${prev.totalProfit.toFixed(2)}`, 'success');
-                            toast.success('¡Take Profit alcanzado!');
-                            stopBot();
-                            return prev;
-                        }
-                        if (prev.totalProfit <= -configRef.current.stopLoss) {
-                            addLog(`🛑 STOP LOSS activado. -$${Math.abs(prev.totalProfit).toFixed(2)}`, 'error');
-                            toast.error('Stop Loss activado');
-                            stopBot();
-                            return prev;
-                        }
+                if (configRef.current) {
+                    if (totalProfitRef.current >= configRef.current.takeProfit) {
+                        addLog(`🏆 ¡META ALCANZADA! +$${totalProfitRef.current.toFixed(2)}`, 'success');
+                        toast.success('¡Take Profit alcanzado!');
+                        stopBot();
+                        return;
                     }
-                    return prev;
-                });
+                    if (totalProfitRef.current <= -configRef.current.stopLoss) {
+                        addLog(`🛑 STOP LOSS activado. -$${Math.abs(totalProfitRef.current).toFixed(2)}`, 'error');
+                        toast.error('Stop Loss activado');
+                        stopBot();
+                        return;
+                    }
+                }
             }
         }
 
@@ -272,35 +275,39 @@ export const useBotApalancamiento = () => {
         });
         setLogs([]);
 
-        // Add message listener
-        socket.addEventListener('message', handleMessage);
-
-        // First, forget all tick subscriptions
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-
-        // Then subscribe to ticks after a short delay
-        setTimeout(() => {
-            const tickRequest = {
-                ticks: config.symbol || '1HZ75V',
-                subscribe: 1,
-            };
-            socket.send(JSON.stringify(tickRequest));
-        }, 100);
-
-        addLog(`🚀 Bot del Apalancamiento iniciado en ${config.symbol || '1HZ75V'}`, 'success');
-        addLog(`💰 Stake: $${config.stake} | TP: $${config.takeProfit} | SL: $${config.stopLoss}`, 'info');
-        addLog(`📊 Estrategia: OVER/UNDER Alternante | Martingale: x${config.martingaleSize}`, 'info');
         addLog(`🔄 Máx pérdidas: ${config.maxLosses} | Ciclo: ${config.tradesPerCycle} trades`, 'info');
 
         setIsRunning(true);
         return true;
-    }, [socket, handleMessage, addLog]);
+    }, [addLog]);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        const config = configRef.current;
+        const symbol = config?.symbol || '1HZ75V';
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     // Stop the bot
     const stopBot = useCallback(() => {
         if (socket) {
-            socket.removeEventListener('message', handleMessage);
-            socket.send(JSON.stringify({ forget_all: 'ticks' }));
+            if (socket) {
+                socket.send(JSON.stringify({ forget_all: 'ticks' }));
+            }
         }
 
         addLog('🛑 Bot del Apalancamiento detenido', 'warning');

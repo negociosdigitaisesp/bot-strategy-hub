@@ -458,21 +458,21 @@ serve(async (req) => {
             // Get affiliate profile
             const { data: affiliateProfile, error: affiliateError } = await supabase
                 .from("profiles")
-                .select("id, email, full_name, affiliate_balance, total_earnings")
+                .select("id, email, full_name, pending_balance, total_earnings")
                 .eq("id", buyerReferredBy)
                 .single();
 
             if (affiliateError || !affiliateProfile) {
                 console.error("[HOTMART-WEBHOOK] Afiliado não encontrado:", affiliateError);
             } else {
-                // Update affiliate balance
-                const newBalance = (affiliateProfile.affiliate_balance || 0) + commissionAmount;
+                // Update affiliate PENDING balance (not available yet - 20 day hold)
+                const newPendingBalance = (affiliateProfile.pending_balance || 0) + commissionAmount;
                 const newTotalEarnings = (affiliateProfile.total_earnings || 0) + commissionAmount;
 
                 const { error: balanceError } = await supabase
                     .from("profiles")
                     .update({
-                        affiliate_balance: newBalance,
+                        pending_balance: newPendingBalance,  // ⚠️ CHANGED: Goes to PENDING, not available
                         total_earnings: newTotalEarnings,
                         updated_at: new Date().toISOString(),
                     })
@@ -481,7 +481,7 @@ serve(async (req) => {
                 if (balanceError) {
                     console.error("[HOTMART-WEBHOOK] Erro ao atualizar saldo do afiliado:", balanceError);
                 } else {
-                    console.log(`[HOTMART-WEBHOOK] ✅ Saldo do afiliado atualizado: $${newBalance}`);
+                    console.log(`[HOTMART-WEBHOOK] ✅ Saldo PENDENTE do afiliado atualizado: $${newPendingBalance} (bloqueado por 20 días)`);
                 }
 
                 // Create referral transaction record

@@ -13,12 +13,6 @@ interface BotConfig {
 }
 
 type Parity = 'even' | 'odd';
-type SemaphoreStatus = 'neutral' | 'yellow' | 'green' | 'red';
-
-interface FilterResult {
-    passed: boolean;
-    reason?: string;
-}
 
 interface BotStats {
     wins: number;
@@ -26,18 +20,13 @@ interface BotStats {
     totalProfit: number;
     currentStake: number;
     martingaleLevel: number;
-    saturationPercent: number;
-    dominantSide: Parity | null;
     consecutiveCount: number;
     signalsTriggered: number;
     signalsBlocked: number;
-}
-
-interface FilterStatus {
-    edge: FilterResult;
-    hft: FilterResult;
-    friction: FilterResult;
-    trend: FilterResult;
+    lastParity: Parity | null;
+    isPingPong: boolean;
+    isOnCooldown: boolean;
+    trendStrength?: 'strong' | 'medium' | 'weak';
 }
 
 interface LogEntry {
@@ -48,29 +37,25 @@ interface LogEntry {
 }
 
 // ============================================================================
-// BOT SIGMA CONFIG - LEY DE LOS GRANDES NÚMEROS
+// BOT SIGMA CONFIG v3 - STRICT TREND FOLLOWING
 // ============================================================================
 const SIGMA_CONFIG = {
     SYMBOL: '1HZ10V',
     SYMBOL_NAME: 'Volatility 10 (1s)',
 
-    // ANÁLISIS DE SATURACIÓN
-    HISTORY_SIZE: 100,                // 100 ticks para calcular saturación
-    SATURATION_THRESHOLD: 55,         // >55% = Saturación detectada
-    STRONG_SATURATION_THRESHOLD: 60,  // >60% = Saturación fuerte
+    // TREND TRIGGER
+    CONSECUTIVE_TRIGGER: 3,           // 3 dígitos iguales = entrada
 
-    // TRIGGER DE EXAUSTÃO
-    EXHAUSTION_SEQUENCE: 4,           // 4 dígitos iguales = trigger
-
-    // FILTROS
-    HFT_THRESHOLD: 0.7,               // >70% trocas = alta frequência
-    HFT_WINDOW: 20,                   // Janela para calcular HFT
-    TREND_MAX_SATURATION: 70,         // >70% = trend muito forte
-    MAX_CONSECUTIVE: 5,               // >5 = sequência muito longa
+    // PING-PONG FILTER
+    PING_PONG_WINDOW: 10,             // Ventana de análisis
+    PING_PONG_THRESHOLD: 0.70,        // >70% alternancia = bloquear
 
     // RISK
     MARTINGALE_FACTOR: 2.1,
-    MAX_MARTINGALE_LEVELS: 4,
+    MAX_MARTINGALE_LEVELS: 4,         // Max gales reducido a 4
+
+    // SMART RECOVERY
+    COOLDOWN_AFTER_LOSS: true,        // Pausa OBLIGATORIA después de pérdida
 };
 
 export const useBotSigma = () => {
@@ -86,36 +71,28 @@ export const useBotSigma = () => {
         totalProfit: 0,
         currentStake: 0.35,
         martingaleLevel: 0,
-        saturationPercent: 50,
-        dominantSide: null,
         consecutiveCount: 0,
         signalsTriggered: 0,
         signalsBlocked: 0,
+        lastParity: null,
+        isPingPong: false,
+        isOnCooldown: false,
     });
     const [logs, setLogs] = useState<LogEntry[]>([]);
-
-    // Analysis State
-    const [saturationPercent, setSaturationPercent] = useState(50);
-    const [dominantSide, setDominantSide] = useState<Parity | null>(null);
-    const [semaphore, setSemaphore] = useState<SemaphoreStatus>('neutral');
-    const [consecutiveCount, setConsecutiveCount] = useState(0);
-    const [lastSequence, setLastSequence] = useState<Parity[]>([]);
-    const [filterStatus, setFilterStatus] = useState<FilterStatus>({
-        edge: { passed: true },
-        hft: { passed: true },
-        friction: { passed: true },
-        trend: { passed: true },
-    });
 
     // Refs
     const isRunningRef = useRef(false);
     const isWaitingForContractRef = useRef(false);
-    const tickHistoryRef = useRef<number[]>([]);
     const parityHistoryRef = useRef<Parity[]>([]);
     const configRef = useRef<BotConfig | null>(null);
     const initialStakeRef = useRef(0.35);
     const currentStakeRef = useRef(0.35);
     const martingaleLevelRef = useRef(0);
+    const totalProfitRef = useRef(0);
+
+    // Smart Recovery Refs
+    const isOnCooldownRef = useRef(false);           // Pausa después de pérdida
+    const pendingMartingaleRef = useRef(false);      // Gale esperando patrón
 
     // --- ADD LOG ---
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -134,28 +111,7 @@ export const useBotSigma = () => {
         return lastDigit % 2 === 0 ? 'even' : 'odd';
     }, []);
 
-    // --- GET LAST DIGIT ---
-    const getLastDigit = useCallback((quote: number): number => {
-        return Math.floor(quote * 100) % 10;
-    }, []);
-
-    // --- CALCULATE SATURATION ---
-    const calculateSaturation = useCallback((history: Parity[]): { percent: number; dominant: Parity | null } => {
-        if (history.length < 10) return { percent: 50, dominant: null };
-
-        const evenCount = history.filter(p => p === 'even').length;
-        const evenPercent = (evenCount / history.length) * 100;
-        const oddPercent = 100 - evenPercent;
-
-        if (evenPercent > oddPercent) {
-            return { percent: evenPercent, dominant: 'even' };
-        } else if (oddPercent > evenPercent) {
-            return { percent: oddPercent, dominant: 'odd' };
-        }
-        return { percent: 50, dominant: null };
-    }, []);
-
-    // --- COUNT CONSECUTIVE ---
+    // --- COUNT CONSECUTIVE (Same parity at end) ---
     const countConsecutive = useCallback((history: Parity[]): { count: number; parity: Parity | null } => {
         if (history.length === 0) return { count: 0, parity: null };
 
@@ -173,26 +129,37 @@ export const useBotSigma = () => {
         return { count, parity: lastParity };
     }, []);
 
-    // --- DETERMINE SEMAPHORE ---
-    const determineSemaphore = useCallback((consecutive: number): SemaphoreStatus => {
-        if (consecutive >= 5) return 'red';
-        if (consecutive >= 4) return 'green';
-        if (consecutive >= 3) return 'yellow';
-        return 'neutral';
-    }, []);
+    // --- ANALYZE CONTEXT (Strength of Trend) ---
+    const analyzeContext = useCallback((history: Parity[], consecutive: number): 'strong' | 'medium' | 'weak' => {
+        // history = [..., P, I, P, P, P] (consecutive = 3, parity = P)
+        // We want to check what was BEFORE the sequence.
+        // Index of last element in sequence = length - 1
+        // Index of element BEFORE sequence = length - 1 - consecutive
 
-    // --- FILTER: EDGE (0 or 9) ---
-    const checkEdgeFilter = useCallback((lastDigit: number): FilterResult => {
-        if (lastDigit === 0 || lastDigit === 9) {
-            return { passed: false, reason: 'BORDA: Dígito de borda detectado (0/9)' };
+        const indexBefore = history.length - 1 - consecutive;
+        if (indexBefore < 0) return 'medium'; // Not enough history
+
+        const beforeParity = history[indexBefore];
+        const lastParity = history[history.length - 1];
+
+        // If before was Different -> Clean Break -> STRONG
+        if (beforeParity !== lastParity) {
+            return 'strong';
         }
-        return { passed: true };
+
+        // This case shouldn't technically happen if countConsecutive is correct, 
+        // because if beforeParity == lastParity, consecutive would be +1.
+        // Unless there was a gap?
+
+        return 'medium';
     }, []);
 
-    // --- FILTER: HFT (High Frequency Trading) ---
-    const checkHFTFilter = useCallback((history: Parity[]): FilterResult => {
-        const window = history.slice(-SIGMA_CONFIG.HFT_WINDOW);
-        if (window.length < SIGMA_CONFIG.HFT_WINDOW) return { passed: true };
+    // --- PING-PONG FILTER ---
+    const checkPingPongFilter = useCallback((history: Parity[]): { isPingPong: boolean; switchRate: number } => {
+        const window = history.slice(-SIGMA_CONFIG.PING_PONG_WINDOW);
+        if (window.length < SIGMA_CONFIG.PING_PONG_WINDOW) {
+            return { isPingPong: false, switchRate: 0 };
+        }
 
         let switches = 0;
         for (let i = 1; i < window.length; i++) {
@@ -200,33 +167,10 @@ export const useBotSigma = () => {
         }
 
         const switchRate = switches / (window.length - 1);
-        if (switchRate > SIGMA_CONFIG.HFT_THRESHOLD) {
-            return { passed: false, reason: `HFT: Alta frecuencia (${(switchRate * 100).toFixed(0)}%)` };
-        }
-        return { passed: true };
-    }, []);
-
-    // --- FILTER: FRICTION ---
-    const checkFrictionFilter = useCallback((history: Parity[]): FilterResult => {
-        const last4 = history.slice(-4);
-        if (last4.length < 4) return { passed: true };
-
-        const isClean = last4.every(p => p === last4[0]);
-        if (!isClean) {
-            return { passed: false, reason: 'FRICCIÓN: Secuencia no homogénea' };
-        }
-        return { passed: true };
-    }, []);
-
-    // --- FILTER: TREND FLOW ---
-    const checkTrendFilter = useCallback((saturation: number, consecutive: number): FilterResult => {
-        if (saturation > SIGMA_CONFIG.TREND_MAX_SATURATION) {
-            return { passed: false, reason: `TREND: Saturación muy alta (${saturation.toFixed(0)}%)` };
-        }
-        if (consecutive >= SIGMA_CONFIG.MAX_CONSECUTIVE + 1) {
-            return { passed: false, reason: `TREND: Secuencia muy larga (${consecutive})` };
-        }
-        return { passed: true };
+        return {
+            isPingPong: switchRate >= SIGMA_CONFIG.PING_PONG_THRESHOLD,
+            switchRate
+        };
     }, []);
 
     // --- EXECUTE TRADE ---
@@ -265,72 +209,77 @@ export const useBotSigma = () => {
         if (!isRunningRef.current || isWaitingForContractRef.current) return;
 
         const parity = getParityFromTick(quote);
-        const lastDigit = getLastDigit(quote);
 
-        // Update histories
-        tickHistoryRef.current = [...tickHistoryRef.current, quote].slice(-SIGMA_CONFIG.HISTORY_SIZE);
-        parityHistoryRef.current = [...parityHistoryRef.current, parity].slice(-SIGMA_CONFIG.HISTORY_SIZE);
+        // Update history
+        parityHistoryRef.current = [...parityHistoryRef.current, parity].slice(-50);
 
         // Need minimum data
-        if (parityHistoryRef.current.length < 20) {
-            addLog(`📊 Recolectando datos... ${parityHistoryRef.current.length}/${SIGMA_CONFIG.HISTORY_SIZE}`, 'info');
+        if (parityHistoryRef.current.length < 5) {
+            addLog(`📊 Recolectando datos... ${parityHistoryRef.current.length}/5`, 'info');
             return;
         }
 
-        // Calculate saturation
-        const { percent, dominant } = calculateSaturation(parityHistoryRef.current);
-        setSaturationPercent(percent);
-        setDominantSide(dominant);
-        setStats(prev => ({ ...prev, saturationPercent: percent, dominantSide: dominant }));
+        // Count consecutive same parity
+        const { count: consecutive, parity: lastParity } = countConsecutive(parityHistoryRef.current);
 
-        // Count consecutive
-        const { count: consecutive, parity: consecutiveParity } = countConsecutive(parityHistoryRef.current);
-        setConsecutiveCount(consecutive);
-        setLastSequence(parityHistoryRef.current.slice(-4));
-        setStats(prev => ({ ...prev, consecutiveCount: consecutive }));
+        // Analyze Context
+        const trendStrength = analyzeContext(parityHistoryRef.current, consecutive);
 
-        // Determine semaphore
-        const semaphoreStatus = determineSemaphore(consecutive);
-        setSemaphore(semaphoreStatus);
+        // Check Ping-Pong Filter
+        const { isPingPong, switchRate } = checkPingPongFilter(parityHistoryRef.current);
 
-        // Check conditions for entry
-        const isSaturated = percent >= SIGMA_CONFIG.SATURATION_THRESHOLD;
-        const isExhausted = consecutive >= SIGMA_CONFIG.EXHAUSTION_SEQUENCE;
+        // Update stats for UI
+        setStats(prev => ({
+            ...prev,
+            consecutiveCount: consecutive,
+            lastParity,
+            isPingPong,
+            isOnCooldown: isOnCooldownRef.current,
+            trendStrength
+        }));
 
-        if (!isSaturated || !isExhausted) {
-            // Not ready yet
-            if (semaphoreStatus === 'yellow') {
-                addLog(`🟡 Preparando... Secuencia: ${consecutive}/4`, 'info');
+        // --- SMART RECOVERY: Cooldown Check ---
+        if (isOnCooldownRef.current) {
+            // Esperando nuevo patrón de 3 iguales (fresh start)
+            // IMPORTANTE: Debemos asegurarnos que es una NUEVA secuencia, no la misma que causó el loss.
+            // Pero como paramos de operar, el mercado sigue. Si vemos 3 iguales ahora, es una nueva oportunidad.
+            if (consecutive >= SIGMA_CONFIG.CONSECUTIVE_TRIGGER) {
+                // Check strength for reentry
+                if (trendStrength === 'strong') {
+                    isOnCooldownRef.current = false;
+                    addLog(`✅ Nueva Tendencia Fuerte. Fin del cooldown.`, 'success');
+                    // Continue to entry logic
+                } else {
+                    if (Math.random() < 0.2) addLog(`⚠️ Tendencia débil para recuperación. Esperando...`, 'warning');
+                    return;
+                }
+            } else {
+                if (Math.random() < 0.1) {
+                    addLog(`⏸️ COOLDOWN: Esperando patrón (${consecutive}/${SIGMA_CONFIG.CONSECUTIVE_TRIGGER})...`, 'warning');
+                }
+                return;
             }
-            return;
         }
 
-        // Apply filters
-        const edgeResult = checkEdgeFilter(lastDigit);
-        const hftResult = checkHFTFilter(parityHistoryRef.current);
-        const frictionResult = checkFrictionFilter(parityHistoryRef.current);
-        const trendResult = checkTrendFilter(percent, consecutive);
-
-        setFilterStatus({
-            edge: edgeResult,
-            hft: hftResult,
-            friction: frictionResult,
-            trend: trendResult,
-        });
-
-        // Check if any filter failed
-        const allFilters = [edgeResult, hftResult, frictionResult, trendResult];
-        const failedFilter = allFilters.find(f => !f.passed);
-
-        if (failedFilter) {
-            addLog(`🚫 ${failedFilter.reason}`, 'filter');
+        // --- PING-PONG FILTER ---
+        if (isPingPong) {
+            addLog(`🚫 PING-PONG: Choppy market (${(switchRate * 100).toFixed(0)}%). Bloqueado.`, 'filter');
             setStats(prev => ({ ...prev, signalsBlocked: prev.signalsBlocked + 1 }));
             return;
         }
 
-        // Check risk system
+        // --- TREND TRIGGER: 3 CONSECUTIVE SAME ---
+        if (consecutive < SIGMA_CONFIG.CONSECUTIVE_TRIGGER) {
+            // Not enough consecutive
+            if (Math.random() < 0.1) {
+                addLog(`🔍 Analizando... Secuencia: ${consecutive}/${SIGMA_CONFIG.CONSECUTIVE_TRIGGER}`, 'info');
+            }
+            return;
+        }
+
+        // --- RISK SYSTEM CHECK ---
         if (riskEnabled) {
-            const safetyCheck = checkSafetyLock(stats.totalProfit);
+            const safetyCheck = checkSafetyLock(totalProfitRef.current);
             if (!safetyCheck.allowed) {
                 addLog(`🛑 ${safetyCheck.reason}`, 'warning');
                 isRunningRef.current = false;
@@ -340,16 +289,20 @@ export const useBotSigma = () => {
             }
         }
 
-        // ENTRY: Bet on REVERSAL
-        const betOn: Parity = dominant === 'even' ? 'odd' : 'even';
+        // --- ENTRY: BET ON SAME SIDE (TREND FOLLOWING) ---
+        const betOn: Parity = lastParity!;
         const betName = betOn === 'even' ? 'PAR' : 'IMPAR';
 
         isWaitingForContractRef.current = true;
-        executeTrade(betOn, `🎯 REVERSIÓN >> ${betName} (Sat: ${percent.toFixed(0)}%, Seq: ${consecutive})`);
 
-    }, [getParityFromTick, getLastDigit, calculateSaturation, countConsecutive, determineSemaphore,
-        checkEdgeFilter, checkHFTFilter, checkFrictionFilter, checkTrendFilter, executeTrade,
-        addLog, riskEnabled, checkSafetyLock, stats.totalProfit]);
+        const strengthEmoji = trendStrength === 'strong' ? '💪' : '⚠️';
+        const galeInfo = pendingMartingaleRef.current ? ` | GALE ${martingaleLevelRef.current}` : '';
+        executeTrade(betOn, `📈 TENDENCIA ${strengthEmoji} >> ${betName} (Seq: ${consecutive})${galeInfo}`);
+
+        // Clear pending martingale flag
+        pendingMartingaleRef.current = false;
+
+    }, [getParityFromTick, countConsecutive, analyzeContext, checkPingPongFilter, executeTrade, addLog, riskEnabled, checkSafetyLock]);
 
     // --- PROCESS CONTRACT RESULT ---
     const processContractResult = useCallback((result: { profit: number; status: string }) => {
@@ -358,6 +311,7 @@ export const useBotSigma = () => {
         const config = configRef.current;
         const isWin = result.profit > 0;
 
+        // Update stats
         setStats(prev => {
             const newStats = {
                 ...prev,
@@ -365,35 +319,51 @@ export const useBotSigma = () => {
                 losses: !isWin ? prev.losses + 1 : prev.losses,
                 totalProfit: prev.totalProfit + result.profit,
             };
+            totalProfitRef.current = newStats.totalProfit;
+            return newStats;
+        });
 
-            updateStats(result.profit, isWin);
+        updateStats(result.profit, isWin);
 
-            if (isWin) {
+        if (isWin) {
+            // WIN - Reset stake
+            currentStakeRef.current = initialStakeRef.current;
+            martingaleLevelRef.current = 0;
+            isOnCooldownRef.current = false; // Just in case
+            pendingMartingaleRef.current = false;
+
+            addLog(`✅ ¡VICTORIA! +$${result.profit.toFixed(2)} | Reset`, 'success');
+
+            if ((window as any).showProfitNotification) {
+                (window as any).showProfitNotification('Bot Sigma', result.profit);
+            }
+        } else {
+            // LOSS - Smart Martingale
+            addLog(`❌ PÉRDIDA -$${Math.abs(result.profit).toFixed(2)}`, 'error');
+
+            if (config.useMartingale && martingaleLevelRef.current < SIGMA_CONFIG.MAX_MARTINGALE_LEVELS) {
+                martingaleLevelRef.current += 1;
+                currentStakeRef.current = Math.round(initialStakeRef.current * Math.pow(SIGMA_CONFIG.MARTINGALE_FACTOR, martingaleLevelRef.current) * 100) / 100;
+
+                // SMART RECOVERY: Activate cooldown IMMEDIATELY
+                isOnCooldownRef.current = true;
+                pendingMartingaleRef.current = true;
+                addLog(`⏸️ PAUSA OBLIGATORIA: Esperando nueva secuencia de 3.`, 'warning');
+            } else {
                 currentStakeRef.current = initialStakeRef.current;
                 martingaleLevelRef.current = 0;
-                addLog(`✅ VICTORIA +$${result.profit.toFixed(2)} | Reset`, 'success');
-
-                if ((window as any).showProfitNotification) {
-                    (window as any).showProfitNotification('Bot Sigma', result.profit);
-                }
-            } else {
-                if (config.useMartingale && martingaleLevelRef.current < SIGMA_CONFIG.MAX_MARTINGALE_LEVELS) {
-                    martingaleLevelRef.current += 1;
-                    currentStakeRef.current = Math.round(initialStakeRef.current * Math.pow(SIGMA_CONFIG.MARTINGALE_FACTOR, martingaleLevelRef.current) * 100) / 100;
-                    addLog(`❌ PÉRDIDA | Gale ${martingaleLevelRef.current}: $${currentStakeRef.current.toFixed(2)}`, 'error');
-                } else {
-                    currentStakeRef.current = initialStakeRef.current;
-                    martingaleLevelRef.current = 0;
-                    addLog(`❌ PÉRDIDA | Reset`, 'error');
-                }
+                isOnCooldownRef.current = false;
+                pendingMartingaleRef.current = false;
+                addLog(`🔄 Max Gale alcanzado. Reset.`, 'error');
             }
+        }
 
-            return {
-                ...newStats,
-                currentStake: currentStakeRef.current,
-                martingaleLevel: martingaleLevelRef.current,
-            };
-        });
+        setStats(prev => ({
+            ...prev,
+            currentStake: currentStakeRef.current,
+            martingaleLevel: martingaleLevelRef.current,
+            isOnCooldown: isOnCooldownRef.current,
+        }));
 
         isWaitingForContractRef.current = false;
     }, [updateStats, addLog]);
@@ -418,7 +388,7 @@ export const useBotSigma = () => {
             }
 
             if (data.msg_type === 'buy' && data.error) {
-                addLog(`ERROR: ${data.error.message}`, 'error');
+                addLog(`Error: ${data.error.message}`, 'error');
                 isWaitingForContractRef.current = false;
             }
 
@@ -428,10 +398,32 @@ export const useBotSigma = () => {
                     processContractResult({ profit: parseFloat(contract.profit), status: contract.status });
                 }
             }
+
+            if (data.error && data.msg_type !== 'buy') {
+                addLog(`Error API: ${data.error.message}`, 'error');
+            }
         } catch (error) {
             console.error('[BotSigma] Error parsing message:', error);
         }
     }, [socket, processTick, processContractResult, addLog]);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: SIGMA_CONFIG.SYMBOL,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     // --- START BOT ---
     const startBot = useCallback((config: BotConfig) => {
@@ -446,30 +438,36 @@ export const useBotSigma = () => {
         initialStakeRef.current = config.stake;
         currentStakeRef.current = config.stake;
         martingaleLevelRef.current = 0;
+        totalProfitRef.current = 0;
         isRunningRef.current = true;
         isWaitingForContractRef.current = false;
-        tickHistoryRef.current = [];
+        isOnCooldownRef.current = false;
+        pendingMartingaleRef.current = false;
         parityHistoryRef.current = [];
 
         setIsRunning(true);
         setActiveBot('Bot Sigma');
-        setStats(prev => ({
-            ...prev,
+        setStats({
+            wins: 0,
+            losses: 0,
+            totalProfit: 0,
             currentStake: config.stake,
             martingaleLevel: 0,
-        }));
+            consecutiveCount: 0,
+            signalsTriggered: 0,
+            signalsBlocked: 0,
+            lastParity: null,
+            isPingPong: false,
+            isOnCooldown: false,
+        });
+        setLogs([]);
 
-        // Subscribe to ticks
-        socket.send(JSON.stringify({
-            ticks: SIGMA_CONFIG.SYMBOL,
-            subscribe: 1,
-        }));
+        addLog(`🎯 BOT SIGMA v3 - STRICT TREND`, 'success');
+        addLog(`📈 Estrategia: Sequencia de ${SIGMA_CONFIG.CONSECUTIVE_TRIGGER} dígitos iguales`, 'info');
+        addLog(`💡 Smart Recovery: Pausa obligatoria después de Loss`, 'info');
+        addLog(`🛡️ Max Gales: ${SIGMA_CONFIG.MAX_MARTINGALE_LEVELS}`, 'info');
 
-        addLog(`🎰 BOT SIGMA ACTIVADO - Ley de los Grandes Números`, 'success');
-        addLog(`📊 Analizando ${SIGMA_CONFIG.HISTORY_SIZE} ticks...`, 'info');
-        addLog(`🎯 Saturación > ${SIGMA_CONFIG.SATURATION_THRESHOLD}% + Secuencia de ${SIGMA_CONFIG.EXHAUSTION_SEQUENCE}`, 'info');
-
-        toast.success('Bot Sigma Activado', {
+        toast.success('Bot Sigma v3 Activado', {
             description: `Operando en ${SIGMA_CONFIG.SYMBOL_NAME}`,
         });
     }, [socket, isConnected, setActiveBot, addLog]);
@@ -490,25 +488,11 @@ export const useBotSigma = () => {
         toast.info('Bot Sigma Detenido');
     }, [socket, setActiveBot, addLog]);
 
-    // Effect: Message listener
-    useEffect(() => {
-        if (!socket) return;
-
-        socket.addEventListener('message', handleMessage);
-        return () => socket.removeEventListener('message', handleMessage);
-    }, [socket, handleMessage]);
-
     return {
         isRunning,
         isConnected,
         stats,
         logs,
-        saturationPercent,
-        dominantSide,
-        semaphore,
-        consecutiveCount,
-        lastSequence,
-        filterStatus,
         startBot,
         stopBot,
     };

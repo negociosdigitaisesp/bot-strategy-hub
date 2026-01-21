@@ -94,8 +94,7 @@ export const useBotQuantum = () => {
 
         isRunningRef.current = false;
 
-        if (socket && handlerRef.current) {
-            socket.removeEventListener('message', handlerRef.current);
+        if (socket) {
             socket.send(JSON.stringify({ forget_all: 'ticks' }));
         }
 
@@ -343,40 +342,35 @@ export const useBotQuantum = () => {
         });
         setLogs([]);
 
-        // Store handler reference for cleanup
-        handlerRef.current = handleMessage;
-
-        // Add message listener
-        socket.addEventListener('message', handleMessage);
-
-        // First, forget all tick subscriptions
-        socket.send(JSON.stringify({ forget_all: 'ticks' }));
-
-        // Then subscribe to ticks after a short delay
-        setTimeout(() => {
-            if (isRunningRef.current && socket.readyState === WebSocket.OPEN) {
-                const tickRequest = {
-                    ticks: config.symbol || 'R_100',
-                    subscribe: 1,
-                };
-                socket.send(JSON.stringify(tickRequest));
-            }
-        }, 100);
-
-        addLog(`🚀 Quantum Bot iniciado en ${config.symbol || 'R_100'}`, 'success');
-        addLog(`💰 Stake: $${config.stake} | TP: $${config.takeProfit} | SL: $${config.stopLoss}`, 'info');
-        addLog(`📊 Soros: ${config.sorosRounds} rondas | Martingale: ${config.martingaleCount}`, 'info');
-        addLog(`🔧 División MG: ${config.martingaleDivision} | Multiplicador: ${config.martingaleMultiplier}`, 'info');
-
         setIsRunning(true);
         return true;
-    }, [socket, handleMessage, addLog, generateRandomDigit]);
+    }, [addLog, generateRandomDigit]);
+
+    // --- SOCKET MANAGEMENT ---
+    useEffect(() => {
+        if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        const onMessage = (event: MessageEvent) => handleMessage(event);
+        socket.addEventListener('message', onMessage);
+
+        const config = configRef.current;
+        const symbol = config?.symbol || 'R_100';
+
+        // Subscribe to ticks
+        socket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1,
+        }));
+
+        return () => {
+            socket.removeEventListener('message', onMessage);
+        };
+    }, [isRunning, socket, handleMessage]);
 
     // Cleanup on unmount only
     useEffect(() => {
         return () => {
-            if (isRunningRef.current && socket && handlerRef.current) {
-                socket.removeEventListener('message', handlerRef.current);
+            if (isRunningRef.current && socket) {
                 socket.send(JSON.stringify({ forget_all: 'ticks' }));
             }
         };

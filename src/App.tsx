@@ -434,7 +434,7 @@ const App = () => {
                     </Routes>
                     <TelegramFloatingButton />
                     <FloatingUpgradeButton />
-                    <MarketingOverlay />
+
                   </div>
                 </PricingModalProvider>
               </TradingSessionProvider>
