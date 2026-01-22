@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { Shield, Key, CheckCircle2, AlertCircle, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { AffiliateModal } from './AffiliateModal';
 
 export const DerivConnectionForm = () => {
     const { isConnected, isConnecting, connect, disconnect, lastError, account } = useDeriv();
     const [inputToken, setInputToken] = useState('');
+    const [showAffiliateModal, setShowAffiliateModal] = useState(false);
 
     const handleConnect = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -13,22 +15,27 @@ export const DerivConnectionForm = () => {
         await connect(inputToken.trim());
     };
 
+    const handleConfigClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setShowAffiliateModal(true);
+    };
+
     if (isConnected && account) {
         return (
-            <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-xl p-6 shadow-sm">
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+            <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-2xl p-4 sm:p-6 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 shrink-0 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                             <CheckCircle2 size={24} />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-lg text-emerald-500">Conectado con Éxito</h3>
-                            <p className="text-sm text-muted-foreground">Su cuenta Deriv está activa y vinculada.</p>
+                            <h3 className="font-bold text-lg text-emerald-400 leading-tight">Conectado con Éxito</h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground opacity-80">Su cuenta Deriv está activa y vinculada.</p>
                         </div>
                     </div>
                     <button
                         onClick={disconnect}
-                        className="flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 hover:bg-red-500/10 rounded-lg border border-transparent hover:border-red-500/20"
+                        className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-red-400 hover:text-red-300 transition-all px-4 py-2 bg-red-500/5 hover:bg-red-500/10 rounded-xl border border-red-500/10 hover:border-red-500/30 w-full sm:w-auto"
                         title="Cerrar sesión y usar otra cuenta"
                     >
                         <LogOut size={16} />
@@ -36,21 +43,21 @@ export const DerivConnectionForm = () => {
                     </button>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-background/50 p-4 rounded-lg border border-border">
-                        <span className="text-xs text-muted-foreground block mb-1">ID de Inicio de Sesión</span>
-                        <span className="font-mono font-medium">{account.loginid}</span>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="bg-background/40 p-4 rounded-xl border border-white/5 backdrop-blur-md">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest block mb-1 font-bold">ID de Inicio de Sesión</span>
+                        <span className="font-mono font-bold text-white text-sm sm:text-base">{account.loginid}</span>
                     </div>
-                    <div className="bg-background/50 p-4 rounded-lg border border-border">
-                        <span className="text-xs text-muted-foreground block mb-1">Saldo Actual</span>
-                        <span className="font-mono font-medium text-emerald-500">
-                            {account.currency} {account.balance}
+                    <div className="bg-background/40 p-4 rounded-xl border border-white/5 backdrop-blur-md">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest block mb-1 font-bold">Saldo Actual</span>
+                        <span className="font-mono font-bold text-emerald-400 text-sm sm:text-base">
+                            {account.currency} {parseFloat(account.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </div>
                     {account.fullname && (
-                        <div className="bg-background/50 p-4 rounded-lg border border-border md:col-span-2">
-                            <span className="text-xs text-muted-foreground block mb-1">Nombre</span>
-                            <span className="font-medium">{account.fullname}</span>
+                        <div className="bg-background/40 p-4 rounded-xl border border-white/5 backdrop-blur-md sm:col-span-2">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest block mb-1 font-bold">Nombre del Titular</span>
+                            <span className="font-bold text-white text-sm sm:text-base">{account.fullname}</span>
                         </div>
                     )}
                 </div>
@@ -97,15 +104,14 @@ export const DerivConnectionForm = () => {
                             <p className="text-xs text-muted-foreground">
                                 Para obtener su token, asegúrese de habilitar los permisos "Read" y "Trade".
                             </p>
-                            <a
-                                href="https://app.deriv.com/account/api-token"
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <button
+                                onClick={handleConfigClick}
+                                type="button"
                                 className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-300 group"
                             >
                                 <ExternalLink size={14} className="group-hover:translate-x-0.5 transition-transform" />
                                 Ir a Configuración de API
-                            </a>
+                            </button>
                         </div>
                     </div>
 
@@ -148,6 +154,11 @@ export const DerivConnectionForm = () => {
                     </p>
                 </div>
             </div>
+
+            <AffiliateModal
+                isOpen={showAffiliateModal}
+                onClose={() => setShowAffiliateModal(false)}
+            />
         </div>
     );
 };

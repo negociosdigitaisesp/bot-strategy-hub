@@ -22,10 +22,14 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useDeriv } from '../contexts/DerivContext';
+import { AccountSwitcher } from '../components/AccountSwitcher';
+import RecentGainsTicker from '../components/RecentGainsTicker';
+import { useNavigate } from 'react-router-dom';
 
 // Types
 type RiskProfile = 'blindaje' | 'cohete';
@@ -55,6 +59,8 @@ const PROFILE_CONFIG = {
 
 const RiskSettingsPage = () => {
     const { user } = useAuth();
+    const { account, isConnected } = useDeriv();
+    const navigate = useNavigate();
 
     // State
     const [isLoading, setIsLoading] = useState(true);
@@ -108,6 +114,13 @@ const RiskSettingsPage = () => {
 
         loadSettings();
     }, [user]);
+
+    // Auto-fill balance when connected
+    useEffect(() => {
+        if (isConnected && account?.balance) {
+            setTotalBalance(account.balance.toString());
+        }
+    }, [isConnected, account]);
 
     // Auto-calculate when balance or profile changes
     useEffect(() => {
@@ -228,34 +241,39 @@ const RiskSettingsPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-[#08090C] text-white p-4 pb-28 md:p-6 overflow-x-hidden">
+        <div className="min-h-screen bg-[#08090C] text-white pt-16 pb-28 md:pt-8 md:pb-8 px-4 overflow-x-hidden">
             {/* Ambient Background */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-0 left-1/4 w-[500px] h-[300px] bg-cyan-500/[0.03] rounded-full blur-[120px]" />
                 <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-amber-500/[0.02] rounded-full blur-[100px]" />
             </div>
 
-            <div className="relative z-10 max-w-4xl mx-auto space-y-6">
+            <div className="relative z-10 max-w-4xl mx-auto space-y-3">
+                {/* Recent Gains Ticker */}
+                <RecentGainsTicker className="mb-2 -mx-4" />
 
                 {/* Header */}
-                <header className="flex flex-col gap-2 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20">
-                                <Brain className="text-cyan-400" size={22} />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">
-                                    Gestión de Riesgo Inteligente
-                                </h1>
-                                <p className="text-xs text-cyan-400/60 font-mono">ROBO-ADVISOR v2.0</p>
-                            </div>
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+                            <Shield className="text-cyan-400" size={24} />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white via-white/90 to-white/70 bg-clip-text text-transparent">
+                                Gestión de Riesgo
+                            </h1>
+                            <p className="text-[10px] text-cyan-400/60 font-mono tracking-widest uppercase">ROBO-ADVISOR v2.0</p>
                         </div>
                     </div>
-                    <p className="text-sm text-white/40 pl-11">
-                        Configure y active la protección automática de su capital
-                    </p>
+
+                    <div className="w-full md:w-auto z-50">
+                        <AccountSwitcher onAddAccount={() => navigate('/conectar-deriv')} />
+                    </div>
                 </header>
+
+                <p className="text-sm text-white/40 max-w-md leading-relaxed pl-1 -mt-4 mb-4">
+                    Configure y active la protección automática de su capital con inteligencia artificial.
+                </p>
 
                 {/* Master Toggle Card */}
                 <motion.section
@@ -331,7 +349,7 @@ const RiskSettingsPage = () => {
                                 exit={{ height: 0, opacity: 0 }}
                                 className="overflow-hidden"
                             >
-                                <div className="mt-4 pt-4 border-t border-emerald-500/20 grid grid-cols-3 gap-3">
+                                <div className="mt-4 pt-4 border-t border-emerald-500/20 grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div className="text-center p-2 bg-emerald-500/10 rounded-lg">
                                         <Skull size={16} className="mx-auto text-rose-400 mb-1" />
                                         <div className="text-xs text-white/40">Stop Loss</div>
@@ -493,7 +511,7 @@ const RiskSettingsPage = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="text-[10px] text-rose-500/60 uppercase tracking-wider font-mono mb-2 flex items-center gap-2">
                                     <Skull size={11} /> Stop Loss

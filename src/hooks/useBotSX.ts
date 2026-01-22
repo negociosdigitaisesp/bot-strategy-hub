@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
+import { useRiskSystem } from './useRiskSystem';
 import { toast } from 'sonner';
 
 // Types
@@ -30,6 +31,8 @@ type TrendColor = 'Red' | 'Blue';
 
 export const useBotSX = () => {
     const { socket, isConnected } = useDeriv();
+
+    const { isEnabled: isRiskEnabled, settings: riskSettings } = useRiskSystem();
 
     // Bot State
     const [isRunning, setIsRunning] = useState(false);
@@ -236,9 +239,16 @@ export const useBotSX = () => {
             return false;
         }
 
+        // Determine Effective Stake (Risk System Override)
+        let effectiveStake = config.stake;
+        if (isRiskEnabled && riskSettings?.base_stake) {
+            effectiveStake = riskSettings.base_stake;
+            addLog(`🛡️ Gestión de Riesgo Inteligente ACTIVADA: Usando Stake Global $${effectiveStake}`, 'success');
+        }
+
         // Reset state
         configRef.current = config;
-        initialStakeRef.current = config.stake;
+        initialStakeRef.current = effectiveStake; // Use effective stake
         totalLostRef.current = 0;
         ticksRef.current = [];
         isWaitingForContractRef.current = false;
@@ -247,7 +257,7 @@ export const useBotSX = () => {
             wins: 0,
             losses: 0,
             totalProfit: 0,
-            currentStake: config.stake,
+            currentStake: effectiveStake, // Use effective stake
         });
         setLogs([]);
 
@@ -255,7 +265,7 @@ export const useBotSX = () => {
 
         setIsRunning(true);
         return true;
-    }, [addLog]);
+    }, [addLog, isRiskEnabled, riskSettings]);
 
     // --- SOCKET MANAGEMENT ---
     useEffect(() => {

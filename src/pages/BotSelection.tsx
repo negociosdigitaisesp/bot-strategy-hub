@@ -40,6 +40,7 @@ import { AstronPanel } from '../components/bots/AstronPanel';
 import { XtremePanel } from '../components/bots/XtremePanel';
 import { QuantumPanel } from '../components/bots/QuantumPanel';
 import APIStatusIndicator from '../components/APIStatusIndicator';
+import { AccountSwitcher } from '../components/AccountSwitcher';
 import RecentGainsTicker from '../components/RecentGainsTicker';
 
 // ============================================
@@ -488,6 +489,7 @@ const BotSelection = () => {
     const { isFree, isLoading: freemiumLoading } = useFreemiumLimiter();
     const { isConnected } = useDeriv();
     const { openPricingModal } = usePricingModal();
+    const navigate = useNavigate();
 
     // Auto-selección de bot desde URL (desde Ranking de Asertividad)
     useEffect(() => {
@@ -514,13 +516,13 @@ const BotSelection = () => {
                 }}
             />
 
-            <div className="relative max-w-6xl mx-auto py-6 px-4 animate-in fade-in duration-700">
+            <div className="relative max-w-6xl mx-auto pt-16 pb-6 px-4 animate-in fade-in duration-700">
                 {/* Recent Gains Ticker */}
-                <RecentGainsTicker className="mb-6 -mx-4" />
+                <RecentGainsTicker className="mb-2 -mx-4" />
 
                 {/* Encabezado de Página */}
-                <div className="mb-8">
-                    <div className="flex items-center justify-between">
+                <div className="mb-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <div className="relative">
                                 <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full animate-pulse" />
@@ -537,11 +539,18 @@ const BotSelection = () => {
                                 </p>
                             </div>
                         </div>
-                        {/* API Status Indicator */}
-                        <APIStatusIndicator
-                            status={isConnected ? 'connected' : 'disconnected'}
-                            showLabel={true}
-                        />
+
+                        {/* Controles de Topo: API Status + Switcher */}
+                        <div className="flex items-center gap-3 w-full md:w-auto z-50">
+                            {/* API Status Indicator - Hidden on mobile if needed or kept compact */}
+                            <div className="hidden md:block">
+                                <APIStatusIndicator
+                                    status={isConnected ? 'connected' : 'disconnected'}
+                                    showLabel={true}
+                                />
+                            </div>
+
+                        </div>
                     </div>
                 </div>
 

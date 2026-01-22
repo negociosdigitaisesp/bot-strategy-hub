@@ -681,12 +681,12 @@ const SettingsPage = () => {
                     <Sparkles className="text-white" size={18} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">Marketing Mode</h2>
-                    <p className="text-xs text-purple-500 font-medium">DEMO CONTROL CENTER</p>
+                    <h2 className="text-lg font-semibold">Modo Marketing</h2>
+                    <p className="text-xs text-purple-500 font-medium">CENTRO DE CONTROL DEMO</p>
                   </div>
                 </div>
                 <div className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-500 border border-purple-500/20 font-mono">
-                  MKT ONLY
+                  SOLO MARKETING
                 </div>
               </div>
 
@@ -877,7 +877,7 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto py-8 px-4 animate-in fade-in duration-500">
+    <div className="container max-w-7xl mx-auto pt-20 pb-8 px-4 animate-in fade-in duration-500">
       {/* Header */}
       <div className="relative mb-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
@@ -939,7 +939,7 @@ const SettingsPage = () => {
                   ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
                   : "text-blue-500 bg-blue-500/10 border-blue-500/20"
               )}>
-                {isPro ? 'Plan Pro' : 'Plan Free'}
+                {isPro ? 'Plan Pro' : 'Plan Gratuito'}
               </div>
             </div>
           </div>

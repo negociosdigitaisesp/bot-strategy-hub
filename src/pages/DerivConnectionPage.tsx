@@ -61,7 +61,7 @@ const DerivConnectionPage = () => {
     };
 
     return (
-        <div className="container max-w-4xl mx-auto py-8 px-4 animate-in fade-in duration-500">
+        <div className="container max-w-4xl mx-auto pt-20 pb-8 md:py-8 px-4 animate-in fade-in duration-500">
             {/* Recent Gains Ticker */}
             <RecentGainsTicker className="mb-6 -mx-4" />
             {/* Header com Switcher */}

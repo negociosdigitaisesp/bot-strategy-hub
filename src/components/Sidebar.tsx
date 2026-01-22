@@ -227,7 +227,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
 
             {isMobile && !collapsed && (
                 <div
-                    className="fixed inset-0 bg-black/60 z-40 transition-opacity duration-300"
+                    className="fixed inset-0 bg-black/60 z-[60] transition-opacity duration-300"
                     onClick={toggleSidebar}
                 />
             )}
@@ -237,7 +237,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                 isMobile
                     ? 'bg-background border-r border-border shadow-2xl'
                     : 'bg-gradient-to-b from-sidebar via-sidebar/98 to-sidebar/95 shadow-2xl border-r border-sidebar-border/30',
-                'transition-all duration-500 ease-out z-40',
+                'transition-all duration-500 ease-out z-[70]',
                 isMobile ? (
                     collapsed
                         ? '-translate-x-full opacity-0'

@@ -68,7 +68,7 @@ const BugDeriv = () => {
         if (isLimitReached && isRunning) {
             stopBot();
             setShowLimitModal(true);
-            toast.warning('Daily limit reached!');
+            toast.warning('¡Límite diario alcanzado!');
         }
     }, [isLimitReached, isRunning, stopBot]);
 
@@ -229,7 +229,7 @@ const BugDeriv = () => {
             toast.info('Fortress Desativada');
         } else {
             if (!isConnected) {
-                toast.error('Conecte sua conta Deriv primeiro');
+                toast.error('Conecte su cuenta Deriv primero');
                 return;
             }
 
@@ -310,9 +310,9 @@ const BugDeriv = () => {
                             </span>
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
-                            {isUp && 'Tendência de Alta - Barreira Inferior'}
-                            {isDown && 'Tendência de Baixa - Barreira Superior'}
-                            {isNeutral && 'Analisando Micro-Tendência...'}
+                            {isUp && 'Tendencia Alcista - Barrera Inferior'}
+                            {isDown && 'Tendencia Bajista - Barrera Superior'}
+                            {isNeutral && 'Analizando Micro-Tendencia...'}
                         </p>
                     </div>
                 </div>
@@ -330,7 +330,7 @@ const BugDeriv = () => {
             <div className="bg-black/40 rounded-xl border border-white/5 p-4">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-                        Volatilidade ATR
+                        Volatilidad ATR
                     </span>
                     <span className="text-lg font-mono font-bold text-amber-400">
                         {avgVol.toFixed(4)}
@@ -353,7 +353,7 @@ const BugDeriv = () => {
                         </span>
                     </div>
                     <div className="bg-white/5 rounded-lg p-2 text-center">
-                        <span className="text-[9px] text-slate-500 block">Safety Factor</span>
+                        <span className="text-[9px] text-slate-500 block">Factor de Seguridad</span>
                         <span className="text-sm font-mono font-bold text-violet-400">
                             {safetyFactor.toFixed(1)}x
                         </span>
@@ -380,7 +380,7 @@ const BugDeriv = () => {
             <div className="bg-black/40 rounded-xl border border-white/5 p-4">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-                        Probabilidade de Êxito
+                        Probabilidad de Éxito
                     </span>
                     <ShieldCheck size={16} className="text-emerald-400" />
                 </div>
@@ -407,14 +407,14 @@ const BugDeriv = () => {
                             cy="48"
                             r="40"
                             fill="none"
-                            stroke="url(#probGradient)"
+                            stroke="url(#bugDerivProbGradient)"
                             strokeWidth="8"
                             strokeLinecap="round"
                             strokeDasharray={`${probability * 2.51} 251`}
                             className="transition-all duration-500"
                         />
                         <defs>
-                            <linearGradient id="probGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <linearGradient id="bugDerivProbGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                                 <stop offset="0%" stopColor="#22d3ee" />
                                 <stop offset="100%" stopColor="#10b981" />
                             </linearGradient>
@@ -427,11 +427,11 @@ const BugDeriv = () => {
 
                 <div className="space-y-2 text-xs font-mono">
                     <div className="flex justify-between">
-                        <span className="text-slate-500">Preço Atual</span>
+                        <span className="text-slate-500">Precio Actual</span>
                         <span className="text-cyan-400">{price.toFixed(4)}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-slate-500">Barreira</span>
+                        <span className="text-slate-500">Barrera</span>
                         <span className="text-amber-400">{barrier.toFixed(4)}</span>
                     </div>
                 </div>
@@ -447,11 +447,11 @@ const BugDeriv = () => {
                 <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-amber-600/5 blur-[120px]" />
             </div>
 
-            <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto space-y-5">
-                <RecentGainsTicker />
+            <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto space-y-5 pt-20 pb-6">
+                <RecentGainsTicker className="-mx-4 mb-2" />
 
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div className="flex items-center gap-4">
                         <button onClick={() => navigate(-1)} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
                             <ArrowLeft size={20} className="text-slate-400" />
@@ -477,26 +477,23 @@ const BugDeriv = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono",
-                            isConnected ? "bg-emerald-950/30 border-emerald-500/30 text-emerald-400" : "bg-rose-950/30 border-rose-500/30 text-rose-400"
-                        )}>
-                            {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-                            {isConnected ? "LINKED" : "OFFLINE"}
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono bg-slate-900/50 border-white/10">
+                            {isConnected ? <Wifi size={12} className="text-emerald-400" /> : <WifiOff size={12} className="text-rose-400" />}
+                            <span className={isConnected ? "text-emerald-400" : "text-rose-400"}>{isConnected ? "LINKED" : "OFFLINE"}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Dashboard */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <div className="flex flex-col lg:grid lg:grid-cols-12 gap-5">
 
-                    {/* Left: Controls */}
-                    <div className="lg:col-span-3 space-y-4">
+                    {/* Left: Controls (Order 3 on Mobile) */}
+                    <div className="order-3 lg:order-1 lg:col-span-3 space-y-4">
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
                             <div className="flex items-center gap-2 mb-5 text-cyan-400">
                                 <Settings2 size={16} />
-                                <span className="text-xs font-bold uppercase tracking-widest">Parâmetros</span>
+                                <span className="text-xs font-bold uppercase tracking-widest">PARÁMETROS</span>
                             </div>
 
                             <div className="space-y-4">
@@ -516,7 +513,7 @@ const BugDeriv = () => {
 
                                 <div>
                                     <label className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-2 block">
-                                        Safety Factor: {localSafetyFactor.toFixed(1)}x
+                                        Factor de Seguridad: {localSafetyFactor.toFixed(1)}x
                                     </label>
                                     <input
                                         type="range"
@@ -560,7 +557,7 @@ const BugDeriv = () => {
 
                                 <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                                     <div>
-                                        <span className="text-xs font-medium text-slate-200 block">Martingale</span>
+                                        <span className="text-xs font-medium text-slate-200 block">Martingala</span>
                                         <span className="text-[9px] text-slate-500">{fortressConfig.MARTINGALE_FACTOR}x | Max {fortressConfig.MAX_MARTINGALE_LEVELS}</span>
                                     </div>
                                     <button
@@ -595,30 +592,30 @@ const BugDeriv = () => {
                                 <div>
                                     <h4 className="text-xs font-bold text-cyan-300 mb-1">Escudo Matemático</h4>
                                     <p className="text-[10px] text-cyan-200/60 leading-relaxed">
-                                        A barreira dinâmica é calculada usando volatilidade real (ATR) multiplicada pelo Safety Factor. Quanto maior o fator, mais segura a aposta.
+                                        La barrera dinámica se calcula usando la volatilidad real (ATR) multiplicada por el Factor de Seguridad. Cuanto mayor sea el factor, más segura será la apuesta.
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Center: Chart + Trend */}
-                    <div className="lg:col-span-6 space-y-4">
+                    {/* Center: Chart + Trend (Order 2 on Mobile) */}
+                    <div className="order-2 lg:order-2 lg:col-span-6 space-y-4">
                         {/* Price Chart */}
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <BarChart3 size={16} className="text-cyan-400" />
-                                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Gráfico de Preço</span>
+                                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Gráfico de Precio</span>
                                 </div>
                                 <div className="flex items-center gap-3 text-[9px] font-mono">
                                     <div className="flex items-center gap-1">
                                         <div className="w-3 h-0.5 bg-cyan-400 rounded" />
-                                        <span className="text-slate-500">Preço</span>
+                                        <span className="text-slate-500">Precio</span>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <div className="w-3 h-0.5 bg-amber-400 rounded" style={{ borderStyle: 'dashed' }} />
-                                        <span className="text-slate-500">Barreira</span>
+                                        <span className="text-slate-500">Barrera</span>
                                     </div>
                                 </div>
                             </div>
@@ -630,7 +627,7 @@ const BugDeriv = () => {
                                 />
                                 {priceHistory.length < 2 && (
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        <span className="text-slate-600 text-sm">Aguardando dados...</span>
+                                        <span className="text-slate-600 text-sm">Esperando datos...</span>
                                     </div>
                                 )}
                             </div>
@@ -640,7 +637,7 @@ const BugDeriv = () => {
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
                             <div className="flex items-center gap-2 mb-4">
                                 <Target size={16} className="text-cyan-400" />
-                                <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Direção Atual</span>
+                                <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Dirección Actual</span>
                             </div>
                             <TrendIndicator />
                         </div>
@@ -649,8 +646,8 @@ const BugDeriv = () => {
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl overflow-hidden flex flex-col h-[200px]">
                             <div className="p-3 border-b border-white/5 flex items-center gap-2">
                                 <Activity size={14} className="text-slate-500" />
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Log de Atividade</span>
-                                <span className="ml-auto text-[9px] font-mono text-slate-600">{stats.signalsTriggered} sinais</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Log de Actividad</span>
+                                <span className="ml-auto text-[9px] font-mono text-slate-600">{stats.signalsTriggered} señales</span>
                             </div>
                             <div ref={logsContainerRef} className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-[10px]">
                                 {logs.length === 0 ? (
@@ -680,14 +677,14 @@ const BugDeriv = () => {
                         </div>
                     </div>
 
-                    {/* Right: Gauges + Stats */}
-                    <div className="lg:col-span-3 space-y-4">
+                    {/* Right: Gauges + Stats (Order 1 on Mobile) */}
+                    <div className="order-1 lg:order-3 lg:col-span-3 space-y-4">
                         <VolatilityGauge />
                         <ProbabilityDisplay />
 
                         {/* Stats Card */}
                         <div className="bg-[#0c0e14] border border-white/5 rounded-2xl p-5">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-4">Performance</span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-4">Rendimiento</span>
 
                             <div className="space-y-4">
                                 <div>
@@ -700,22 +697,22 @@ const BugDeriv = () => {
 
                                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/5">
                                     <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Wins</span>
+                                        <span className="text-[10px] text-slate-500 block mb-1">Ganadas</span>
                                         <div className="text-xl font-mono text-emerald-400">{stats.wins}</div>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Losses</span>
+                                        <span className="text-[10px] text-slate-500 block mb-1">Perdidas</span>
                                         <div className="text-xl font-mono text-rose-400">{stats.losses}</div>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/5">
                                     <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Stake Atual</span>
+                                        <span className="text-[10px] text-slate-500 block mb-1">Stake Actual</span>
                                         <div className="text-lg font-mono text-cyan-400">${stats.currentStake.toFixed(2)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-[10px] text-slate-500 block mb-1">Gale Level</span>
+                                        <span className="text-[10px] text-slate-500 block mb-1">Nivel Gale</span>
                                         <div className="text-lg font-mono text-amber-400">{stats.martingaleLevel}</div>
                                     </div>
                                 </div>

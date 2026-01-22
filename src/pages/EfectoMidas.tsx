@@ -167,7 +167,7 @@ const EfectoMidas = () => {
         return (
             <div
                 className={cn(
-                    "relative flex flex-col items-center justify-center w-12 h-16 rounded-xl transition-all duration-300",
+                    "relative flex flex-col items-center justify-center w-8 h-12 md:w-12 md:h-16 rounded-xl transition-all duration-300",
                     isSelected && "scale-105 -translate-y-0.5",
                     isRepeated && "scale-110"
                 )}
@@ -201,7 +201,7 @@ const EfectoMidas = () => {
 
                 {/* Number */}
                 <span className={cn(
-                    "relative z-10 text-xl font-mono font-bold transition-colors duration-300",
+                    "relative z-10 text-base md:text-xl font-mono font-bold transition-colors duration-300",
                     isSelected ? "text-amber-300" :
                         isLowFrequency ? "text-emerald-400/80" :
                             "text-white/50"
@@ -284,19 +284,19 @@ const EfectoMidas = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-[#08090c] via-[#0a0b10] to-[#08090c] p-4 md:p-6">
+        <div className="min-h-screen bg-gradient-to-b from-[#08090c] via-[#0a0b10] to-[#08090c] pt-16 pb-6 px-4 md:p-6">
             {/* Ambient gold glow */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-20 left-1/3 w-[500px] h-[300px] bg-amber-500/[0.015] rounded-full blur-[120px]" />
                 <div className="absolute bottom-20 right-1/4 w-[400px] h-[250px] bg-amber-600/[0.01] rounded-full blur-[100px]" />
             </div>
 
-            <div className="relative z-10 max-w-7xl mx-auto space-y-5">
+            <div className="relative z-10 max-w-7xl mx-auto flex flex-col lg:grid lg:grid-cols-12 gap-5">
                 {/* Recent Gains Ticker */}
-                <RecentGainsTicker className="mb-4 -mx-4 md:-mx-6" />
+                <RecentGainsTicker className="mb-4 -mx-4 md:-mx-6 lg:col-span-12" />
 
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 lg:col-span-12">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => navigate(-1)}
@@ -319,10 +319,10 @@ const EfectoMidas = () => {
                                     Efecto Midas
                                 </h1>
                                 <span className="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-gradient-to-r from-amber-500/10 to-amber-600/10 text-amber-400 border border-amber-500/20 rounded">
-                                    Elite
+                                    Élite
                                 </span>
                             </div>
-                            <p className="text-xs text-white/40">Shadow Mode • Digit Differs</p>
+                            <p className="text-xs text-white/40">Modo Sombra • Dígitos Diferentes</p>
                         </div>
                     </div>
 
@@ -367,7 +367,7 @@ const EfectoMidas = () => {
                                     ? isShadowMode ? "text-slate-400" : "text-amber-400"
                                     : "text-white/40"
                             )}>
-                                {isRunning ? (isShadowMode ? 'Shadow' : 'Activo') : 'Off'}
+                                {isRunning ? (isShadowMode ? 'Sombra' : 'Activo') : 'Inactivo'}
                             </span>
                         </div>
 
@@ -386,7 +386,7 @@ const EfectoMidas = () => {
 
                 {/* Scanner Panel with gold accents */}
                 <div className={cn(
-                    "relative rounded-2xl transition-all duration-500 overflow-hidden",
+                    "relative rounded-2xl transition-all duration-500 overflow-hidden lg:col-span-12 order-1 lg:order-1",
                     anomalyDetected
                         ? "bg-gradient-to-b from-amber-950/20 to-[#0a0b10] border border-amber-500/30"
                         : "bg-white/[0.015] border border-white/[0.08]"
@@ -415,7 +415,7 @@ const EfectoMidas = () => {
                         </div>
                     )}
 
-                    <div className="relative p-5 md:p-6">
+                    <div className="relative p-3 md:p-6">
                         {/* Header */}
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                             <div className="flex items-center gap-3">
@@ -479,291 +479,289 @@ const EfectoMidas = () => {
                     <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
                 </div>
 
-                <div className="grid grid-cols-12 gap-5">
-                    {/* Left Panel - Config */}
-                    <div className="col-span-12 lg:col-span-3 space-y-4">
-                        {/* Config Card */}
-                        <div className="bg-white/[0.015] border border-white/[0.08] rounded-2xl p-5 relative overflow-hidden">
-                            {/* Subtle gold accent */}
-                            <div className="absolute top-0 left-0 w-1/2 h-px bg-gradient-to-r from-amber-500/30 to-transparent" />
+                {/* Left Panel - Config */}
+                <div className="lg:col-span-3 space-y-4 order-3 lg:order-2">
+                    {/* Config Card */}
+                    <div className="bg-white/[0.015] border border-white/[0.08] rounded-2xl p-5 relative overflow-hidden">
+                        {/* Subtle gold accent */}
+                        <div className="absolute top-0 left-0 w-1/2 h-px bg-gradient-to-r from-amber-500/30 to-transparent" />
 
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.08] flex items-center justify-center">
-                                    <Settings2 size={16} className="text-white/60" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-medium text-white">Configuración</h3>
-                                    <p className="text-[10px] text-white/40">Parámetros</p>
-                                </div>
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.08] flex items-center justify-center">
+                                <Settings2 size={16} className="text-white/60" />
                             </div>
-
-                            <div className="space-y-4">
-                                {/* Stake */}
-                                <div>
-                                    <label className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 block font-medium">
-                                        Stake Inicial
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400/60 font-mono text-sm">$</span>
-                                        <input
-                                            type="number"
-                                            value={stake}
-                                            onChange={(e) => setStake(e.target.value)}
-                                            disabled={isRunning}
-                                            className="w-full pl-7 pr-3 py-2.5 bg-black/30 border border-white/[0.08] rounded-lg text-white font-mono focus:border-amber-500/40 focus:outline-none transition-colors disabled:opacity-50"
-                                            step="0.01"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Max Losses */}
-                                <div>
-                                    <label className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 block font-medium">
-                                        Stop de Seguridad
-                                    </label>
-                                    <select
-                                        value={maxLosses}
-                                        onChange={(e) => setMaxLosses(e.target.value)}
-                                        disabled={isRunning}
-                                        className="w-full px-3 py-2.5 bg-black/30 border border-white/[0.08] rounded-lg text-white font-mono focus:border-amber-500/40 focus:outline-none transition-colors disabled:opacity-50 appearance-none cursor-pointer"
-                                    >
-                                        <option value="1">1 Loss → Detener</option>
-                                        <option value="2">2 Losses → Detener</option>
-                                        <option value="3">3 Losses → Detener</option>
-                                    </select>
-                                </div>
-
-                                {/* SL / TP */}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="text-[10px] text-rose-400/60 uppercase tracking-wider mb-1.5 block font-medium">
-                                            Stop Loss
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400/60 font-mono text-xs">$</span>
-                                            <input
-                                                type="number"
-                                                value={stopLoss}
-                                                onChange={(e) => setStopLoss(e.target.value)}
-                                                disabled={isRunning}
-                                                className="w-full pl-6 pr-2 py-2 bg-rose-500/5 border border-rose-500/20 rounded-lg text-rose-400 font-mono text-sm focus:border-rose-400/40 focus:outline-none transition-colors disabled:opacity-50"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-emerald-400/60 uppercase tracking-wider mb-1.5 block font-medium">
-                                            Take Profit
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400/60 font-mono text-xs">$</span>
-                                            <input
-                                                type="number"
-                                                value={takeProfit}
-                                                onChange={(e) => setTakeProfit(e.target.value)}
-                                                disabled={isRunning}
-                                                className="w-full pl-6 pr-2 py-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg text-emerald-400 font-mono text-sm focus:border-emerald-400/40 focus:outline-none transition-colors disabled:opacity-50"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Martingale */}
-                                <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] text-white/60 uppercase tracking-wider font-medium">Martingale</span>
-                                        <button
-                                            onClick={() => setUseMartingale(!useMartingale)}
-                                            disabled={isRunning}
-                                            className={cn(
-                                                "relative w-10 h-5 rounded-full transition-colors disabled:opacity-50",
-                                                useMartingale ? "bg-gradient-to-r from-amber-500/40 to-amber-600/40" : "bg-white/10"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all shadow",
-                                                useMartingale ? "left-5" : "left-0.5"
-                                            )} />
-                                        </button>
-                                    </div>
-
-                                    {useMartingale && (
-                                        <div className="pt-2">
-                                            <label className="text-[9px] text-white/40 uppercase tracking-wider mb-1 block">
-                                                Factor ×
-                                            </label>
-                                            <input
-                                                type="number"
-                                                value={martingaleFactor}
-                                                onChange={(e) => setMartingaleFactor(e.target.value)}
-                                                disabled={isRunning}
-                                                step="0.1"
-                                                className="w-full px-2.5 py-1.5 bg-black/30 border border-white/[0.08] rounded text-white/80 font-mono text-xs focus:border-amber-500/30 focus:outline-none transition-colors disabled:opacity-50"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
+                            <div>
+                                <h3 className="text-sm font-medium text-white">Configuración</h3>
+                                <p className="text-[10px] text-white/40">Parámetros</p>
                             </div>
                         </div>
 
-                        {/* Control Button */}
-                        <button
-                            onClick={handleToggleBot}
-                            disabled={!isConnected}
-                            className={cn(
-                                "w-full py-4 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed group",
-                                isRunning
-                                    ? "bg-rose-500/10 hover:bg-rose-500/15 text-rose-400 border border-rose-500/20"
-                                    : "bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/35"
-                            )}
-                        >
-                            {/* Shine effect */}
-                            {!isRunning && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
-                            )}
-                            {isRunning ? (
-                                <>
-                                    <Square fill="currentColor" size={16} />
-                                    <span>DETENER</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Gem size={18} className="drop-shadow" />
-                                    <span className="tracking-wide">ACTIVAR MIDAS</span>
-                                </>
-                            )}
-                        </button>
-
-                        {/* Freemium Progress Bar - only for free users */}
-                        {isFree && (
-                            <FreemiumProgressBar currentProfit={currentProfit} />
-                        )}
-
-                        {/* Info */}
-                        <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl p-4 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/5 rounded-full blur-2xl" />
-                            <div className="relative flex items-start gap-3">
-                                <Shield size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <h4 className="text-xs font-medium text-white mb-1">Shadow Mode</h4>
-                                    <p className="text-[11px] text-white/40 leading-relaxed">
-                                        Monitorea invisiblemente. Ejecuta solo al detectar anomalía estadística.
-                                    </p>
+                        <div className="space-y-4">
+                            {/* Stake */}
+                            <div>
+                                <label className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 block font-medium">
+                                    Stake Inicial
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400/60 font-mono text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        value={stake}
+                                        onChange={(e) => setStake(e.target.value)}
+                                        disabled={isRunning}
+                                        className="w-full pl-7 pr-3 py-2.5 bg-black/30 border border-white/[0.08] rounded-lg text-white font-mono focus:border-amber-500/40 focus:outline-none transition-colors disabled:opacity-50"
+                                        step="0.01"
+                                    />
                                 </div>
+                            </div>
+
+                            {/* Max Losses */}
+                            <div>
+                                <label className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 block font-medium">
+                                    Stop de Seguridad
+                                </label>
+                                <select
+                                    value={maxLosses}
+                                    onChange={(e) => setMaxLosses(e.target.value)}
+                                    disabled={isRunning}
+                                    className="w-full px-3 py-2.5 bg-black/30 border border-white/[0.08] rounded-lg text-white font-mono focus:border-amber-500/40 focus:outline-none transition-colors disabled:opacity-50 appearance-none cursor-pointer"
+                                >
+                                    <option value="1">1 Pérdida → Detener</option>
+                                    <option value="2">2 Pérdidas → Detener</option>
+                                    <option value="3">3 Pérdidas → Detener</option>
+                                </select>
+                            </div>
+
+                            {/* SL / TP */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] text-rose-400/60 uppercase tracking-wider mb-1.5 block font-medium">
+                                        Stop Loss
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400/60 font-mono text-xs">$</span>
+                                        <input
+                                            type="number"
+                                            value={stopLoss}
+                                            onChange={(e) => setStopLoss(e.target.value)}
+                                            disabled={isRunning}
+                                            className="w-full pl-6 pr-2 py-2 bg-rose-500/5 border border-rose-500/20 rounded-lg text-rose-400 font-mono text-sm focus:border-rose-400/40 focus:outline-none transition-colors disabled:opacity-50"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-emerald-400/60 uppercase tracking-wider mb-1.5 block font-medium">
+                                        Take Profit
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400/60 font-mono text-xs">$</span>
+                                        <input
+                                            type="number"
+                                            value={takeProfit}
+                                            onChange={(e) => setTakeProfit(e.target.value)}
+                                            disabled={isRunning}
+                                            className="w-full pl-6 pr-2 py-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg text-emerald-400 font-mono text-sm focus:border-emerald-400/40 focus:outline-none transition-colors disabled:opacity-50"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Martingale */}
+                            <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-white/60 uppercase tracking-wider font-medium">Martingala</span>
+                                    <button
+                                        onClick={() => setUseMartingale(!useMartingale)}
+                                        disabled={isRunning}
+                                        className={cn(
+                                            "relative w-10 h-5 rounded-full transition-colors disabled:opacity-50",
+                                            useMartingale ? "bg-gradient-to-r from-amber-500/40 to-amber-600/40" : "bg-white/10"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all shadow",
+                                            useMartingale ? "left-5" : "left-0.5"
+                                        )} />
+                                    </button>
+                                </div>
+
+                                {useMartingale && (
+                                    <div className="pt-2">
+                                        <label className="text-[9px] text-white/40 uppercase tracking-wider mb-1 block">
+                                            Factor ×
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={martingaleFactor}
+                                            onChange={(e) => setMartingaleFactor(e.target.value)}
+                                            disabled={isRunning}
+                                            step="0.1"
+                                            className="w-full px-2.5 py-1.5 bg-black/30 border border-white/[0.08] rounded text-white/80 font-mono text-xs focus:border-amber-500/30 focus:outline-none transition-colors disabled:opacity-50"
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Panel - Stats & Logs */}
-                    <div className="col-span-12 lg:col-span-9 space-y-4">
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                            {/* Total Profit */}
-                            <div className="col-span-2 bg-white/[0.015] border border-white/[0.08] rounded-xl p-4 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-amber-500/30 via-amber-500/10 to-transparent" />
-                                <div className="flex items-center gap-2 mb-2">
-                                    <BarChart3 size={16} className="text-amber-400/60" />
-                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Resultado</span>
-                                </div>
-                                <div className={cn(
-                                    "text-3xl font-bold font-mono",
-                                    stats.totalProfit > 0 ? "text-emerald-400" :
-                                        stats.totalProfit < 0 ? "text-rose-400" :
-                                            "text-white/60"
-                                )}>
-                                    {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)}
-                                    <span className="text-sm ml-1 text-white/40">USD</span>
-                                </div>
-                            </div>
+                    {/* Control Button */}
+                    <button
+                        onClick={handleToggleBot}
+                        disabled={!isConnected}
+                        className={cn(
+                            "w-full py-4 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed group",
+                            isRunning
+                                ? "bg-rose-500/10 hover:bg-rose-500/15 text-rose-400 border border-rose-500/20"
+                                : "bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/35"
+                        )}
+                    >
+                        {/* Shine effect */}
+                        {!isRunning && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
+                        )}
+                        {isRunning ? (
+                            <>
+                                <Square fill="currentColor" size={16} />
+                                <span>DETENER</span>
+                            </>
+                        ) : (
+                            <>
+                                <Gem size={18} className="drop-shadow" />
+                                <span className="tracking-wide">ACTIVAR MIDAS</span>
+                            </>
+                        )}
+                    </button>
 
-                            {/* Wins */}
-                            <div className="bg-white/[0.015] border-l-2 border-l-emerald-500/50 border-y border-r border-white/[0.08] rounded-xl p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <TrendingUp size={14} className="text-emerald-400" />
-                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Wins</span>
-                                </div>
-                                <div className="text-2xl font-bold font-mono text-emerald-400">{stats.wins}</div>
-                            </div>
+                    {/* Freemium Progress Bar - only for free users */}
+                    {isFree && (
+                        <FreemiumProgressBar currentProfit={currentProfit} />
+                    )}
 
-                            {/* Losses */}
-                            <div className="bg-white/[0.015] border-l-2 border-l-rose-500/50 border-y border-r border-white/[0.08] rounded-xl p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <TrendingDown size={14} className="text-rose-400" />
-                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Losses</span>
-                                </div>
-                                <div className="text-2xl font-bold font-mono text-rose-400">{stats.losses}</div>
+                    {/* Info */}
+                    <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl p-4 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/5 rounded-full blur-2xl" />
+                        <div className="relative flex items-start gap-3">
+                            <Shield size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <h4 className="text-xs font-medium text-white mb-1">Modo Sombra</h4>
+                                <p className="text-[11px] text-white/40 leading-relaxed">
+                                    Monitorea de forma invisible. Ejecuta solo al detectar anomalía estadística.
+                                </p>
                             </div>
+                        </div>
+                    </div>
+                </div>
 
-                            {/* Win Rate */}
-                            <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Target size={14} className="text-white/40" />
-                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Rate</span>
-                                </div>
-                                <div className="text-2xl font-bold font-mono text-white/80">
-                                    {winRate}<span className="text-sm text-white/40">%</span>
-                                </div>
+                {/* Right Panel - Stats & Logs */}
+                <div className="lg:col-span-9 space-y-4 order-2 lg:order-3">
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        {/* Total Profit */}
+                        <div className="col-span-2 bg-white/[0.015] border border-white/[0.08] rounded-xl p-4 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-amber-500/30 via-amber-500/10 to-transparent" />
+                            <div className="flex items-center gap-2 mb-2">
+                                <BarChart3 size={16} className="text-amber-400/60" />
+                                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Resultado</span>
                             </div>
-
-                            {/* Stake */}
-                            <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl p-4 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-8 h-px bg-gradient-to-r from-amber-500/40 to-transparent" />
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Coins size={14} className="text-amber-400" />
-                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Stake</span>
-                                </div>
-                                <div className="text-xl font-bold font-mono text-amber-400">
-                                    ${stats.currentStake.toFixed(2)}
-                                </div>
+                            <div className={cn(
+                                "text-3xl font-bold font-mono",
+                                stats.totalProfit > 0 ? "text-emerald-400" :
+                                    stats.totalProfit < 0 ? "text-rose-400" :
+                                        "text-white/60"
+                            )}>
+                                {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)}
+                                <span className="text-sm ml-1 text-white/40">USD</span>
                             </div>
                         </div>
 
-                        {/* Activity Log */}
-                        <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl overflow-hidden">
-                            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <Activity size={16} className="text-white/40" />
-                                    <span className="text-sm font-medium text-white">Operaciones</span>
-                                </div>
-                                <span className="text-[10px] text-white/40 font-mono">{logs.length}</span>
+                        {/* Wins */}
+                        <div className="bg-white/[0.015] border-l-2 border-l-emerald-500/50 border-y border-r border-white/[0.08] rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <TrendingUp size={14} className="text-emerald-400" />
+                                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Ganadas</span>
                             </div>
+                            <div className="text-2xl font-bold font-mono text-emerald-400">{stats.wins}</div>
+                        </div>
 
-                            <div ref={logsContainerRef} className="h-[280px] overflow-y-auto">
-                                {logs.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center p-8">
-                                        <Eye size={24} className="text-white/20 mb-2" />
-                                        <p className="text-white/30 text-sm">Esperando actividad...</p>
-                                    </div>
-                                ) : (
-                                    <div className="p-3 space-y-1.5">
-                                        {logs.map((log) => (
-                                            <div
-                                                key={log.id}
-                                                className={cn(
-                                                    "flex items-start gap-2.5 p-2.5 rounded-lg transition-all",
-                                                    log.type === 'gold' && "bg-amber-500/5 border-l-2 border-l-amber-500/50",
-                                                    log.type === 'success' && "border-l-2 border-l-emerald-500/50",
-                                                    log.type === 'error' && "border-l-2 border-l-rose-500/50",
-                                                    log.type === 'warning' && "border-l-2 border-l-amber-500/50",
-                                                    log.type === 'info' && "border-l-2 border-l-white/10"
-                                                )}
-                                            >
-                                                <div className="flex-shrink-0 mt-0.5">
-                                                    {getLogIcon(log.type)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-[10px] font-mono text-white/30 block mb-0.5">
-                                                        {log.time}
-                                                    </span>
-                                                    <p className="text-xs text-white/70 leading-relaxed">
-                                                        {log.message}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        <div ref={logsEndRef} />
-                                    </div>
-                                )}
+                        {/* Losses */}
+                        <div className="bg-white/[0.015] border-l-2 border-l-rose-500/50 border-y border-r border-white/[0.08] rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <TrendingDown size={14} className="text-rose-400" />
+                                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Perdidas</span>
                             </div>
+                            <div className="text-2xl font-bold font-mono text-rose-400">{stats.losses}</div>
+                        </div>
+
+                        {/* Win Rate */}
+                        <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Target size={14} className="text-white/40" />
+                                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Tasa</span>
+                            </div>
+                            <div className="text-2xl font-bold font-mono text-white/80">
+                                {winRate}<span className="text-sm text-white/40">%</span>
+                            </div>
+                        </div>
+
+                        {/* Stake */}
+                        <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl p-4 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-8 h-px bg-gradient-to-r from-amber-500/40 to-transparent" />
+                            <div className="flex items-center gap-2 mb-2">
+                                <Coins size={14} className="text-amber-400" />
+                                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Stake</span>
+                            </div>
+                            <div className="text-xl font-bold font-mono text-amber-400">
+                                ${stats.currentStake.toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Activity Log */}
+                    <div className="bg-white/[0.015] border border-white/[0.08] rounded-xl overflow-hidden">
+                        <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Activity size={16} className="text-white/40" />
+                                <span className="text-sm font-medium text-white">Operaciones</span>
+                            </div>
+                            <span className="text-[10px] text-white/40 font-mono">{logs.length}</span>
+                        </div>
+
+                        <div ref={logsContainerRef} className="h-[280px] overflow-y-auto">
+                            {logs.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center p-8">
+                                    <Eye size={24} className="text-white/20 mb-2" />
+                                    <p className="text-white/30 text-sm">Esperando actividad...</p>
+                                </div>
+                            ) : (
+                                <div className="p-3 space-y-1.5">
+                                    {logs.map((log) => (
+                                        <div
+                                            key={log.id}
+                                            className={cn(
+                                                "flex items-start gap-2.5 p-2.5 rounded-lg transition-all",
+                                                log.type === 'gold' && "bg-amber-500/5 border-l-2 border-l-amber-500/50",
+                                                log.type === 'success' && "border-l-2 border-l-emerald-500/50",
+                                                log.type === 'error' && "border-l-2 border-l-rose-500/50",
+                                                log.type === 'warning' && "border-l-2 border-l-amber-500/50",
+                                                log.type === 'info' && "border-l-2 border-l-white/10"
+                                            )}
+                                        >
+                                            <div className="flex-shrink-0 mt-0.5">
+                                                {getLogIcon(log.type)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-[10px] font-mono text-white/30 block mb-0.5">
+                                                    {log.time}
+                                                </span>
+                                                <p className="text-xs text-white/70 leading-relaxed">
+                                                    {log.message}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div ref={logsEndRef} />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
