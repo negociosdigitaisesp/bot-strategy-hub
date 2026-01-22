@@ -33,7 +33,7 @@ import { useTradingSession } from '../contexts/TradingSessionContext';
 import { useDeriv } from '../contexts/DerivContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
-import { SigmaPanel } from '../components/bots/SigmaPanel';
+
 import { GainPanel } from '../components/bots/GainPanel';
 import { MaquinaPanel } from '../components/bots/MaquinaPanel';
 import { AstronPanel } from '../components/bots/AstronPanel';
@@ -492,7 +492,7 @@ const BotSelection = () => {
     // Auto-selección de bot desde URL (desde Ranking de Asertividad)
     useEffect(() => {
         const selectParam = searchParams.get('select');
-        const validBots = ['sigma', 'gain', 'maquina', 'astron', 'xtreme', 'quantum'];
+        const validBots = ['gain', 'maquina', 'astron', 'xtreme', 'quantum'];
 
         if (selectParam && validBots.includes(selectParam)) {
             console.log(`Auto-seleccionando bot desde URL: ${selectParam}`);
@@ -560,18 +560,7 @@ const BotSelection = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Sigma Bot Card - LOCKED for free users */}
-                            <BotCard
-                                name="Sigma Scalper"
-                                symbol="R_10"
-                                description="Estrategia de dígitos con martingale • DIGITOVER"
-                                icon={<Target size={26} className="text-purple-400" />}
-                                colorClass="bg-purple-500/10 border-purple-500/30 text-purple-400"
-                                color="purple"
-                                onSelect={() => setSelectedBot('sigma')}
-                                isLocked={isFree}
-                                openPricingModal={openPricingModal}
-                            />
+
 
                             {/* Gain Bot Card - LOCKED for free users */}
                             <BotCard
@@ -657,13 +646,7 @@ const BotSelection = () => {
 
                         {/* Panel del Bot Seleccionado */}
                         <div className="relative overflow-hidden rounded-2xl border bg-slate-900/50 backdrop-blur-xl border-white/10">
-                            {selectedBot === 'sigma' && (
-                                <SigmaPanel
-                                    isActive={true}
-                                    onToggle={() => { }}
-                                    onBack={() => setSelectedBot(null)}
-                                />
-                            )}
+
                             {selectedBot === 'gain' && (
                                 <GainPanel
                                     isActive={true}

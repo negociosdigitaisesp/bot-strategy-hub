@@ -170,21 +170,14 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             description: 'Shadow Mode - Digit Differs'
         },
         {
-            name: 'Bot Sigma',
-            icon: <Target size={20} />,
-            path: '/bot-sigma',
+            name: 'Vacuum Crash',
+            icon: <Zap size={20} />,
+            path: '/vacuum-crash',
             isImportant: false,
             requiresUpgrade: false,
-            description: 'Ley de los Grandes Números'
+            description: 'Cazador de Vacíos (CRASH 500)'
         },
-        {
-            name: 'Mejores Horarios',
-            icon: <Clock size={20} />,
-            path: '/mejores-horarios',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Optimización temporal'
-        },
+
         {
             name: 'Tutorial de Instalación',
             icon: <FileText size={20} />,

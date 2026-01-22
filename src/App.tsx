@@ -46,7 +46,7 @@ import PaginaBloqueada from "./pages/PaginaBloqueada";
 import DerivConnectionPage from "./pages/DerivConnectionPage";
 import BotAlpha from "./pages/BotAlpha";
 import BotSelection from "./pages/BotSelection";
-import BotSigma from "./pages/BotSigma";
+import VacuumCrash from "./pages/VacuumCrash";
 import GainBot from "./pages/GainBot";
 import BotOmega from "./pages/BotOmega";
 import BotSpeed from "./pages/BotSpeed";
@@ -336,11 +336,11 @@ const App = () => {
                           </>
                         } />
 
-                        <Route path="/bot-sigma" element={
+                        <Route path="/vacuum-crash" element={
                           <>
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <BotSigma />
+                              <VacuumCrash />
                             </main>
                           </>
                         } />

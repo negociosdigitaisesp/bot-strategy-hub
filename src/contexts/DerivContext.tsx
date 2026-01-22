@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 
 // Define types for Deriv API
@@ -10,6 +10,11 @@ interface DerivAccount {
   fullname?: string;
 }
 
+export interface DerivAPI {
+  send: (request: any) => Promise<any>;
+  onMessage: (callback: (data: any) => void) => () => void;
+}
+
 interface DerivContextType {
   isConnected: boolean;
   isConnecting: boolean;
@@ -19,6 +24,7 @@ interface DerivContextType {
   disconnect: () => void;
   lastError: string | null;
   socket: WebSocket | null;
+  api: DerivAPI | null; // New API object
 }
 
 const DerivContext = createContext<DerivContextType | undefined>(undefined);
@@ -34,6 +40,11 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('deriv_active_token'));
   const [lastError, setLastError] = useState<string | null>(null);
   const [keepAliveInterval, setKeepAliveInterval] = useState<NodeJS.Timeout | null>(null);
+
+  // API State
+  const reqIdCounter = useRef(1);
+  const pendingRequests = useRef<Map<number, { resolve: (data: any) => void; reject: (err: any) => void }>>(new Map());
+  const observers = useRef<Set<(data: any) => void>>(new Set());
 
   // Ref to track if disconnection was intentional (user clicked logout) or accidental (network error)
   const shouldReconnect = React.useRef(true);
@@ -60,9 +71,25 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
     ws.onmessage = (msg) => {
       const data = JSON.parse(msg.data);
 
+      // 1. Resolve pending promises (API Layer)
+      if (data.req_id && pendingRequests.current.has(data.req_id)) {
+        const { resolve, reject } = pendingRequests.current.get(data.req_id)!;
+        if (data.error) {
+          reject(data.error);
+        } else {
+          resolve(data);
+        }
+        pendingRequests.current.delete(data.req_id);
+      }
+
+      // 2. Notify observers (API Layer)
+      observers.current.forEach((callback) => callback(data));
+
+      // 3. Handle Internal Context Logic
       if (data.error) {
-        console.error('Deriv API Error:', data.error);
+        // Only log/handle critical errors here, specific request errors are handled by promise rejection above
         if (data.error.code === 'InvalidToken') {
+          console.error('Deriv API Error (Critical):', data.error);
           setLastError('Token inválido ou expirado.');
           // Fatal error, do not reconnect automatically
           shouldReconnect.current = false;
@@ -72,10 +99,13 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
           setIsConnected(false);
           setAccount(null);
           toast.error('Token da Deriv inválido. Por favor, faça login novamente.');
-        } else {
+        } else if (!data.req_id) {
+          // Log errors that don't belong to a specific request (e.g. general stream errors)
           setLastError(`${data.error.code}: ${data.error.message}`);
         }
-        setIsConnecting(false);
+
+        // Note: We don't stop connecting state here always, depends on error severity
+        if (data.error.code === 'InvalidToken') setIsConnecting(false);
         return;
       }
 
@@ -117,6 +147,10 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
       setIsConnecting(false);
       setSocket(null);
 
+      // Reject all pending requests
+      pendingRequests.current.forEach(({ reject }) => reject(new Error('Connection closed')));
+      pendingRequests.current.clear();
+
       // Auto-Reconnect Logic
       if (shouldReconnect.current) {
         toast.info('Conexão perdida. Tentando reconectar...');
@@ -138,7 +172,7 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
 
     setSocket(ws);
     return ws;
-  }, [socket]); // Added socket dependency to prevent duplicate connections logic
+  }, [socket]); // socket dep preserved
 
   // Connect function exposed to consumers
   const connect = async (apiToken: string): Promise<boolean> => {
@@ -194,6 +228,31 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []); // Only run once on mount
 
+  // API Object Implementation
+  const api = useMemo<DerivAPI | null>(() => {
+    if (!socket || !isConnected) return null;
+
+    return {
+      send: (request: any) => {
+        return new Promise((resolve, reject) => {
+          if (socket.readyState !== WebSocket.OPEN) {
+            reject(new Error('Socket not open'));
+            return;
+          }
+          const req_id = reqIdCounter.current++;
+          pendingRequests.current.set(req_id, { resolve, reject });
+          socket.send(JSON.stringify({ ...request, req_id }));
+        });
+      },
+      onMessage: (callback: (data: any) => void) => {
+        observers.current.add(callback);
+        return () => {
+          observers.current.delete(callback);
+        };
+      }
+    };
+  }, [socket, isConnected]);
+
   return (
     <DerivContext.Provider
       value={{
@@ -204,7 +263,8 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
         connect,
         disconnect,
         lastError,
-        socket
+        socket,
+        api
       }}
     >
       {children}
