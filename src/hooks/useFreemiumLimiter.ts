@@ -5,8 +5,8 @@ import { useTradingSession } from '../contexts/TradingSessionContext';
 
 // Constantes de límites para el plan gratuito
 export const FREEMIUM_LIMITS = {
-    MAX_STAKE: 1.00,      // Límite de apuesta: $1.00 USD
-    MAX_PROFIT: 10.00,    // Tope de ganancia de sesión: $10.00 USD (changed from $5)
+    MAX_STAKE: Infinity,  // Límite de apuesta: Ilimitado (antes $1.00)
+    MAX_PROFIT: 14.00,    // Tope de ganancia de sesión: $14.00 USD (antes $10.00)
 };
 
 // Marketing accounts - always PRO
@@ -18,7 +18,7 @@ export const COOLDOWN_CONFIG = {
     STORAGE_KEY: 'freemium_cooldown_ends_at',
 };
 
-export type PlanType = 'free' | 'pro' | 'premium' | 'elite' | 'whale';
+export type PlanType = 'free' | 'pro' | 'premium' | 'elite' | 'whale' | 'vitalicio' | 'iniciado' | 'mensual' | 'anual';
 
 interface FreemiumLimiterState {
     planType: PlanType;
@@ -143,8 +143,10 @@ export const useFreemiumLimiter = () => {
                 // MARKETING BYPASS: Force PRO for marketing accounts
                 const isMarketingAccount = MARKETING_EMAILS.includes(user.email?.toLowerCase() || '');
 
-                // Check for all pro-tier plans including legacy 'premium' OR marketing accounts
-                const isPro = isMarketingAccount || ['pro', 'premium', 'elite', 'whale'].includes(planType);
+                // Check for all paid plans (including legacy names) OR marketing accounts
+                // Paid plans include: pro, premium, elite, whale, vitalicio, iniciado, mensual, anual
+                const PAID_PLANS = ['pro', 'premium', 'elite', 'whale', 'vitalicio', 'iniciado', 'mensual', 'anual'];
+                const isPro = isMarketingAccount || PAID_PLANS.includes(planType.toLowerCase());
 
                 // Calculate days logic
                 const now = new Date();

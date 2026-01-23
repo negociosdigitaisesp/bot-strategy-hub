@@ -16,7 +16,7 @@ interface RadarSignal {
   reason: string;
   operations_after_pattern: number;
   created_at: string;
-  
+
   // === NOVOS CAMPOS ADICIONADOS ===
   strategy_used: string | null;
   strategy_confidence: number | null;
@@ -181,8 +181,8 @@ const ConfidenceBadge: React.FC<{ confidence: number }> = ({ confidence }) => {
   };
 
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={`${getConfidenceColor(confidence)} font-medium`}
     >
       {confidence}% confiança
@@ -211,11 +211,11 @@ const RadarApalancamiento = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
 
   // Estado centralizado para dados do Tunder Dashboard
-  const [tunderDashboardData, setTunderDashboardData] = useState({ 
-    visual_history_40: '' 
+  const [tunderDashboardData, setTunderDashboardData] = useState({
+    visual_history_40: ''
   });
 
-  
+
   // Estados para controle de alta volatilidade
   const [scalpingHighVolatility, setScalpingHighVolatility] = useState(false);
   const [tunderHighVolatility, setTunderHighVolatility] = useState(false);
@@ -238,13 +238,13 @@ const RadarApalancamiento = () => {
   // Função para converter UTC-3 para horário local do dispositivo
   const convertUTCMinus3ToLocal = (utcMinus3String) => {
     if (!utcMinus3String) return 'N/A';
-    
+
     // Criar data assumindo que o timestamp está em UTC-3
     const utcMinus3Date = new Date(utcMinus3String);
-    
+
     // Adicionar 3 horas para converter UTC-3 para UTC
     const utcDate = new Date(utcMinus3Date.getTime() + (3 * 60 * 60 * 1000));
-    
+
     // Converter para horário local do dispositivo
     return utcDate.toLocaleString('pt-BR', {
       day: '2-digit',
@@ -265,12 +265,12 @@ const RadarApalancamiento = () => {
         .in('operation_result', ['WIN', 'LOSS'])
         .order('timestamp', { ascending: false })
         .limit(20);
-      
+
       if (error) {
         console.error('Erro ao buscar histórico do Scalping Bot:', error);
         return [];
       }
-      
+
       return data || [];
     } catch (error) {
       console.error('Erro ao buscar histórico do Scalping Bot:', error);
@@ -289,12 +289,12 @@ const RadarApalancamiento = () => {
         .in('operation_result', ['WIN', 'LOSS'])
         .order('created_at', { ascending: false })
         .limit(20);
-      
+
       if (error) {
         console.error('Erro ao buscar histórico do Tunder Bot:', error);
         return [];
       }
-      
+
       console.log('📊 Histórico Tunder Bot atualizado:', data?.length || 0, 'operações');
       return data || [];
     } catch (error) {
@@ -310,22 +310,22 @@ const RadarApalancamiento = () => {
     try {
       // Usar timestamp para scalping_accumulator_bot_logs e created_at para outras tabelas
       const timestampColumn = tableName === 'scalping_accumulator_bot_logs' ? 'timestamp' : 'created_at';
-      const selectColumns = tableName === 'scalping_accumulator_bot_logs' 
-        ? 'operation_result, timestamp' 
+      const selectColumns = tableName === 'scalping_accumulator_bot_logs'
+        ? 'operation_result, timestamp'
         : 'operation_result, created_at';
-      
+
       const { data, error } = await supabase
         .from(tableName)
         .select(selectColumns)
         .in('operation_result', ['WIN', 'LOSS'])
         .order(timestampColumn, { ascending: false })
         .limit(1);
-      
+
       if (error) {
         console.error(`Erro na consulta ${tableName}:`, error);
         return null;
       }
-      
+
       return data?.[0] || null;
     } catch (error) {
       console.error(`Erro ao buscar última operação de ${tableName}:`, error);
@@ -340,12 +340,12 @@ const RadarApalancamiento = () => {
         .from('vw_tunder_dashboard')
         .select('*')
         .single();
-      
+
       if (error) {
         console.error('Erro ao buscar dados do Tunder Dashboard:', error);
         return { visual_history_40: '' };
       }
-      
+
       console.log('📊 Dados Tunder Dashboard atualizados:', data);
       return data || { visual_history_40: '' };
     } catch (error) {
@@ -521,7 +521,7 @@ const RadarApalancamiento = () => {
   const obtenerEstadisticasExactas = async () => {
     try {
       const { data, error } = await supabase.rpc('get_scalping_stats_exact');
-      
+
       if (error) {
         console.error('Error al obtener estadísticas exactas:', error);
         return null;
@@ -584,7 +584,7 @@ const RadarApalancamiento = () => {
     const victories = historico.filter(op => op.profit_percentage > 0).length;
     const defeats = historico.filter(op => op.profit_percentage <= 0).length;
     const precision = historico.length > 0 ? (victories / historico.length) * 100 : 0;
-    
+
     // Usar estadísticas exactas si están disponibles
     let victoriasVsDerrotas = `${victories}/${defeats}`;
     let losses10Display = '0 x 0';
@@ -603,7 +603,7 @@ const RadarApalancamiento = () => {
       losses10Percent = Math.round((statsExactas.losses_10 / (statsExactas.losses_10 + statsExactas.wins_10)) * 100) || 0;
       wins5Display = `${statsExactas.wins_5}x${statsExactas.losses_5}`;
       wins5Percent = Math.round((statsExactas.wins_5 / (statsExactas.wins_5 + statsExactas.losses_5)) * 100) || 0;
-      
+
       lossesLast10 = statsExactas.losses_10;
       winsLast5 = statsExactas.wins_5;
       assertivityLast10 = Math.round((statsExactas.wins_10 / (statsExactas.losses_10 + statsExactas.wins_10)) * 100) || 0;
@@ -614,12 +614,12 @@ const RadarApalancamiento = () => {
       lossesLast10 = last10Ops.filter(op => op.profit_percentage <= 0).length;
       const winsLast10 = last10Ops.filter(op => op.profit_percentage > 0).length;
       assertivityLast10 = last10Ops.length > 0 ? Math.round((winsLast10 / last10Ops.length) * 100) : 0;
-      
+
       const last5Ops = historico.slice(0, 5);
       winsLast5 = last5Ops.filter(op => op.profit_percentage > 0).length;
       const lossesLast5 = last5Ops.filter(op => op.profit_percentage <= 0).length;
       assertivityLast5 = last5Ops.length > 0 ? Math.round((winsLast5 / last5Ops.length) * 100) : 0;
-      
+
       losses10Display = `${lossesLast10} x ${winsLast10}`;
       losses10Percent = last10Ops.length > 0 ? Math.round((lossesLast10 / last10Ops.length) * 100) : 0;
       wins5Display = `${winsLast5}x${lossesLast5}`;
@@ -629,10 +629,10 @@ const RadarApalancamiento = () => {
     // ADICIONAR dados do dashboard:
     let winLosses20Display = '0 x 0';
     let assertivity20 = 0;
-    
+
     if (dashboardStats && dashboardStats.win_losses) {
       winLosses20Display = dashboardStats.win_losses; // Formato "18 x 2"
-      
+
       // Calcular asertividad a partir do formato "wins x losses"
       const [wins, losses] = dashboardStats.win_losses.split(' x ').map(Number);
       const total = wins + losses;
@@ -706,7 +706,7 @@ const RadarApalancamiento = () => {
         icon: 'text-blue-400'
       };
     }
-    
+
     return {
       bg: 'bg-orange-500/10',
       border: 'border-orange-500/20',
@@ -729,10 +729,10 @@ const RadarApalancamiento = () => {
     // Victorias / Derrotas: activo se há mais vitórias que derrotas nas últimas 20 ops
     const [wins, losses] = (stats.victoriasVsDerrotas || '0/0').split('/').map(Number);
     const victoriasVsDerrotasActive = wins > losses;
-    
+
     // Wins 5 Ops: activo si wins >= 3 en las últimas 5 operaciones
     const winFilterActive = stats.winsLast5 >= 3;
-    
+
     return {
       patronVDV: evaluarPatronVDV(historico.slice(0, 3)),
       victoriasVsDerrotasActive,
@@ -754,12 +754,12 @@ const RadarApalancamiento = () => {
         .from('vw_scalping_dashboard')
         .select('wins, losses, wins_5_display') // Colunas wins, losses e wins_5_display
         .limit(1);
-      
+
       if (error) {
         console.error('Error al obtener dashboard stats:', error);
         return null;
       }
- 
+
       return data?.[0] || null;
     } catch (error) {
       console.error('Error en obtenerDashboardStats:', error);
@@ -796,36 +796,36 @@ const RadarApalancamiento = () => {
       setReversaoCalmaData(estadoReversaoCalma);
       setHistoricData(historico);
       setDashboardStats(dashboardStats);
-      
+
       if (estadoScalpingBot) {
         const stats = calcularEstadisticas(historico, estadoScalpingBot, statsExactas, dashboardStats);
         setBotStats(stats);
       }
-      
+
       setLastScalpingOperation(lastScalping);
       setLastTunderOperation(lastTunder);
       setScalpingOperationsHistory(scalpingHistory);
       setTunderOperationsHistory(tunderHistory);
-      
+
       // Atualizar dados centralizados do Tunder Dashboard
       setTunderDashboardData(tunderDashboard);
-      
+
       // Verificar alta volatilidade - Scalping Bot
       if (statsExactas && statsExactas.losses_5 > 4) {
         setScalpingHighVolatility(true);
       } else {
         setScalpingHighVolatility(false);
       }
-      
+
       // Verificar alta volatilidade - Tunder Bot (usando dados do hook)
-      const tunderLosses = tunderBot.data.wins_5_display ? 
+      const tunderLosses = tunderBot.data.wins_5_display ?
         parseInt(tunderBot.data.wins_5_display.split('/')[1]) || 0 : 0;
       if (tunderLosses > 4) {
         setTunderHighVolatility(true);
       } else {
         setTunderHighVolatility(false);
       }
-      
+
       setLastUpdateTime(new Date());
     } catch (error) {
       console.error('Error updating data:', error);
@@ -837,7 +837,7 @@ const RadarApalancamiento = () => {
   // Efecto para cargar datos iniciales y configurar actualización automática
   useEffect(() => {
     actualizarDatos();
-    
+
     // REALTIME SUBSCRIPTION unificada para todos os bots
     const channel = supabase
       .channel('shared-signals-realtime')
@@ -850,13 +850,13 @@ const RadarApalancamiento = () => {
         },
         (payload) => {
           console.log('Shared Signals - Update recebido:', payload);
-          
+
           if (payload.new) {
             // Distribuir dados baseado no bot_name - ATUALIZADO para nova estrutura
             if (payload.new.bot_name === 'Radar Scalping I.A') {
               console.log('Atualizando dados do Scalping Bot');
               setScalpingRadarData(payload.new);
-              
+
               // Recalcular estatísticas se necessário
               if (historicData.length > 0) {
                 const newStats = calcularEstadisticas(historicData, payload.new, null, null);
@@ -865,7 +865,7 @@ const RadarApalancamiento = () => {
             } else if (payload.new.bot_name && payload.new.bot_name.includes('Radar Tunder 3.5%')) {
               console.log('Atualizando dados do Tunder Bot - Nova estrutura:', payload.new);
               setTunderRadarData(payload.new);
-              
+
               // Atualizar dados específicos baseado no strategy_used
               if (payload.new.strategy_used === 'Log-ANALISIS') {
                 console.log('Atualização de análise recebida');
@@ -875,7 +875,7 @@ const RadarApalancamiento = () => {
                 console.log('Atualização de ciclo recebida');
               }
             }
-            
+
             setLastUpdateTime(new Date());
           }
         }
@@ -905,13 +905,13 @@ const RadarApalancamiento = () => {
       .subscribe();
 
     // REMOVIDO: Listener específico para tunder_bot_logs - Agora usando radar_de_apalancamiento_signals unificado
-    
+
     // ATUALIZAÇÃO AUTOMÁTICA A CADA 5 SEGUNDOS
     const autoUpdateInterval = setInterval(() => {
       console.log('🔄 Atualizando dados automaticamente...');
       actualizarDatos();
     }, 5000); // 5 segundos
-    
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(metricsChannel);
@@ -927,26 +927,26 @@ const RadarApalancamiento = () => {
 
   // Detectar padrão encontrado específico para Scalping Bot
   const isScalpingPatternFound = scalpingRadarData?.is_safe_to_operate === true;
-  
+
   // Detectar padrão encontrado específico para Scalping Reversion
   const isScalpingReversionPatternFound = scalpingReversionData?.is_safe_to_operate === true;
-  
+
   // Detectar padrão encontrado específico para Tunder Bot
   const isTunderPatternFound = tunderRadarData?.is_safe_to_operate === true;
-  
+
   // Detectar padrão encontrado específico para Momentum Medio Bot
   const isMomentumMedioPatternFound = momentumMedioData?.is_safe_to_operate === true;
-  
+
   // Detectar padrão encontrado específico para Momentum Calmo LL Bot
-  const isMomentumCalmoLLPatternFound = momentumCalmoLLData?.is_safe_to_operate === true && 
+  const isMomentumCalmoLLPatternFound = momentumCalmoLLData?.is_safe_to_operate === true &&
     momentumCalmoLLData?.reason?.includes('SEÑAL ACTIVA: LL detectado');
-  
+
   // Detectar padrão encontrado específico para Reversão Calma Bot
   const isReversaoCalmaPatternFound = reversaoCalmaData?.is_safe_to_operate === true;
-  
+
   // Definir condição para padrão encontrado (qualquer uma das estratégias do Scalping Bot)
   const isPatternFound = isScalpingPatternFound || isScalpingReversionPatternFound;
-  
+
   // Definir condição para padrão encontrado no Alavanca Bot (Momentum Medio OU Momentum Calmo LL)
   const isAlavancaPatternFound = isMomentumMedioPatternFound || isMomentumCalmoLLPatternFound;
 
@@ -1017,11 +1017,11 @@ const RadarApalancamiento = () => {
     document.addEventListener('keydown', handleFirstInteraction);
 
     return () => {
-       document.removeEventListener('click', handleFirstInteraction);
-       document.removeEventListener('touchstart', handleFirstInteraction);
-       document.removeEventListener('keydown', handleFirstInteraction);
-     };
-   }, [initializeAudio]);
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('touchstart', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, [initializeAudio]);
 
 
 
@@ -1062,14 +1062,14 @@ const RadarApalancamiento = () => {
           <History size={16} />
           <span>Histórico de Estratégias</span>
         </div>
-        
+
         {recentStrategies.map((strategy, index) => {
           const colors = getStrategyColors(strategy.type);
           const timeAgo = new Date(strategy.detected_at).toLocaleTimeString('pt-BR', {
             hour: '2-digit',
             minute: '2-digit'
           });
-          
+
           return (
             <div key={strategy.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700/30 hover:bg-slate-800/50 transition-all duration-200">
               <div className="flex items-center gap-3">
@@ -1090,7 +1090,7 @@ const RadarApalancamiento = () => {
             </div>
           );
         })}
-        
+
         {/* Gráfico de barras simples com taxa de sucesso */}
         <div className="mt-4 p-3 bg-slate-800/20 rounded-lg border border-slate-700/30">
           <div className="text-xs font-medium text-slate-300 mb-2">Taxa de Sucesso por Estratégia</div>
@@ -1101,9 +1101,9 @@ const RadarApalancamiento = () => {
                   {strategy.name.split('_')[0]}
                 </div>
                 <div className="flex-1 bg-slate-700/50 rounded-full h-2 overflow-hidden">
-                  <div 
+                  <div
                     className="h-full rounded-full transition-all duration-500"
-                    style={{ 
+                    style={{
                       width: `${strategy.performance.success_rate}%`,
                       backgroundColor: getStrategyColors(strategy.type).accent
                     }}
@@ -1129,8 +1129,8 @@ const RadarApalancamiento = () => {
         <div className="bg-card rounded-xl p-4 mb-4 border border-white/10 shadow-lg shadow-black/30">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={() => navigate(-1)}
                 className="hover:bg-white/10 p-2"
               >
@@ -1149,36 +1149,34 @@ const RadarApalancamiento = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Status de Conexión Compacto */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4">
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-300 ${
-              isLoading 
-                ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' 
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-300 ${isLoading
+                ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
                 : 'bg-green-500/10 border-green-500/20 text-green-400'
-            }`}>
-              <div className={`w-3 h-3 rounded-full ${
-                isLoading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
-              }`}></div>
+              }`}>
+              <div className={`w-3 h-3 rounded-full ${isLoading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
+                }`}></div>
               <span className="font-medium text-xs">
                 {isLoading ? '🔄 Conectando...' : '✅ Conectado'}
               </span>
             </div>
-            
+
             <div className="flex items-center gap-2 px-3 py-2 bg-[#1C2A3A] rounded-lg border border-white/10">
               <Clock className="text-slate-400" size={14} />
               <span className="text-xs font-medium text-slate-300">
                 <span className="text-[#2DD4BF]">{lastUpdateTime.toLocaleTimeString('es-ES')}</span>
               </span>
             </div>
-            
+
             <div className="flex items-center gap-2 px-3 py-2 bg-[#2DD4BF]/10 rounded-lg border border-[#2DD4BF]/30">
               <Zap className="text-[#2DD4BF]" size={14} />
               <span className="text-xs font-medium text-[#2DD4BF]">
                 Auto: <span className="text-green-400">5s</span>
               </span>
             </div>
-            
+
             {isConnecting && (
               <div className="flex items-center gap-2 px-3 py-2 bg-[#2DD4BF]/10 rounded-lg border border-[#2DD4BF]/30 animate-pulse">
                 <RefreshCw size={14} className="text-[#2DD4BF] animate-spin" />
@@ -1196,8 +1194,8 @@ const RadarApalancamiento = () => {
       {/* Botão de Instalação */}
       <div className="max-w-7xl mx-auto mb-8 px-4">
         <div className="text-center">
-          <Button 
-            onClick={() => navigate('/installation-tutorial')}
+          <Button
+            onClick={() => navigate('/tutorial')}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 sm:py-4 sm:px-8 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl border border-blue-500/30 w-full sm:w-auto text-sm sm:text-base"
           >
             <Download size={16} className="mr-2 sm:mr-3 flex-shrink-0" />
@@ -1211,12 +1209,11 @@ const RadarApalancamiento = () => {
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* SCALPING BOT Card - DESIGN UX PROFISSIONAL */}
-          <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${
-            isPatternFound
+          <Card className={`bg-gradient-to-br from-slate-900/95 to-slate-800/90 backdrop-blur-sm shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all duration-500 ${isPatternFound
               ? 'border-2 border-emerald-400 shadow-emerald-400/30 ring-2 ring-emerald-400/20'
               : 'border border-slate-600/50 shadow-slate-900/50'
-          } relative overflow-hidden group`}>
-            
+            } relative overflow-hidden group`}>
+
             {/* Banner Superior - Quando padrão encontrado */}
             {isPatternFound && (
               <div className="bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-black text-center py-2 px-4 shadow-lg">
@@ -1231,10 +1228,9 @@ const RadarApalancamiento = () => {
             )}
 
             {/* Accent Bar */}
-            <div className={`h-2 rounded-t-lg ${
-              isPatternFound ? 'bg-emerald-400' : 'bg-[#2DD4BF]'
-            }`}></div>
-            
+            <div className={`h-2 rounded-t-lg ${isPatternFound ? 'bg-emerald-400' : 'bg-[#2DD4BF]'
+              }`}></div>
+
             <CardHeader className="pb-2 bg-[#1C2A3A]/80">
               {/* Tag Minimalista dentro do Card */}
               <div className="flex items-center justify-between mb-3">
@@ -1245,11 +1241,10 @@ const RadarApalancamiento = () => {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 border shadow-md rounded-xl ${
-                    isPatternFound
+                  <div className={`p-2 border shadow-md rounded-xl ${isPatternFound
                       ? 'bg-green-500/20 border-green-500/50 shadow-green-400/30'
                       : 'bg-[#2DD4BF]/20 border-[#2DD4BF]/30'
-                  }`}>
+                    }`}>
                     <Shield className={isPatternFound ? 'text-green-400' : 'text-[#2DD4BF]'} size={20} />
                   </div>
                   <div>
@@ -1257,21 +1252,19 @@ const RadarApalancamiento = () => {
                       🤖 SCALPING BOT IA
                     </CardTitle>
                     {lastScalpingOperation && (
-                      <div className={`text-xs px-2 py-1 rounded mt-1 ${
-                        lastScalpingOperation.operation_result === 'WIN'
+                      <div className={`text-xs px-2 py-1 rounded mt-1 ${lastScalpingOperation.operation_result === 'WIN'
                           ? 'bg-green-500/20 text-green-400'
                           : 'bg-red-500/20 text-red-400'
-                      }`}>
+                        }`}>
                         Última operación: {lastScalpingOperation.operation_result || 'N/A'}
                       </div>
                     )}
                   </div>
                 </div>
-                
+
                 <div className="text-right">
-                  <Badge className={`text-white text-xs px-2 py-1 ${
-                    isPatternFound ? 'bg-green-500 animate-pulse' : 'bg-[#2DD4BF]'
-                  }`}>
+                  <Badge className={`text-white text-xs px-2 py-1 ${isPatternFound ? 'bg-green-500 animate-pulse' : 'bg-[#2DD4BF]'
+                    }`}>
                     {isPatternFound ? 'PATRÓN ACTIVO' : 'MONITORANDO'}
                   </Badge>
                 </div>
@@ -1296,22 +1289,20 @@ const RadarApalancamiento = () => {
               {/* Estratégias Grid Layout */}
               <div className="grid gap-4">
                 {/* Estratégia 1 - PRECISION SURGE */}
-                <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${
-                  isScalpingPatternFound 
-                    ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-green-700/10 border-green-500/50 shadow-lg shadow-green-500/20' 
+                <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${isScalpingPatternFound
+                    ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-green-700/10 border-green-500/50 shadow-lg shadow-green-500/20'
                     : 'bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-700/20 border-slate-600/30 hover:border-slate-500/50'
-                }`}>
+                  }`}>
                   {isScalpingPatternFound && (
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
                   )}
                   <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          isScalpingPatternFound 
-                            ? 'bg-green-500/20 text-green-400' 
+                        <div className={`p-2 rounded-lg ${isScalpingPatternFound
+                            ? 'bg-green-500/20 text-green-400'
                             : 'bg-blue-500/20 text-blue-400'
-                        }`}>
+                          }`}>
                           {isScalpingPatternFound ? (
                             <CheckCircle size={20} />
                           ) : (
@@ -1332,9 +1323,8 @@ const RadarApalancamiento = () => {
                         </div>
                       )}
                     </div>
-                    <div className={`text-sm font-medium mb-2 ${
-                      isScalpingPatternFound ? 'text-green-300' : 'text-slate-300'
-                    }`}>
+                    <div className={`text-sm font-medium mb-2 ${isScalpingPatternFound ? 'text-green-300' : 'text-slate-300'
+                      }`}>
                       {scalpingRadarData?.reason || 'Aguardando padrão de entrada...'}
                     </div>
                     <div className="flex items-center justify-between text-xs">
@@ -1347,22 +1337,20 @@ const RadarApalancamiento = () => {
                 </div>
 
                 {/* Estratégia 2 - SCALPING REVERSION */}
-                <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${
-                  isScalpingReversionPatternFound 
-                    ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-green-700/10 border-green-500/50 shadow-lg shadow-green-500/20' 
+                <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${isScalpingReversionPatternFound
+                    ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-green-700/10 border-green-500/50 shadow-lg shadow-green-500/20'
                     : 'bg-gradient-to-br from-purple-900/30 via-purple-800/20 to-purple-700/10 border-purple-600/30 hover:border-purple-500/50'
-                }`}>
+                  }`}>
                   {isScalpingReversionPatternFound && (
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
                   )}
                   <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          isScalpingReversionPatternFound 
-                            ? 'bg-green-500/20 text-green-400' 
+                        <div className={`p-2 rounded-lg ${isScalpingReversionPatternFound
+                            ? 'bg-green-500/20 text-green-400'
                             : 'bg-purple-500/20 text-purple-400'
-                        }`}>
+                          }`}>
                           {isScalpingReversionPatternFound ? (
                             <CheckCircle size={20} />
                           ) : (
@@ -1383,9 +1371,8 @@ const RadarApalancamiento = () => {
                         </div>
                       )}
                     </div>
-                    <div className={`text-sm font-medium mb-2 ${
-                      isScalpingReversionPatternFound ? 'text-green-300' : 'text-slate-300'
-                    }`}>
+                    <div className={`text-sm font-medium mb-2 ${isScalpingReversionPatternFound ? 'text-green-300' : 'text-slate-300'
+                      }`}>
                       {scalpingReversionData?.reason || 'Aguardando padrão de reversão...'}
                     </div>
                     <div className="flex items-center justify-between text-xs">
@@ -1399,130 +1386,129 @@ const RadarApalancamiento = () => {
               </div>
 
               {/* Métricas Simplificadas */}
-               <div className="grid grid-cols-2 gap-3">
-                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl p-4 border border-green-500/20">
-                   <div className="text-center">
-                     <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Vitórias</div>
-                     <div className="text-2xl font-bold text-green-400">
-                       {dashboardStats ? dashboardStats.wins : '0'}
-                     </div>
-                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
-                   </div>
-                 </div>
-                 
-                 <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-4 border border-red-500/20">
-                   <div className="text-center">
-                     <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-2">Derrotas</div>
-                     <div className="text-2xl font-bold text-red-400">
-                       {dashboardStats ? dashboardStats.losses : '0'}
-                     </div>
-                     <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
-                   </div>
-                 </div>
-               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl p-4 border border-green-500/20">
+                  <div className="text-center">
+                    <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Vitórias</div>
+                    <div className="text-2xl font-bold text-green-400">
+                      {dashboardStats ? dashboardStats.wins : '0'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
+                  </div>
+                </div>
 
-               {/* Histórico Visual das Últimas 20 Operações */}
-               <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-lg p-3 border border-slate-600/20">
-                 <div className="flex items-center gap-2 mb-3">
-                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                   <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
-                 </div>
-                 
-                 <div className="grid grid-cols-10 gap-1">
-                   {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 ? (
-                     scalpingOperationsHistory.map((operation, index) => (
-                       <div
-                         key={index}
-                         className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${
-                           operation.operation_result === 'WIN'
-                             ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
-                             : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
-                         }`}
-                         title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.timestamp)}`}
-                       >
-                         {operation.operation_result === 'WIN' ? 'W' : 'L'}
-                       </div>
-                     ))
-                   ) : (
-                     <div className="col-span-10 text-center text-slate-400 text-xs py-2">
-                       Cargando histórico...
-                     </div>
-                   )}
-                 </div>
-                 
-                 {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 && (
-                   <div className="mt-3 flex justify-between text-xs text-slate-400">
-                     <span>Más reciente</span>
-                     <span>Más antigua</span>
-                   </div>
-                 )}
-               </div>
+                <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-4 border border-red-500/20">
+                  <div className="text-center">
+                    <div className="text-xs font-medium text-red-400 uppercase tracking-wider mb-2">Derrotas</div>
+                    <div className="text-2xl font-bold text-red-400">
+                      {dashboardStats ? dashboardStats.losses : '0'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">Últimas 20</div>
+                  </div>
+                </div>
+              </div>
 
+              {/* Histórico Visual das Últimas 20 Operações */}
+              <div className="bg-gradient-to-br from-slate-800/40 to-slate-700/20 rounded-lg p-3 border border-slate-600/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <h3 className="text-sm font-semibold text-slate-200">Histórico Visual</h3>
+                </div>
+
+                <div className="grid grid-cols-10 gap-1">
+                  {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 ? (
+                    scalpingOperationsHistory.map((operation, index) => (
+                      <div
+                        key={index}
+                        className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110 cursor-pointer ${operation.operation_result === 'WIN'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-sm'
+                            : 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-sm'
+                          }`}
+                        title={`${operation.operation_result} - ${convertUTCMinus3ToLocal(operation.timestamp)}`}
+                      >
+                        {operation.operation_result === 'WIN' ? 'W' : 'L'}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-10 text-center text-slate-400 text-xs py-2">
+                      Cargando histórico...
+                    </div>
+                  )}
+                </div>
+
+                {scalpingOperationsHistory && scalpingOperationsHistory.length > 0 && (
+                  <div className="mt-3 flex justify-between text-xs text-slate-400">
+                    <span>Más reciente</span>
+                    <span>Más antigua</span>
+                  </div>
+                )}
+              </div>
 
 
-               {/* Estrategia de Operaciones Optimizada */}
-               <div className="bg-gradient-to-br from-blue-500/10 to-indigo-600/5 rounded-xl p-4 border border-blue-500/20 shadow-lg">
-                 <div className="flex items-center gap-2 mb-3">
-                   <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
-                   <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wide">Estrategia de Precisión Avanzada</h3>
-                 </div>
-                 
-                 <div className="space-y-3">
-                   <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
-                     <div className="flex items-center gap-2 mb-2">
-                       <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-                       <span className="text-xs font-semibold text-emerald-400 uppercase">Recomendación Profesional</span>
-                     </div>
-                     <p className="text-sm text-slate-200 font-medium leading-relaxed">
-                       Utilizar únicamente las <span className="text-emerald-400 font-bold">2 Primeras Operaciones</span> después de surgir el patrón
-                     </p>
-                     <div className="mt-2 text-xs text-slate-400">
-                       Máxima efectividad • Menor exposición al riesgo
-                     </div>
-                   </div>
-                   
-                   <div className="grid grid-cols-2 gap-2">
-                     <div className="bg-emerald-500/10 rounded-lg p-2 border border-emerald-500/20">
-                       <div className="text-xs font-bold text-emerald-400 mb-1">1ª Operación</div>
-                       <div className="text-xs text-slate-300">Precisión: 85%</div>
-                     </div>
-                     <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
-                       <div className="text-xs font-bold text-blue-400 mb-1">2ª Operación</div>
-                       <div className="text-xs text-slate-300">Precisión: 78%</div>
-                     </div>
-                   </div>
-                   
-                   <div className="bg-amber-500/10 rounded-lg p-2 border border-amber-500/20">
-                     <div className="flex items-center gap-2">
-                       <AlertTriangle size={14} className="text-amber-400" />
-                       <span className="text-xs font-medium text-amber-400">Importante:</span>
-                     </div>
-                     <p className="text-xs text-slate-300 mt-1">
-                       Evitar operaciones posteriores para mantener rentabilidad óptima
-                     </p>
-                   </div>
-                 </div>
-               </div>
 
-               {/* Tarja de Aviso */}
-               <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-lg p-3 mb-4">
-                 <div className="flex items-center gap-2 text-amber-400">
-                   <AlertTriangle size={16} />
-                   <span className="text-xs font-bold">⚠️ ATENCIÓN:</span>
-                 </div>
-                 <p className="text-xs text-amber-300 mt-1 font-medium">
-                   Antes de utilizar el Bot, verifica que la Tasa de Crescimiento esté en 2%
-                 </p>
-               </div>
+              {/* Estrategia de Operaciones Optimizada */}
+              <div className="bg-gradient-to-br from-blue-500/10 to-indigo-600/5 rounded-xl p-4 border border-blue-500/20 shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+                  <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wide">Estrategia de Precisión Avanzada</h3>
+                </div>
 
-               {/* Botão Descargar Bot */}
-               <Button 
-                 className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                 onClick={() => window.open('https://drive.google.com/file/d/1GvTxgoItvCn6ngvuttIcTX_ryuMuJB4D/view?usp=sharing', '_blank')}
-               >
-                 <Download size={18} className="mr-2" />
-                 Descargar Bot
-               </Button>
+                <div className="space-y-3">
+                  <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-lg p-3 border border-slate-600/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <span className="text-xs font-semibold text-emerald-400 uppercase">Recomendación Profesional</span>
+                    </div>
+                    <p className="text-sm text-slate-200 font-medium leading-relaxed">
+                      Utilizar únicamente las <span className="text-emerald-400 font-bold">2 Primeras Operaciones</span> después de surgir el patrón
+                    </p>
+                    <div className="mt-2 text-xs text-slate-400">
+                      Máxima efectividad • Menor exposición al riesgo
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-emerald-500/10 rounded-lg p-2 border border-emerald-500/20">
+                      <div className="text-xs font-bold text-emerald-400 mb-1">1ª Operación</div>
+                      <div className="text-xs text-slate-300">Precisión: 85%</div>
+                    </div>
+                    <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
+                      <div className="text-xs font-bold text-blue-400 mb-1">2ª Operación</div>
+                      <div className="text-xs text-slate-300">Precisión: 78%</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-500/10 rounded-lg p-2 border border-amber-500/20">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={14} className="text-amber-400" />
+                      <span className="text-xs font-medium text-amber-400">Importante:</span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Evitar operaciones posteriores para mantener rentabilidad óptima
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tarja de Aviso */}
+              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <AlertTriangle size={16} />
+                  <span className="text-xs font-bold">⚠️ ATENCIÓN:</span>
+                </div>
+                <p className="text-xs text-amber-300 mt-1 font-medium">
+                  Antes de utilizar el Bot, verifica que la Tasa de Crescimiento esté en 2%
+                </p>
+              </div>
+
+              {/* Botão Descargar Bot */}
+              <Button
+                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                onClick={() => window.open('https://drive.google.com/file/d/1GvTxgoItvCn6ngvuttIcTX_ryuMuJB4D/view?usp=sharing', '_blank')}
+              >
+                <Download size={18} className="mr-2" />
+                Descargar Bot
+              </Button>
             </CardContent>
           </Card>
 
@@ -1548,8 +1534,8 @@ const RadarApalancamiento = () => {
                     <p className="text-muted-foreground text-sm mt-1">Últimas 20 operaciones del Scalping Bot</p>
                   </div>
                 </div>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowHistoryModal(false)}
                   className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl p-2"
@@ -1558,7 +1544,7 @@ const RadarApalancamiento = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="p-8 overflow-y-auto max-h-[65vh]">
               {historicData.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -1580,25 +1566,23 @@ const RadarApalancamiento = () => {
                             {formatToLocalTime(operation.created_at)}
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`px-4 py-2 rounded-xl text-sm font-bold shadow-sm ${
-                              operation.profit_percentage > 0 
-                                ? 'bg-success/10 text-success border border-success' 
+                            <span className={`px-4 py-2 rounded-xl text-sm font-bold shadow-sm ${operation.profit_percentage > 0
+                                ? 'bg-success/10 text-success border border-success'
                                 : 'bg-danger/10 text-danger border border-danger'
-                            }`}>
+                              }`}>
                               {operation.profit_percentage > 0 ? '🏆 VICTORIA' : '❌ DERROTA'}
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`text-lg font-bold ${
-                              operation.profit_percentage > 0 ? 'text-success' : 'text-danger'
-                            }`}>
+                            <span className={`text-lg font-bold ${operation.profit_percentage > 0 ? 'text-success' : 'text-danger'
+                              }`}>
                               {operation.profit_percentage > 0 ? '+' : ''}{operation.profit_percentage.toFixed(2)}%
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              {operation.profit_percentage > 0 ? 
-                                <TrendingUp className="text-success" size={20} /> : 
+                              {operation.profit_percentage > 0 ?
+                                <TrendingUp className="text-success" size={20} /> :
                                 <TrendingDown className="text-danger" size={20} />
                               }
                               <span className="text-xs text-muted-foreground font-medium">
@@ -1642,8 +1626,8 @@ const RadarApalancamiento = () => {
                     <p className="text-muted-foreground text-sm mt-1">Últimas 20 operaciones del Tunder Bot</p>
                   </div>
                 </div>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => tunderBot.setShowTunderHistoryModal(false)}
                   className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl p-2"
@@ -1652,7 +1636,7 @@ const RadarApalancamiento = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="p-8 overflow-y-auto max-h-[65vh]">
               {tunderBot.operations && tunderBot.operations.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -1674,25 +1658,23 @@ const RadarApalancamiento = () => {
                             {formatToLocalTime(operation.created_at)}
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`px-4 py-2 rounded-xl text-sm font-bold shadow-sm ${
-                              operation.profit_percentage > 0 
-                                ? 'bg-success/10 text-success border border-success' 
+                            <span className={`px-4 py-2 rounded-xl text-sm font-bold shadow-sm ${operation.profit_percentage > 0
+                                ? 'bg-success/10 text-success border border-success'
                                 : 'bg-danger/10 text-danger border border-danger'
-                            }`}>
+                              }`}>
                               {operation.profit_percentage > 0 ? '🏆 VICTORIA' : '❌ DERROTA'}
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`text-lg font-bold ${
-                              operation.profit_percentage > 0 ? 'text-success' : 'text-danger'
-                            }`}>
+                            <span className={`text-lg font-bold ${operation.profit_percentage > 0 ? 'text-success' : 'text-danger'
+                              }`}>
                               {operation.profit_percentage > 0 ? '+' : ''}{operation.profit_percentage.toFixed(2)}%
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              {operation.profit_percentage > 0 ? 
-                                <TrendingUp className="text-success" size={20} /> : 
+                              {operation.profit_percentage > 0 ?
+                                <TrendingUp className="text-success" size={20} /> :
                                 <TrendingDown className="text-danger" size={20} />
                               }
                               <span className="text-xs text-muted-foreground font-medium">

@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import BotDetail from "./pages/BotDetail";
 import NotFound from "./pages/NotFound";
-import InstallationTutorial from "./pages/InstallationTutorial";
+
 import BestHours from "./pages/BestHours";
 
 import Library from "./pages/Library";
@@ -15,7 +15,7 @@ import SettingsPage from "./pages/Settings";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import DerivCallback from "./pages/DerivCallback";
-import TelegramFloatingButton from "./components/TelegramFloatingButton";
+
 
 import PendingApprovalPage from "./pages/PendingApprovalPage";
 import VerificandoAcessoPage from "./pages/VerificandoAcessoPage";
@@ -46,7 +46,7 @@ import PaginaBloqueada from "./pages/PaginaBloqueada";
 import DerivConnectionPage from "./pages/DerivConnectionPage";
 import BotAlpha from "./pages/BotAlpha";
 import BotSelection from "./pages/BotSelection";
-import VacuumCrash from "./pages/VacuumCrash";
+
 import GainBot from "./pages/GainBot";
 import BotOmega from "./pages/BotOmega";
 import BotSpeed from "./pages/BotSpeed";
@@ -57,6 +57,7 @@ import EfectoMidas from "./pages/EfectoMidas";
 import BugDeriv from "./pages/BugDeriv";
 import ReferralLanding from "./pages/ReferralLanding";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
+import Academy from "./pages/Academy";
 import { TradingSessionProvider } from "./contexts/TradingSessionContext";
 import { PricingModalProvider } from "./contexts/PricingModalContext";
 import PricingModal from "./components/PricingModal";
@@ -117,14 +118,7 @@ const App = () => {
                           </>
                         } />
 
-                        <Route path="/installation-tutorial" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <InstallationTutorial />
-                            </main>
-                          </>
-                        } />
+
 
                         <Route path="/mejores-horarios" element={
                           <>
@@ -336,14 +330,7 @@ const App = () => {
                           </>
                         } />
 
-                        <Route path="/vacuum-crash" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <VacuumCrash />
-                            </main>
-                          </>
-                        } />
+
 
                         <Route path="/bots/gain" element={
                           <>
@@ -426,13 +413,22 @@ const App = () => {
                           </>
                         } />
 
+                        <Route path="/tutorial" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <Academy />
+                            </main>
+                          </>
+                        } />
+
                       </Route>
 
                       <Route path="/pagina-de-teste" element={<PaginaDeTeste />} />
                       <Route path="/PaginaBloqueada" element={<PaginaBloqueada />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
-                    <TelegramFloatingButton />
+
                     <FloatingUpgradeButton />
 
                   </div>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { AccountNumberDisplay } from './AccountNumberDisplay';
 
 interface SavedAccount {
     token: string;
@@ -189,9 +190,14 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                     {/* Seta e ID */}
                     <div className="flex items-center gap-2">
                         {account && (
-                            <span className="hidden sm:inline-block text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded text-white/40 border border-white/5">
-                                {getDisplayLoginId(account.loginid)}
-                            </span>
+                            <div className="hidden sm:inline-block">
+                                <AccountNumberDisplay
+                                    accountNumber={getDisplayLoginId(account.loginid)}
+                                    className="text-[10px] font-mono bg-black/20 px-2 py-0.5 rounded text-white/40 border border-white/5"
+                                    iconSize={12}
+                                    showToggle={true}
+                                />
+                            </div>
                         )}
                         <ChevronDown
                             size={18}
@@ -286,7 +292,12 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                                                <span className="opacity-70">{getDisplayLoginId(acc.loginid)}</span>
+                                                <AccountNumberDisplay
+                                                    accountNumber={getDisplayLoginId(acc.loginid)}
+                                                    className="opacity-70"
+                                                    iconSize={12}
+                                                    showToggle={false}
+                                                />
                                                 <span className="w-1 h-1 rounded-full bg-slate-600"></span>
                                                 <span>{acc.balance ? `${currencySymbol}${formatBalance(acc.balance)}` : '---'}</span>
                                             </div>

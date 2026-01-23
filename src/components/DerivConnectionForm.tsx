@@ -3,6 +3,8 @@ import { useDeriv } from '../contexts/DerivContext';
 import { Shield, Key, CheckCircle2, AlertCircle, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AffiliateModal } from './AffiliateModal';
+import { SmartHelpTrigger } from './SmartHelpTrigger';
+import { AccountNumberDisplay } from './AccountNumberDisplay';
 
 export const DerivConnectionForm = () => {
     const { isConnected, isConnecting, connect, disconnect, lastError, account } = useDeriv();
@@ -46,7 +48,11 @@ export const DerivConnectionForm = () => {
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="bg-background/40 p-4 rounded-xl border border-white/5 backdrop-blur-md">
                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest block mb-1 font-bold">ID de Inicio de Sesión</span>
-                        <span className="font-mono font-bold text-white text-sm sm:text-base">{account.loginid}</span>
+                        <AccountNumberDisplay
+                            accountNumber={account.loginid}
+                            className="font-bold text-white text-sm sm:text-base"
+                            iconSize={16}
+                        />
                     </div>
                     <div className="bg-background/40 p-4 rounded-xl border border-white/5 backdrop-blur-md">
                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest block mb-1 font-bold">Saldo Actual</span>
@@ -85,6 +91,7 @@ export const DerivConnectionForm = () => {
                         <label htmlFor="api-token" className="text-sm font-medium flex items-center gap-2">
                             <Key size={16} className="text-primary" />
                             Token de API
+                            <SmartHelpTrigger />
                         </label>
                         <div className="relative">
                             <input

@@ -8,12 +8,12 @@ import { bots } from '../lib/mockData';
 const getLeverageBots = () => {
   // IDs de los bots de apalancamiento específicos
   const leverageBotIds = ['factor50x', '15', '14', 'apalancamiento-100x']; // Factor50X, Sniper Bot, NexusBot, Apalancamiento 100X
-  
+
   // Filtrar y mapear los bots desde la biblioteca
   const leverageBots = leverageBotIds.map(id => {
     const bot = bots.find(b => b.id === id);
     if (!bot) return null;
-    
+
     // Mapear los datos del bot a la estructura esperada
     return {
       id: bot.id,
@@ -83,7 +83,7 @@ const getLeverageBots = () => {
       ]
     };
   }).filter(Boolean);
-  
+
   // Ordenar por assertividade (accuracy) de mayor a menor
   return leverageBots.sort((a, b) => b.accuracy - a.accuracy);
 };
@@ -115,7 +115,7 @@ const BotsApalancamiento = () => {
       <section className="mb-12">
         <div className="relative overflow-hidden rounded-2xl shadow-xl">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/15 to-background"></div>
-          
+
           {/* Decorative elements */}
           <div className="absolute inset-0 w-full h-full overflow-hidden opacity-70">
             <div className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-br from-primary/20 to-transparent -top-[350px] -right-[100px] blur-md"></div>
@@ -125,7 +125,7 @@ const BotsApalancamiento = () => {
               <path fill="currentColor" d="M47.1,-57.8C58.6,-47.6,63.6,-30.8,66.8,-13.5C70,3.8,71.5,21.6,64.6,35.5C57.6,49.4,42.2,59.5,25.7,65.1C9.1,70.7,-8.5,72,-23.9,66.3C-39.3,60.7,-52.5,48.1,-63.1,32.5C-73.7,16.9,-81.7,-1.7,-77.9,-17.7C-74.1,-33.7,-58.5,-47.1,-42.2,-56.5C-25.9,-65.9,-8.9,-71.4,6.8,-79.5C22.6,-87.6,39.4,-98.5,47.1,-57.8Z" transform="translate(120 130)" />
             </svg>
           </div>
-          
+
           <div className="relative z-10 py-12 px-8 flex flex-col md:flex-row items-start gap-10">
             <div className="flex-1 max-w-3xl">
               <div className="inline-block mb-3 bg-primary/10 backdrop-blur-sm rounded-full px-4 py-1.5 border border-primary/20">
@@ -142,7 +142,7 @@ const BotsApalancamiento = () => {
                 </span>
               </h1>
               <p className="text-xl mb-6 text-muted-foreground leading-relaxed max-w-2xl">
-                Descubre nuestros bots especializados en trading con apalancamiento para la plataforma Deriv. 
+                Descubre nuestros bots especializados en trading con apalancamiento para la plataforma Deriv.
                 Diseñados por traders expertos para maximizar oportunidades en mercados volátiles.
               </p>
               <div className="flex flex-wrap gap-4 mt-8">
@@ -160,7 +160,7 @@ const BotsApalancamiento = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-4 bg-card/80 backdrop-blur-sm rounded-lg p-6 border border-border/50 shadow-sm min-w-[300px]">
               <div className="text-center">
                 <span className="text-xs text-muted-foreground">Bots Disponibles</span>
@@ -169,7 +169,7 @@ const BotsApalancamiento = () => {
                   <Bot size={16} className="text-primary" />
                 </div>
               </div>
-              
+
               <div className="text-center">
                 <span className="text-xs text-muted-foreground">Asertividad Promedio</span>
                 <div className="flex items-baseline justify-center gap-1">
@@ -179,7 +179,7 @@ const BotsApalancamiento = () => {
                   <ChartLine size={16} className="text-primary" />
                 </div>
               </div>
-              
+
               <div className="text-center">
                 <span className="text-xs text-muted-foreground">Total Operaciones</span>
                 <div className="flex items-baseline justify-center gap-1">
@@ -265,14 +265,14 @@ const BotsApalancamiento = () => {
             <div>
               <h3 className="text-lg font-semibold mb-3 text-primary">Concepto Básico</h3>
               <p className="text-muted-foreground mb-4">
-                El apalancamiento permite controlar una posición más grande con una cantidad menor de capital. 
+                El apalancamiento permite controlar una posición más grande con una cantidad menor de capital.
                 Por ejemplo, con apalancamiento 100:1, puede controlar $10,000 con solo $100.
               </p>
               <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
                 <h4 className="font-medium mb-2">Ejemplo Práctico:</h4>
                 <p className="text-sm text-muted-foreground">
-                  Con $100 y apalancamiento 50x, puede abrir una posición de $5,000. 
-                  Si el mercado sube 2%, gana $100 (100% de retorno). 
+                  Con $100 y apalancamiento 50x, puede abrir una posición de $5,000.
+                  Si el mercado sube 2%, gana $100 (100% de retorno).
                   Si baja 2%, pierde $100 (100% de pérdida).
                 </p>
               </div>
@@ -313,7 +313,7 @@ const BotsApalancamiento = () => {
             Desarrollados por traders expertos en Deriv
           </div>
         </div>
-        
+
         <div className="grid lg:grid-cols-3 gap-8">
           {leverageBots.map((bot) => (
             <div key={bot.id} className="group relative">
@@ -328,7 +328,7 @@ const BotsApalancamiento = () => {
                       {bot.risk}
                     </div>
                   </div>
-                  
+
                   <div className="pr-20">
                     <div className="flex items-center gap-2 mb-2">
                       <div className={cn(
@@ -339,7 +339,7 @@ const BotsApalancamiento = () => {
                     </div>
 
                   </div>
-                  
+
                   {/* Enhanced Stats */}
                   <div className="grid grid-cols-3 gap-4 mt-6">
                     <div className="text-center bg-background/50 rounded-lg p-3 border border-border/50">
@@ -362,7 +362,7 @@ const BotsApalancamiento = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Enhanced Details */}
                 <div className="p-6">
                   <div className="space-y-6">
@@ -377,7 +377,7 @@ const BotsApalancamiento = () => {
                         <div className="font-bold">{bot.timeframe}</div>
                       </div>
                     </div>
-                    
+
                     {/* Strategy Badge */}
                     <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg p-4 border border-primary/20">
                       <div className="flex items-center gap-2 mb-2">
@@ -386,7 +386,7 @@ const BotsApalancamiento = () => {
                       </div>
                       <div className="font-bold text-lg">{bot.strategy}</div>
                     </div>
-                    
+
                     {/* Features */}
                     <div>
                       <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -404,17 +404,17 @@ const BotsApalancamiento = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Footer */}
                 <div className="p-6 pt-0">
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       onClick={() => setSelectedBot(selectedBot === bot.id ? null : bot.id)}
                       className="flex-1 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-md text-sm font-medium transition-colors"
                     >
                       {selectedBot === bot.id ? 'Ocultar Detalles' : 'Ver Detalles'}
                     </button>
-                    <button 
+                    <button
                       onClick={() => navigate(bot.id === 'factor50x' ? '/factor50x' : `/bot/${bot.id}`)}
                       className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-sm font-medium transition-colors text-center flex items-center justify-center gap-1"
                     >
@@ -423,7 +423,7 @@ const BotsApalancamiento = () => {
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Expanded Details */}
                 {selectedBot === bot.id && (
                   <div className="border-t border-border p-6 bg-muted/20 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -477,7 +477,7 @@ const BotsApalancamiento = () => {
               Recomendaciones de profesionales con años de experiencia en trading con apalancamiento en Deriv
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-card/50 rounded-lg p-6 border border-border">
               <div className="text-primary mb-3">
@@ -485,31 +485,31 @@ const BotsApalancamiento = () => {
               </div>
               <h3 className="font-semibold mb-2">Gestión de Capital</h3>
               <p className="text-sm text-muted-foreground">
-                "Nunca arriesgues más del 2% de tu capital en una sola operación. 
+                "Nunca arriesgues más del 2% de tu capital en una sola operación.
                 La consistencia es más importante que las ganancias grandes."
               </p>
               <div className="text-xs text-primary mt-2 font-medium">- Carlos Mendoza, Trader Senior</div>
             </div>
-            
+
             <div className="bg-card/50 rounded-lg p-6 border border-border">
               <div className="text-emerald-500 mb-3">
                 <Target size={24} />
               </div>
               <h3 className="font-semibold mb-2">Análisis Técnico</h3>
               <p className="text-sm text-muted-foreground">
-                "Combina múltiples indicadores y siempre confirma las señales. 
+                "Combina múltiples indicadores y siempre confirma las señales.
                 Los bots son herramientas, pero el análisis humano sigue siendo clave."
               </p>
               <div className="text-xs text-emerald-500 mt-2 font-medium">- Ana Rodriguez, Analista Técnica</div>
             </div>
-            
+
             <div className="bg-card/50 rounded-lg p-6 border border-border">
               <div className="text-blue-500 mb-3">
                 <Activity size={24} />
               </div>
               <h3 className="font-semibold mb-2">Psicología del Trading</h3>
               <p className="text-sm text-muted-foreground">
-                "Mantén la disciplina emocional. Los bots te ayudan a eliminar 
+                "Mantén la disciplina emocional. Los bots te ayudan a eliminar
                 las decisiones impulsivas, pero debes seguir el plan establecido."
               </p>
               <div className="text-xs text-blue-500 mt-2 font-medium">- Miguel Santos, Trader Profesional</div>
@@ -523,18 +523,18 @@ const BotsApalancamiento = () => {
         <div className="bg-gradient-to-r from-primary to-primary/80 rounded-xl p-8 text-center text-primary-foreground">
           <h2 className="text-2xl font-bold mb-4">¿Listo para Comenzar?</h2>
           <p className="mb-6 opacity-90 max-w-2xl mx-auto">
-            Únete a miles de traders que ya están utilizando nuestros bots de apalancamiento 
+            Únete a miles de traders que ya están utilizando nuestros bots de apalancamiento
             para maximizar sus oportunidades en los mercados financieros.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              to="/library" 
+            <Link
+              to="/library"
               className="px-6 py-3 bg-white text-primary rounded-lg font-medium hover:bg-gray-100 transition-colors"
             >
               Ver Todos los Bots
             </Link>
-            <Link 
-              to="/installation-tutorial" 
+            <Link
+              to="/tutorial"
               className="px-6 py-3 bg-primary-foreground/20 text-white rounded-lg font-medium hover:bg-primary-foreground/30 transition-colors border border-primary-foreground/30"
             >
               Tutorial de Instalación

@@ -17,6 +17,7 @@ interface RiskSettings {
 interface SafetyCheck {
     allowed: boolean;
     reason?: string;
+    triggerType?: 'stop_loss' | 'take_profit';
 }
 
 interface RiskSystemReturn {
@@ -147,7 +148,8 @@ export const useRiskSystem = (): RiskSystemReturn => {
             console.log(`[RiskSystem] 🛑 STOP LOSS ACTIVADO | Pérdida: $${Math.abs(currentSessionProfit).toFixed(2)}`);
             return {
                 allowed: false,
-                reason: `🛑 STOP LOSS ALCANZADO (-$${settings.global_stop_loss.toFixed(2)})`
+                reason: `🛑 STOP LOSS ALCANZADO (-$${settings.global_stop_loss.toFixed(2)})`,
+                triggerType: 'stop_loss'
             };
         }
 
@@ -156,7 +158,8 @@ export const useRiskSystem = (): RiskSystemReturn => {
             console.log(`[RiskSystem] 🎯 META ALCANZADA | Ganancia: $${currentSessionProfit.toFixed(2)}`);
             return {
                 allowed: false,
-                reason: `🎯 META DIARIA ALCANZADA (+$${settings.global_take_profit.toFixed(2)})`
+                reason: `🎯 META DIARIA ALCANZADA (+$${settings.global_take_profit.toFixed(2)})`,
+                triggerType: 'take_profit'
             };
         }
 

@@ -280,7 +280,7 @@ const BestHours = () => {
         <div className="relative p-10 text-center">
           <h2 className="text-3xl font-bold mb-4 text-foreground">¿Listo para Comenzar?</h2>          <p className="text-xl mb-8 max-w-2xl mx-auto text-muted-foreground">Prueba tu robot en la cuenta demo en diferentes horarios y descubre los períodos que funcionan mejor para tu estrategia específica.</p>
           <div className="flex flex-col sm:flex-row gap-5 justify-center">
-            <a href="/installation-tutorial" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-4 rounded-lg font-semibold shadow-lg transition-colors inline-flex items-center justify-center gap-2">
+            <a href="/tutorial" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-4 rounded-lg font-semibold shadow-lg transition-colors inline-flex items-center justify-center gap-2">
               <Clock className="h-5 w-5" />
               Tutorial de Instalación
             </a>

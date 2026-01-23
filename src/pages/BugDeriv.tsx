@@ -54,9 +54,7 @@ const BugDeriv = () => {
     const [stopLoss, setStopLoss] = useState<string>(() => localStorage.getItem('bugderiv_stoploss') || '50.00');
     const [takeProfit, setTakeProfit] = useState<string>(() => localStorage.getItem('bugderiv_takeprofit') || '20.00');
     const [useMartingale, setUseMartingale] = useState<boolean>(() => localStorage.getItem('bugderiv_martingale') !== 'false');
-    const [localSafetyFactor, setLocalSafetyFactor] = useState<number>(() =>
-        parseFloat(localStorage.getItem('bugderiv_safetyfactor') || '1.2')
-    );
+    const [localSafetyFactor, setLocalSafetyFactor] = useState<number>(2.2);
 
     const logsContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<HTMLCanvasElement>(null);
@@ -77,8 +75,7 @@ const BugDeriv = () => {
         localStorage.setItem('bugderiv_stoploss', stopLoss);
         localStorage.setItem('bugderiv_takeprofit', takeProfit);
         localStorage.setItem('bugderiv_martingale', String(useMartingale));
-        localStorage.setItem('bugderiv_safetyfactor', String(localSafetyFactor));
-    }, [stake, stopLoss, takeProfit, useMartingale, localSafetyFactor]);
+    }, [stake, stopLoss, takeProfit, useMartingale]);
 
     useEffect(() => {
         if (logsContainerRef.current) {
@@ -511,26 +508,7 @@ const BugDeriv = () => {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-2 block">
-                                        Factor de Seguridad: {localSafetyFactor.toFixed(1)}x
-                                    </label>
-                                    <input
-                                        type="range"
-                                        min={fortressConfig.MIN_SAFETY_FACTOR}
-                                        max={fortressConfig.MAX_SAFETY_FACTOR}
-                                        step="0.1"
-                                        value={localSafetyFactor}
-                                        onChange={(e) => setLocalSafetyFactor(parseFloat(e.target.value))}
-                                        disabled={isRunning}
-                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                                    />
-                                    <div className="flex justify-between text-[9px] text-slate-600 mt-1">
-                                        <span>0.5x</span>
-                                        <span>1.2x</span>
-                                        <span>3.0x</span>
-                                    </div>
-                                </div>
+
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>

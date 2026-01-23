@@ -56,9 +56,9 @@ const SHIELD_CONFIG = {
     TREND_TICKS: 3,                 // 3 ticks for trend
 
     // BARRIER CALCULATION
-    DEFAULT_SAFETY_FACTOR: 2.5,     // 2.5x ATR (Aggressive Barrier)
-    MIN_SAFETY_FACTOR: 1.0,
-    MAX_SAFETY_FACTOR: 5.0,
+    DEFAULT_SAFETY_FACTOR: 2.2,     // Locked to 2.2 as per user request
+    MIN_SAFETY_FACTOR: 2.2,
+    MAX_SAFETY_FACTOR: 2.2,
 
     // CONTRACT SETTINGS
     CONTRACT_DURATION: 5,           // 5 ticks duration
@@ -291,10 +291,10 @@ export const useBugDeriv = () => {
         if (profitPercent < SHIELD_CONFIG.MIN_PAYOUT_PERCENT) {
             addLog(`⚠️ Payout muy bajo (${profitPercent.toFixed(1)}%). Reajustando...`, 'warning');
 
-            // Reduce safety factor to get closer to price (higher risk/reward)
-            const newFactor = Math.max(SHIELD_CONFIG.MIN_SAFETY_FACTOR, safetyFactorRef.current - 0.2);
-            safetyFactorRef.current = newFactor;
-            setSafetyFactor(newFactor);
+            // Note: Automatic factor reduction disabled per user request (locked at 2.2)
+            // const newFactor = Math.max(SHIELD_CONFIG.MIN_SAFETY_FACTOR, safetyFactorRef.current - 0.2);
+            // safetyFactorRef.current = newFactor;
+            // setSafetyFactor(newFactor);
 
             // Cancel this trade entry
             isWaitingForContractRef.current = false;
@@ -338,10 +338,10 @@ export const useBugDeriv = () => {
             martingaleLevelRef.current = 0;
             consecutiveLossesRef.current = 0;
 
-            // Restore Safety Factor slowly on win
-            const newFactor = Math.min(SHIELD_CONFIG.MAX_SAFETY_FACTOR, safetyFactorRef.current + 0.1);
-            safetyFactorRef.current = newFactor;
-            setSafetyFactor(newFactor);
+            // Note: Automatic factor restoration disabled per user request (locked at 2.2)
+            // const newFactor = Math.min(SHIELD_CONFIG.MAX_SAFETY_FACTOR, safetyFactorRef.current + 0.1);
+            // safetyFactorRef.current = newFactor;
+            // setSafetyFactor(newFactor);
 
             addLog(`✅ VICTORIA +$${result.profit.toFixed(2)}`, 'success');
         } else {

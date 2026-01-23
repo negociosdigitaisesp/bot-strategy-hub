@@ -43,6 +43,9 @@ interface RiskSettings {
     risk_enabled: boolean;
 }
 
+// Deriv minimum stake value (the platform does not accept less than this)
+const DERIV_MIN_STAKE = 0.35;
+
 // Profile Configurations (% of balance)
 const PROFILE_CONFIG = {
     blindaje: {
@@ -127,12 +130,16 @@ const RiskSettingsPage = () => {
         const balance = parseFloat(totalBalance);
         if (!isNaN(balance) && balance > 0) {
             const config = PROFILE_CONFIG[selectedProfile];
+            // Calculate stake based on percentage but enforce Deriv's minimum of 0.35
+            const calculatedStake = parseFloat((balance * config.stakePercent / 100).toFixed(2));
+            const finalStake = Math.max(DERIV_MIN_STAKE, calculatedStake);
+
             setSettings(prev => ({
                 ...prev,
                 risk_mode: selectedProfile,
                 global_stop_loss: parseFloat((balance * config.stopLossPercent / 100).toFixed(2)),
                 global_take_profit: parseFloat((balance * config.takeProfitPercent / 100).toFixed(2)),
-                base_stake: parseFloat((balance * config.stakePercent / 100).toFixed(2)),
+                base_stake: finalStake,
             }));
         }
     }, [totalBalance, selectedProfile]);
@@ -498,14 +505,31 @@ const RiskSettingsPage = () => {
                             <label className="text-[10px] text-white/30 uppercase tracking-wider font-mono mb-2 flex items-center gap-2">
                                 <DollarSign size={11} /> Stake Inicial
                             </label>
-                            <p className="text-[10px] text-white/30 mb-2">Monto base de cada operación</p>
+                            <p className="text-[10px] text-white/30 mb-1">Monto base de cada operación</p>
+                            <p className="text-[9px] text-amber-400/70 mb-2 flex items-center gap-1">
+                                <AlertTriangle size={10} />
+                                Mínimo aceptado por Deriv: $0.35
+                            </p>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500/50 font-mono">$</span>
                                 <input
                                     type="number"
                                     step="0.01"
+                                    min={DERIV_MIN_STAKE}
                                     value={settings.base_stake}
-                                    onChange={(e) => setSettings(s => ({ ...s, base_stake: parseFloat(e.target.value) || 0 }))}
+                                    onChange={(e) => {
+                                        const value = parseFloat(e.target.value) || 0;
+                                        // Enforce minimum stake of 0.35 (Deriv's minimum)
+                                        const finalValue = Math.max(DERIV_MIN_STAKE, value);
+                                        setSettings(s => ({ ...s, base_stake: finalValue }));
+                                    }}
+                                    onBlur={(e) => {
+                                        // Ensure minimum on blur in case user typed less than 0.35
+                                        const value = parseFloat(e.target.value) || 0;
+                                        if (value < DERIV_MIN_STAKE) {
+                                            setSettings(s => ({ ...s, base_stake: DERIV_MIN_STAKE }));
+                                        }
+                                    }}
                                     className="w-full bg-[#050608] border border-white/10 rounded-xl py-2.5 pl-8 pr-4 text-white font-mono focus:outline-none focus:border-cyan-500/40"
                                 />
                             </div>

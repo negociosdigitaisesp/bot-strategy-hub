@@ -169,22 +169,15 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             requiresUpgrade: true,
             description: 'Shadow Mode - Digit Differs'
         },
-        {
-            name: 'Vacuum Crash',
-            icon: <Zap size={20} />,
-            path: '/vacuum-crash',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Cazador de Vacíos (CRASH 500)'
-        },
+
 
         {
-            name: 'Tutorial de Instalación',
+            name: 'Tutorial',
             icon: <FileText size={20} />,
-            path: '/installation-tutorial',
+            path: '/tutorial',
             isImportant: false,
             requiresUpgrade: false,
-            description: 'Guía paso a paso'
+            description: 'Academia de Trading'
         },
         {
             name: 'Programa de Socios',
@@ -427,12 +420,6 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                             </span>
                                             <Sparkles size={14} className="text-primary/60 flex-shrink-0" />
                                         </div>
-                                        <span className={cn(
-                                            "text-xs truncate block",
-                                            isMobile ? "text-muted-foreground" : "text-sidebar-foreground/60"
-                                        )}>
-                                            {user?.email}
-                                        </span>
                                         {/* Subtle License Status Widget - REPLACED WITH PREMIUM BADGE */}
                                         <div className="mt-2">
                                             {showTraderDiamondBadge ? (

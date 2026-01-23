@@ -5,6 +5,8 @@ import SkeletonCard from '../components/SkeletonCard';
 import EnhancedFilterControls from '../components/EnhancedFilterControls';
 import LoadingState from '../components/LoadingState';
 import RecentGainsTicker from '../components/RecentGainsTicker';
+import TraderProgress from '../components/TraderProgress';
+import { RankingSmartHelp } from '../components/RankingSmartHelp';
 import {
   Search,
   Filter,
@@ -505,6 +507,9 @@ const Library = () => {
       {/* Recent Gains Ticker */}
       <RecentGainsTicker className="mb-6 -mx-4" />
 
+      {/* Trader Progress Widget */}
+      <TraderProgress className="mb-8" />
+
       {/* Hero Section - Premium Design */}
       <section className="mb-10">
         <div className="relative overflow-hidden rounded-3xl p-[1px] group">
@@ -533,10 +538,11 @@ const Library = () => {
                   <span className="text-xs font-semibold text-primary uppercase tracking-wider">Ranking de Asertividad</span>
                 </div>
 
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-foreground leading-tight tracking-tight">
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-foreground leading-tight tracking-tight flex items-center">
                   <span className="bg-gradient-to-r from-primary via-primary to-emerald-400 bg-clip-text text-transparent drop-shadow-sm">
                     Ranking de Asertividad
                   </span>
+                  <RankingSmartHelp variant="ranking" />
                 </h1>
 
                 <p className="text-base md:text-lg text-muted-foreground mb-6 leading-relaxed max-w-xl">

@@ -4,7 +4,9 @@ import { useMarketingMode } from '../hooks/useMarketingMode';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
 import { Wifi, WifiOff, Loader2, User, DollarSign, Gem } from 'lucide-react';
 import { cn } from '../lib/utils';
+
 import { Link } from 'react-router-dom';
+import { AccountNumberDisplay } from './AccountNumberDisplay';
 
 export const DerivStatus = () => {
     const { isConnected, isConnecting, account } = useDeriv();
@@ -145,7 +147,13 @@ export const DerivStatus = () => {
                         {accountTypeDisplay}
                     </span>
                 </div>
-                <span className="text-[10px] text-white/50 font-mono tracking-wider ml-5">{displayLoginId}</span>
+                <div className="ml-5">
+                    <AccountNumberDisplay
+                        accountNumber={displayLoginId}
+                        className="text-[10px] text-white/50 font-mono tracking-wider"
+                        iconSize={12}
+                    />
+                </div>
             </div>
 
             {/* Balance display */}
