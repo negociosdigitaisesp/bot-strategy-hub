@@ -1,0 +1,100 @@
+export const getWelcomeEmailHTML = (userName: string, appLink: string = 'https://appmillionbots.com') => {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso Liberado</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #020617; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #e2e8f0; line-height: 1.6;">
+  
+  <!-- Container Principal -->
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #020617;">
+    <tr>
+      <td align="center" style="padding: 40px 10px;">
+        
+        <!-- Card do E-mail -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #0f172a; border-radius: 12px; border: 1px solid #1e293b; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="padding: 30px 40px; border-bottom: 1px solid #1e293b; text-align: center;">
+              <h1 style="margin: 0; color: #22d3ee; font-size: 24px; letter-spacing: 2px; text-transform: uppercase;">MILLION BOTS</h1>
+              <p style="margin: 5px 0 0 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Trading Intelligence Suite</p>
+            </td>
+          </tr>
+
+          <!-- Corpo -->
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin-bottom: 20px; font-size: 16px;">Bienvenido a la Resistencia, <strong>${userName}</strong>.</p>
+              
+              <p style="margin-bottom: 20px; font-size: 16px;">
+                Voy a ser directo. No te acabas de registrar en "otro robot de trading". La mayoría de la gente entra al mercado a apostar. 
+                <span style="color: #4ade80; font-weight: bold;">Tú acabas de acceder a una herramienta diseñada para explotar una falla de latencia.</span>
+              </p>
+
+              <div style="background-color: #1e293b; padding: 20px; border-left: 4px solid #22d3ee; border-radius: 4px; margin-bottom: 25px;">
+                <p style="margin: 0; font-size: 15px; color: #fff;">
+                  ⚙️ <strong>Lo que tienes en tus manos es el Bug Deriv.</strong><br><br>
+                  Este algoritmo no adivina. Él detecta un retraso microscópico (aprox. 200ms) entre la explosión del precio y la actualización de la barrera. Es en esa fracción de segundo donde nosotros operamos.
+                </p>
+              </div>
+
+              <p style="margin-bottom: 20px; font-size: 16px;">
+                Tu cuenta actual es <strong>Free</strong>, pero la tecnología que corre por debajo es <em>Elite</em>. Estás conectado a nuestros servidores de Alta Frecuencia, protegidos por el sistema <strong>Quant Shield</strong>.
+              </p>
+
+              <p style="margin-bottom: 25px; font-size: 16px; color: #f87171; font-weight: bold;">
+                ⚠️ PERO NADA DE ESTO FUNCIONA SI NO HACES ESTO AHORA:
+              </p>
+
+              <p style="margin-bottom: 30px; font-size: 16px;">
+                El algoritmo necesita una "llave" para comunicarse con tu cuenta. Sin el <strong>Token de API</strong>, el sistema es un Ferrari sin gasolina.
+              </p>
+
+              <ol style="margin-bottom: 30px; padding-left: 20px; color: #cbd5e1;">
+                <li style="margin-bottom: 10px;">Entra al <strong>Centro de Comando</strong>.</li>
+                <li style="margin-bottom: 10px;">Ve a la sección <strong>"Conectar con Deriv"</strong>.</li>
+                <li style="margin-bottom: 10px;">Sigue el tutorial de 1 minuto y pega tu Token.</li>
+              </ol>
+
+              <!-- Botão CTA -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center">
+                    <a href="${appmillionbots.com}" style="display: inline-block; padding: 16px 32px; background-color: #22d3ee; color: #0f172a; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 8px; transition: all 0.3s ease;">
+                      👉 ACCEDER AL CENTRO DE COMANDO
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin-top: 30px; font-size: 14px; text-align: center; color: #94a3b8;">
+                No dejes la herramienta inactiva. El mercado está abierto y la latencia está a nuestro favor en este momento.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 30px; background-color: #020617; border-top: 1px solid #1e293b; text-align: center;">
+              <p style="margin: 0; font-size: 14px; font-weight: bold; color: #e2e8f0;">Miguel | CEO Million Bots</p>
+              <p style="margin: 5px 0 0 0; font-size: 12px; color: #64748b;">Trading Intelligence • High Frequency • Quant</p>
+              <p style="margin-top: 20px; font-size: 10px; color: #475569;">
+                Si ya no deseas recibir inteligencia de mercado, puedes <a href="#" style="color: #64748b; text-decoration: underline;">darte de baja</a>.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+  `;
+};

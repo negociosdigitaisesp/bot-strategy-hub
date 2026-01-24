@@ -41,10 +41,10 @@ const PricingCard: React.FC<PricingCardProps> = ({
             transition={{ duration: 0.5, delay, ease: 'easeOut' }}
             whileHover={{ y: -8, transition: { duration: 0.3 } }}
             className={`relative flex flex-col rounded-2xl backdrop-blur-xl overflow-hidden transition-all duration-300 ${isPopular
-                    ? 'bg-gradient-to-b from-[#0F171A] to-[#0a1214] border-2 border-cyan-500 shadow-2xl shadow-cyan-500/20 scale-105 z-10'
-                    : isLifetime
-                        ? 'bg-[#0F171A] border border-amber-500/30 hover:border-amber-500/60 hover:shadow-xl hover:shadow-amber-500/10'
-                        : 'bg-[#0F171A] border border-slate-800 hover:border-slate-700 hover:shadow-xl hover:shadow-slate-800/50'
+                ? 'bg-gradient-to-b from-[#0F171A] to-[#0a1214] border-2 border-cyan-500 shadow-2xl shadow-cyan-500/20 scale-105 z-10'
+                : isLifetime
+                    ? 'bg-[#0F171A] border border-amber-500/30 hover:border-amber-500/60 hover:shadow-xl hover:shadow-amber-500/10'
+                    : 'bg-[#0F171A] border border-slate-800 hover:border-slate-700 hover:shadow-xl hover:shadow-slate-800/50'
                 }`}
         >
             {/* Popular Badge */}
@@ -52,7 +52,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
                 <div className="absolute -top-px left-0 right-0 flex justify-center z-20">
                     <div className="bg-gradient-to-r from-cyan-500 via-emerald-400 to-cyan-500 text-black font-bold text-xs uppercase tracking-widest px-6 py-2 rounded-b-xl flex items-center gap-2 shadow-lg shadow-cyan-500/30">
                         <Flame size={14} className="animate-pulse" />
-                        <span>🔥 AHORRA 75% - MEJOR OPCIÓN</span>
+                        <span>🔥 OFERTA SECRETA (AHORRA 85%)</span>
                     </div>
                 </div>
             )}
@@ -117,10 +117,10 @@ const PricingCard: React.FC<PricingCardProps> = ({
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className={`w-full py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 group ${isPopular
-                            ? 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-black hover:shadow-lg hover:shadow-cyan-500/40'
-                            : isLifetime
-                                ? 'border-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/20'
-                                : 'border-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-400'
+                        ? 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-black hover:shadow-lg hover:shadow-cyan-500/40'
+                        : isLifetime
+                            ? 'border-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/20'
+                            : 'border-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-400'
                         }`}
                 >
                     {isPopular && <Zap size={16} />}
@@ -147,55 +147,61 @@ const PricingCard: React.FC<PricingCardProps> = ({
 const PricingSection: React.FC = () => {
     const plans = [
         {
-            title: 'Trader Mensual',
-            price: '$10',
+            title: 'MENSUAL',
+            price: '$17',
             period: '/mes',
-            subtitle: 'Prueba y Valida',
+            subtitle: 'Sin compromiso',
             description: 'Acceso completo por 30 días. Ideal para probar la estrategia.',
             features: [
-                'Acceso a todos los bots',
-                'Análisis de mercado en vivo',
+                'Desbloqueo Inmediato de Bots',
+                'Sin Límites de Ganancia ($5)',
+                'Acceso a Bug Deriv',
+                'Acceso a Efecto Midas',
                 'Soporte por WhatsApp',
-                'Actualizaciones incluidas',
             ],
-            buttonText: 'Comenzar Ahora',
+            buttonText: 'Comenzar Mensual',
             checkoutUrl: 'https://pay.hotmart.com/Q103866199O?off=c1pgsg6o',
             isPopular: false,
             isLifetime: false,
         },
         {
-            title: 'Pro Anual',
+            title: 'PRO ANUAL',
             price: '$30',
             period: '/año',
-            subtitle: 'Equivale a $2.50/mes',
-            description: '12 meses de operaciones ilimitadas. Maximiza tu retorno.',
+            subtitle: 'Pagas menos de $3 al mes',
+            description: 'Un solo Win paga tu año. Acceso ilimitado por 12 meses.',
             features: [
-                'Todo del plan Mensual',
-                'Ahorro del 75%',
-                'Prioridad en nuevos bots',
-                'Acceso a comunidad VIP',
-                'Soporte prioritario 24/7',
+                'Desbloqueo Inmediato de Bots',
+                'Sin Límites de Ganancia ($5)',
+                'IP Dedicada (Anti-Bloqueo)',
+                'Acceso a Efecto Midas & Bug Deriv',
+                'Comunidad VIP',
+                'Soporte Prioritario 24/7',
+                'Actualizaciones Gratis',
+                'Bots Premium Secretos',
             ],
-            buttonText: 'Obtener Pro Anual',
+            buttonText: 'OBTENER OFERTA ANUAL',
             checkoutUrl: 'https://pay.hotmart.com/Q103866199O?off=zouponhf',
             isPopular: true,
             isLifetime: false,
         },
         {
-            title: 'Lifetime License',
-            price: '$60',
+            title: 'DIAMANTE',
+            price: '$67',
             period: '/único',
-            subtitle: 'Edición Founder',
+            subtitle: 'Edición Founder - Acceso Total',
             description: 'Pago único. Acceso vitalicio sin renovaciones futuras.',
             features: [
-                'Todo del plan Pro',
-                'Acceso de por vida',
+                'Desbloqueo Inmediato de Bots',
+                'Sin Límites de Ganancia ($5)',
+                'IP Dedicada (Anti-Bloqueo)',
+                'Acceso a Efecto Midas & Bug Deriv',
+                'Sin Pagos Recurrentes',
                 'Badge de Founder',
-                'Nuevas funciones gratis',
-                'Soporte VIP exclusivo',
-                'Sin pagos recurrentes',
+                'Comunidad VIP Exclusiva',
+                'Soporte VIP Prioritario',
             ],
-            buttonText: 'Ser Founder',
+            buttonText: 'SER DIAMANTE 💎',
             checkoutUrl: 'https://pay.hotmart.com/Q103866199O?off=5v9syrd5',
             isPopular: false,
             isLifetime: true,

@@ -214,6 +214,8 @@ export const useBugDeriv = () => {
         if (!isRunningRef.current || isWaitingForContractRef.current) return;
 
         const currentTime = Date.now();
+        const prevPrice = tickPricesRef.current.length > 0 ? tickPricesRef.current[tickPricesRef.current.length - 1] : quote;
+        const currentMomentum = Math.abs(quote - prevPrice);
 
         // Update buffers
         tickPricesRef.current = [...tickPricesRef.current, quote].slice(-SHIELD_CONFIG.TICK_BUFFER_SIZE);
@@ -261,6 +263,19 @@ export const useBugDeriv = () => {
             }
         }
 
+        // --- NEW: MARTINGALE SAFETY TRIGGER (MOMENTUM FILTER) ---
+        // Only applies if we are in Martingale (Level > 0)
+        if (martingaleLevelRef.current > 0) {
+            const minMomentum = avgVol * 0.3; // Require 30% of Avg Volatility
+            if (currentMomentum < minMomentum) {
+                // Throttle log to avoid spamming every tick
+                if (Math.random() < 0.05) {
+                    addLog(`⚠️ Momentum débil para Martingala (${currentMomentum.toFixed(2)} < ${minMomentum.toFixed(2)})`, 'blocked');
+                }
+                return; // SKIP ENTRY
+            }
+        }
+
         // --- TRIGGER LOGIC ---
         // Trend UP -> CALL
         if (trend === 'up') {
@@ -286,6 +301,9 @@ export const useBugDeriv = () => {
         const stake = proposal.ask_price;
         const netProfit = payout - stake;
         const profitPercent = (netProfit / stake) * 100;
+
+        // Calculate Implied Success Probability: Stake / Total Payout
+        const impliedProbability = (stake / payout) * 100;
 
         // --- FILTER PAYOUT (Anti-Death) ---
         if (profitPercent < SHIELD_CONFIG.MIN_PAYOUT_PERCENT) {
@@ -317,7 +335,8 @@ export const useBugDeriv = () => {
 
             setStats(prev => ({
                 ...prev,
-                signalsTriggered: prev.signalsTriggered + 1
+                signalsTriggered: prev.signalsTriggered + 1,
+                successProbability: impliedProbability // Update Probability
             }));
         }
 

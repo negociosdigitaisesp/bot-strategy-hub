@@ -203,7 +203,7 @@ const PricingModal: React.FC = () => {
     const plans = [
         {
             title: 'Mensual',
-            price: '$10',
+            price: '$17',
             period: '/mes',
             subtitle: 'Prueba y Valida',
             description: 'Acceso completo por 30 días. Ideal para probar la estrategia.',

@@ -58,6 +58,7 @@ import BugDeriv from "./pages/BugDeriv";
 import ReferralLanding from "./pages/ReferralLanding";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import Academy from "./pages/Academy";
+import QuieroSerPro from "./pages/QuieroSerPro";
 import { TradingSessionProvider } from "./contexts/TradingSessionContext";
 import { PricingModalProvider } from "./contexts/PricingModalContext";
 import PricingModal from "./components/PricingModal";
@@ -423,6 +424,9 @@ const App = () => {
                         } />
 
                       </Route>
+
+                      {/* Hidden route for email funnel - not in menu - PUBLIC */}
+                      <Route path="/quieroserpro" element={<QuieroSerPro />} />
 
                       <Route path="/pagina-de-teste" element={<PaginaDeTeste />} />
                       <Route path="/PaginaBloqueada" element={<PaginaBloqueada />} />
