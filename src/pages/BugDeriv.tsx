@@ -404,12 +404,11 @@ const BugDeriv = () => {
 
     // Estado de configuración
     const [symbol, setSymbol] = useState<string>('1HZ100V');
-    const [stakePercent, setStakePercent] = useState<string>('3');
-    const [stopLossPercent, setStopLossPercent] = useState<string>('8');
-    const [takeProfitPercent, setTakeProfitPercent] = useState<string>('15');
+    const [stake, setStake] = useState<string>('3');
+    const [stopLoss, setStopLoss] = useState<string>('8');
+    const [takeProfit, setTakeProfit] = useState<string>('15');
     const [maxLosses, setMaxLosses] = useState<string>('2');
     const [contractType, setContractType] = useState<'EVENODD' | 'DIFFERS' | 'AUTO'>('AUTO');
-    const [initialCapital, setInitialCapital] = useState<string>('100');
 
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -424,21 +423,20 @@ const BugDeriv = () => {
             try {
                 const config = JSON.parse(saved);
                 setSymbol(config.symbol || '1HZ100V');
-                setStakePercent(config.stakePercent || '3');
-                setStopLossPercent(config.stopLossPercent || '8');
-                setTakeProfitPercent(config.takeProfitPercent || '15');
+                setStake(config.stake || '3');
+                setStopLoss(config.stopLoss || '8');
+                setTakeProfit(config.takeProfit || '15');
                 setMaxLosses(config.maxLosses || '2');
                 setContractType(config.contractType || 'AUTO');
-                setInitialCapital(config.initialCapital || '100');
             } catch { }
         }
     }, []);
 
     useEffect(() => {
         localStorage.setItem('statbot_config_v2', JSON.stringify({
-            symbol, stakePercent, stopLossPercent, takeProfitPercent, maxLosses, contractType, initialCapital
+            symbol, stake, stopLoss, takeProfit, maxLosses, contractType
         }));
-    }, [symbol, stakePercent, stopLossPercent, takeProfitPercent, maxLosses, contractType, initialCapital]);
+    }, [symbol, stake, stopLoss, takeProfit, maxLosses, contractType]);
 
     // Auto-scroll logs
     useEffect(() => {
@@ -470,26 +468,33 @@ const BugDeriv = () => {
                 return;
             }
 
-            const config: StatBotConfig = {
-                symbol,
-                initialCapital: parseFloat(initialCapital) || 100,
-                stakePercentage: 3, // Fijo 3%
-                stopLossPercentage: parseFloat(stopLossPercent) || 8,
-                takeProfitPercentage: parseFloat(takeProfitPercent) || 15,
-                maxConsecutiveLosses: parseInt(maxLosses) || 2,
-                preferredContractType: contractType
-            };
+            const stakeValue = parseFloat(stake) || 3;
+            const stopLossValue = parseFloat(stopLoss) || 8;
+            const takeProfitValue = parseFloat(takeProfit) || 15;
 
-            const stake = (config.initialCapital * config.stakePercentage) / 100;
-            const stakeCheck = checkStakeLimit(stake);
+            // Check stake limit
+            const stakeCheck = checkStakeLimit(stakeValue);
             if (!stakeCheck.allowed) {
                 toast.error(stakeCheck.message);
                 return;
             }
 
+            // For now, pass dummy config until we update the hook
+            // We'll use a high initial capital (1000) and convert our absolute values to percentages
+            const dummyCapital = 1000;
+            const config: StatBotConfig = {
+                symbol,
+                initialCapital: dummyCapital,
+                stakePercentage: (stakeValue / dummyCapital) * 100,
+                stopLossPercentage: (stopLossValue / dummyCapital) * 100,
+                takeProfitPercentage: (takeProfitValue / dummyCapital) * 100,
+                maxConsecutiveLosses: parseInt(maxLosses) || 2,
+                preferredContractType: contractType
+            };
+
             const success = startBot(config);
             if (success) {
-                toast.success('🎯 Sistema Multi-Layer ACTIVADO');
+                toast.success('🎯 BUG DERIV ENCENDIDO');
             }
         }
     };
@@ -706,53 +711,55 @@ const BugDeriv = () => {
                                     </select>
                                 </div>
 
-                                {/* Capital */}
+                                {/* Stake Configurable */}
                                 <div>
-                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-2 block">
-                                        Capital Inicial
-                                    </label>
+                                    <label className="text-[10px] text-cyan-400/70 uppercase tracking-wider font-bold mb-2 block">Stake por Trade</label>
                                     <div className="relative">
-                                        <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                        <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" />
                                         <input
                                             type="number"
-                                            value={initialCapital}
-                                            onChange={(e) => setInitialCapital(e.target.value)}
+                                            value={stake}
+                                            onChange={(e) => setStake(e.target.value)}
                                             disabled={isRunning}
-                                            className="w-full bg-black/20 border border-white/10 rounded-lg py-2.5 pl-8 pr-3 text-sm font-mono focus:border-cyan-500/50 focus:outline-none disabled:opacity-50"
+                                            step="0.01"
+                                            min="0.01"
+                                            className="w-full bg-cyan-500/5 border border-cyan-500/20 rounded-lg py-2.5 pl-8 pr-3 text-sm font-mono text-cyan-400 focus:border-cyan-500/50 focus:outline-none disabled:opacity-50"
                                         />
                                     </div>
-                                </div>
-
-                                {/* Stake Fijo */}
-                                <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg p-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] text-cyan-400/70 uppercase font-bold">Stake Fijo</span>
-                                        <span className="text-lg font-mono font-bold text-cyan-400">3%</span>
-                                    </div>
-                                    <span className="text-[9px] text-cyan-400/50">Sin Martingale</span>
+                                    <span className="text-[9px] text-cyan-400/50 mt-1 block">Sin Martingale</span>
                                 </div>
 
                                 {/* SL / TP */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="text-[10px] text-rose-400/70 uppercase tracking-wider font-bold mb-2 block">SL %</label>
-                                        <input
-                                            type="number"
-                                            value={stopLossPercent}
-                                            onChange={(e) => setStopLossPercent(e.target.value)}
-                                            disabled={isRunning}
-                                            className="w-full bg-rose-500/5 border border-rose-500/20 rounded-lg py-2 px-3 text-sm font-mono text-rose-400 focus:border-rose-500/50 focus:outline-none disabled:opacity-50"
-                                        />
+                                        <label className="text-[10px] text-rose-400/70 uppercase tracking-wider font-bold mb-2 block">Stop Loss $</label>
+                                        <div className="relative">
+                                            <DollarSign size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400/50" />
+                                            <input
+                                                type="number"
+                                                value={stopLoss}
+                                                onChange={(e) => setStopLoss(e.target.value)}
+                                                disabled={isRunning}
+                                                step="0.01"
+                                                min="0"
+                                                className="w-full bg-rose-500/5 border border-rose-500/20 rounded-lg py-2 pl-7 pr-3 text-sm font-mono text-rose-400 focus:border-rose-500/50 focus:outline-none disabled:opacity-50"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-emerald-400/70 uppercase tracking-wider font-bold mb-2 block">TP %</label>
-                                        <input
-                                            type="number"
-                                            value={takeProfitPercent}
-                                            onChange={(e) => setTakeProfitPercent(e.target.value)}
-                                            disabled={isRunning}
-                                            className="w-full bg-emerald-500/5 border border-emerald-500/20 rounded-lg py-2 px-3 text-sm font-mono text-emerald-400 focus:border-emerald-500/50 focus:outline-none disabled:opacity-50"
-                                        />
+                                        <label className="text-[10px] text-emerald-400/70 uppercase tracking-wider font-bold mb-2 block">Take Profit $</label>
+                                        <div className="relative">
+                                            <DollarSign size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400/50" />
+                                            <input
+                                                type="number"
+                                                value={takeProfit}
+                                                onChange={(e) => setTakeProfit(e.target.value)}
+                                                disabled={isRunning}
+                                                step="0.01"
+                                                min="0"
+                                                className="w-full bg-emerald-500/5 border border-emerald-500/20 rounded-lg py-2 pl-7 pr-3 text-sm font-mono text-emerald-400 focus:border-emerald-500/50 focus:outline-none disabled:opacity-50"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -818,7 +825,7 @@ const BugDeriv = () => {
                                 ) : (
                                     <>
                                         <Play size={14} fill="currentColor" />
-                                        ACTIVAR MULTI-LAYER
+                                        ENCENDER BUG DERIV
                                     </>
                                 )}
                             </motion.button>
