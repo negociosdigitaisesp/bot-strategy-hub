@@ -514,7 +514,7 @@ const Library = () => {
       <section className="mb-10">
         <div className="relative overflow-hidden rounded-3xl p-[1px] group">
           {/* Infinite Border Animation - Super subtle */}
-          <div className="absolute inset-[-100%] animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0000_0%,theme(colors.primary.DEFAULT)_50%,#0000_100%)] opacity-20" />
+          <div className="absolute inset-[-100%] animate-[spin_15s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#0000_0%,rgb(16,185,129)_50%,#0000_100%)] opacity-20" />
 
           {/* Main Content Container */}
           <div className="relative h-full w-full bg-card/80 backdrop-blur-3xl rounded-[calc(1.5rem-1px)] border border-primary/10 overflow-hidden">
