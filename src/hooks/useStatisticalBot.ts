@@ -445,17 +445,6 @@ export const useStatisticalBot = () => {
         };
     }, [state.isRunning, socket, handleMessage]);
 
-    /**
-     * Cleanup al desmontar
-     */
-    useEffect(() => {
-        return () => {
-            if (isRunningRef.current) {
-                stopBot();
-            }
-        };
-    }, []);
-
     return {
         // State
         isRunning: state.isRunning,

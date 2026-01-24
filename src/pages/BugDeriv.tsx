@@ -33,7 +33,8 @@ import {
     Snowflake,
     Hash,
     TrendingDown as TrendIcon,
-    CircleDot
+    CircleDot,
+    Bug
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -515,6 +516,15 @@ const BugDeriv = () => {
         zScore: 0
     }));
 
+    // Cleanup: stop bot when navigating away from page
+    useEffect(() => {
+        return () => {
+            if (isRunning) {
+                stopBot();
+            }
+        };
+    }, [isRunning, stopBot]);
+
     return (
         <div className="min-h-screen bg-[#080a0e] text-slate-200">
             {/* Background Effects */}
@@ -560,7 +570,7 @@ const BugDeriv = () => {
                                 } : {}}
                                 transition={{ duration: 2, repeat: Infinity }}
                             >
-                                <Layers size={24} className={cn("transition-colors", isRunning ? "text-cyan-400" : "text-slate-400")} />
+                                <Bug size={24} className={cn("transition-colors", isRunning ? "text-cyan-400" : "text-slate-400")} />
                                 {isRunning && (
                                     <motion.div
                                         className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500"
@@ -571,7 +581,7 @@ const BugDeriv = () => {
                             </motion.div>
                             <div>
                                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                                    Sistema Multi-Layer
+                                    Bug Deriv
                                     <span className="px-1.5 py-0.5 rounded text-[9px] bg-gradient-to-r from-cyan-500/10 to-violet-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">
                                         Pro
                                     </span>
