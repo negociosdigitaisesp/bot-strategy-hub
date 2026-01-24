@@ -1011,7 +1011,7 @@ const BugDeriv = () => {
                                     <div>
                                         <span className="text-[10px] text-slate-500 block mb-1">Balance</span>
                                         <div className="text-lg font-mono text-violet-400">
-                                            ${(riskStatus?.currentCapital || parseFloat(initialCapital)).toFixed(2)}
+                                            ${(riskStatus?.currentCapital || account?.balance || 0).toFixed(2)}
                                         </div>
                                     </div>
                                 </div>
