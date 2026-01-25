@@ -54,7 +54,7 @@ import BotApalancamiento from "./pages/BotApalancamiento";
 import BotQuantum from "./pages/BotQuantum";
 import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
-import BugDeriv from "./pages/BugDeriv";
+
 import ReferralLanding from "./pages/ReferralLanding";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import Academy from "./pages/Academy";
@@ -387,14 +387,7 @@ const App = () => {
                           </>
                         } />
 
-                        <Route path="/bugderiv" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <BugDeriv />
-                            </main>
-                          </>
-                        } />
+
 
                         <Route path="/efecto-midas" element={
                           <>

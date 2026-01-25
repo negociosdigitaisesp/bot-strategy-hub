@@ -153,14 +153,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             requiresUpgrade: true,
             description: 'Seleccionar estrategia'
         },
-        {
-            name: 'Bug Deriv',
-            icon: <Target size={20} />,
-            path: '/bugderiv',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Par/Impar Reversal Strategy'
-        },
+
         {
             name: 'Efecto Midas',
             icon: <Coins size={20} />,
