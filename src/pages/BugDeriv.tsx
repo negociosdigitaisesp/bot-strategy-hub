@@ -1005,13 +1005,13 @@ const BugDeriv = () => {
                                     <div>
                                         <span className="text-[10px] text-slate-500 block mb-1">Win Rate</span>
                                         <div className="text-lg font-mono text-cyan-400">
-                                            {(riskStatus?.winRate || 0).toFixed(1)}%
+                                            {Number(riskStatus?.winRate || 0).toFixed(1)}%
                                         </div>
                                     </div>
                                     <div>
                                         <span className="text-[10px] text-slate-500 block mb-1">Balance</span>
                                         <div className="text-lg font-mono text-violet-400">
-                                            ${(riskStatus?.currentCapital || account?.balance || 0).toFixed(2)}
+                                            ${Number(riskStatus?.currentCapital || account?.balance || 0).toFixed(2)}
                                         </div>
                                     </div>
                                 </div>
