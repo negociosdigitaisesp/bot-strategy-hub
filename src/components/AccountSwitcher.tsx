@@ -117,7 +117,7 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
         setIsOpen(false);
         toast.promise(connect(acc.token), {
             loading: 'Conectando carteira...',
-            success: `Conectado: ${acc.loginid}`,
+            success: `Conectado: ${getDisplayLoginId(acc.loginid)}`,
             error: 'Erro ao conectar conta'
         });
     };

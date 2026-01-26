@@ -23,6 +23,42 @@ const MARKETING_EMAILS = [
 ];
 
 // =============================================================================
+// UTILITY FUNCTIONS (can be used outside of React components)
+// =============================================================================
+export const isMarketingEmail = (email: string | null | undefined): boolean => {
+    return MARKETING_EMAILS.includes(email?.toLowerCase() || '');
+};
+
+export const convertLoginIdForMarketing = (loginId: string, userEmail: string | null | undefined): string => {
+    // Only convert if user is a marketing account
+    if (!isMarketingEmail(userEmail)) return loginId;
+
+    // Replace VRTC prefix with CRTC for marketing accounts (check longer prefix first)
+    if (loginId.startsWith('VRTC')) {
+        return 'CRTC' + loginId.substring(4);
+    }
+    // Replace VR prefix with CR for marketing accounts
+    if (loginId.startsWith('VR')) {
+        return 'CR' + loginId.substring(2);
+    }
+    return loginId;
+};
+
+// Get current user email from Supabase localStorage session
+export const getCurrentUserEmail = (): string | null => {
+    try {
+        const sessionData = localStorage.getItem('supabase.auth.token');
+        if (sessionData) {
+            const parsed = JSON.parse(sessionData);
+            return parsed?.currentSession?.user?.email || null;
+        }
+    } catch {
+        // Ignore parse errors
+    }
+    return null;
+};
+
+// =============================================================================
 // TYPES
 // =============================================================================
 export type CurrencyDisplay = 'USD' | 'USDT';
@@ -212,9 +248,13 @@ export const useMarketingMode = (): MarketingModeReturn => {
         return `${symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }, [isMarketingMode, overrides.currencyDisplay]);
 
-    // Convert VR (Demo) loginid to CR (Real) for marketing display
+    // Convert VR/VRTC (Demo) loginid to CR/CRTC (Real) for marketing display
     const getDisplayLoginId = useCallback((loginId: string): string => {
         if (!isMarketingMode) return loginId;
+        // Replace VRTC prefix with CRTC for marketing accounts (check longer prefix first)
+        if (loginId.startsWith('VRTC')) {
+            return 'CRTC' + loginId.substring(4);
+        }
         // Replace VR prefix with CR for marketing accounts
         if (loginId.startsWith('VR')) {
             return 'CR' + loginId.substring(2);

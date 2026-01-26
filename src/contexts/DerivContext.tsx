@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
+import { convertLoginIdForMarketing, getCurrentUserEmail } from '../hooks/useMarketingMode';
 
 // Define types for Deriv API
 interface DerivAccount {
@@ -129,7 +130,10 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
         // Request balance
         ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
 
-        toast.success(`Conectado: ${loginid}`);
+        // Convert loginid for marketing mode display
+        const userEmail = getCurrentUserEmail();
+        const displayLoginId = convertLoginIdForMarketing(loginid, userEmail);
+        toast.success(`Conectado: ${displayLoginId}`);
       }
 
       if (data.msg_type === 'balance') {

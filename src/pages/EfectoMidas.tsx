@@ -32,6 +32,7 @@ import { useEfectoMidas } from '../hooks/useEfectoMidas';
 import { useDeriv } from '../contexts/DerivContext';
 import { useNavigate } from 'react-router-dom';
 import { useFreemiumLimiter, FREEMIUM_LIMITS } from '../hooks/useFreemiumLimiter';
+import { useMarketingMode } from '../hooks/useMarketingMode';
 import { FreemiumProgressBar } from '../components/FreemiumProgressBar';
 import { SystemLimitModal } from '../components/SystemLimitModal';
 import RecentGainsTicker from '../components/RecentGainsTicker';
@@ -39,6 +40,7 @@ import RecentGainsTicker from '../components/RecentGainsTicker';
 const EfectoMidas = () => {
     const navigate = useNavigate();
     const { isConnected, account } = useDeriv();
+    const { getDisplayLoginId } = useMarketingMode();
     const {
         isRunning,
         isShadowMode,
@@ -378,7 +380,7 @@ const EfectoMidas = () => {
                         )}>
                             {isConnected ? <Wifi size={14} className="text-emerald-400" /> : <WifiOff size={14} className="text-rose-400" />}
                             <span className="text-[10px] font-mono text-white/60">
-                                {isConnected ? account?.loginid : 'Offline'}
+                                {isConnected ? getDisplayLoginId(account?.loginid || '') : 'Offline'}
                             </span>
                         </div>
                     </div>
