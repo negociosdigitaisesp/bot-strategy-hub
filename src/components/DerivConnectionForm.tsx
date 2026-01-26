@@ -150,6 +150,22 @@ export const DerivConnectionForm = () => {
                             </>
                         )}
                     </button>
+
+                    {/* Affiliate CTA - Subtle but visible */}
+                    <a
+                        href="https://deriv.com/?t=TRCjAn8FEcUivlVU8hndU2Nd7ZgqdRLk&utm_source=affiliate_223442&utm_medium=affiliate&utm_campaign=MyAffiliates&utm_content=&referrer="
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full mt-3 py-2.5 px-4 rounded-lg font-medium transition-all flex flex-col items-center justify-center gap-0.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/20 hover:border-amber-500/40 group"
+                    >
+                        <span className="text-xs text-amber-200/70 group-hover:text-amber-200 transition-colors">
+                            ¿No tienes cuenta Deriv?
+                        </span>
+                        <span className="text-sm font-bold text-amber-400 group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                            Crea una ahora
+                            <ExternalLink size={12} className="opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                        </span>
+                    </a>
                 </form>
 
                 <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-4">

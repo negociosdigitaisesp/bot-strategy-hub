@@ -45,6 +45,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
     const { user, signOut } = useAuth();
     const [profileInitial, setProfileInitial] = useState('U');
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [fullName, setFullName] = useState<string>('');
     const [isMobile, setIsMobile] = useState(false);
 
     // Get plan details
@@ -62,7 +63,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // Obter dados do perfil (Avatar e Inicial)
+    // Obter dados do perfil (Avatar, Nome Completo e Inicial)
     useEffect(() => {
         const fetchProfile = async () => {
             if (user) {
@@ -73,10 +74,11 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
 
                 if (metaName) {
                     setProfileInitial(metaName.charAt(0).toUpperCase());
+                    setFullName(metaName);
                 }
 
                 try {
-                    // Buscar avatar atualizado do banco
+                    // Buscar avatar e nome completo atualizado do banco
                     const { data, error } = await supabase
                         .from('profiles')
                         .select('avatar_url, full_name')
@@ -86,23 +88,55 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                     if (data) {
                         if (data.avatar_url) setAvatarUrl(data.avatar_url);
 
-                        // Se tiver nome no perfil, usa a inicial dele (tem prioridade sobre auth meta)
+                        // Se tiver nome no perfil, usa ele (tem prioridade sobre auth meta)
                         if (data.full_name) {
+                            setFullName(data.full_name);
                             setProfileInitial(data.full_name.charAt(0).toUpperCase());
                         }
                     }
                 } catch (error) {
-                    console.error('Erro ao buscar avatar sidebar:', error);
+                    console.error('Erro ao buscar perfil sidebar:', error);
                 }
             }
         };
 
         fetchProfile();
+
+        // Subscribe to real-time profile updates
+        if (user) {
+            const channel = supabase
+                .channel('profile-changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'profiles',
+                        filter: `id=eq.${user.id}`
+                    },
+                    (payload) => {
+                        const newData = payload.new as { avatar_url?: string; full_name?: string };
+                        if (newData.avatar_url) setAvatarUrl(newData.avatar_url);
+                        if (newData.full_name) {
+                            setFullName(newData.full_name);
+                            setProfileInitial(newData.full_name.charAt(0).toUpperCase());
+                        }
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        }
     }, [user]);
 
     // Função para obter o nome de exibição do usuário
     const getDisplayName = () => {
         if (!user) return 'Usuário';
+
+        // Prioridade: 1) fullName do state (vem do banco), 2) metadata, 3) email
+        if (fullName) return fullName;
 
         const userName = user.user_metadata?.name ||
             user.user_metadata?.full_name;
@@ -296,7 +330,9 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                 <Link
                                     key={item.name}
                                     to={item.path}
-                                    onClick={() => isMobile && toggleSidebar()}
+                                    onClick={() => {
+                                        if (isMobile) toggleSidebar();
+                                    }}
                                     className={cn(
                                         "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
                                         "hover:bg-white/[0.05]",
