@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DerivConnectionForm } from '../components/DerivConnectionForm';
 import { AccountSwitcher } from '../components/AccountSwitcher';
-import { Shield, PlusCircle, DollarSign, Gamepad2 } from 'lucide-react';
+import { Shield, PlusCircle } from 'lucide-react';
 import { useDeriv } from '../contexts/DerivContext';
 import { cn } from '../lib/utils'; // Assumindo existência, se não, remover
 import RecentGainsTicker from '../components/RecentGainsTicker';
@@ -125,24 +125,6 @@ const DerivConnectionPage = () => {
                             </div>
                         </div>
                     )}
-
-                    {/* Guia Visual Simples */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col items-center text-center">
-                            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
-                                <DollarSign className="text-emerald-400" size={20} />
-                            </div>
-                            <h3 className="text-emerald-400 font-bold text-sm mb-1">Cuenta Real</h3>
-                            <p className="text-xs text-muted-foreground">Para dinero real. El token comienza con características de cuenta Real.</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/10 flex flex-col items-center text-center">
-                            <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center mb-3">
-                                <Gamepad2 className="text-cyan-400" size={20} />
-                            </div>
-                            <h3 className="text-cyan-400 font-bold text-sm mb-1">Cuenta Demo</h3>
-                            <p className="text-xs text-muted-foreground">Para practicar. Use el token de su cuenta Virtual (VR).</p>
-                        </div>
-                    </div>
 
                     <DerivConnectionForm />
                 </div>
