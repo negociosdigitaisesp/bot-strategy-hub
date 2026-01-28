@@ -317,6 +317,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
 
+      // 🛡️ ANTI-ABUSE: Bloquear emails temporários
+      const BLOCKED_EMAIL_DOMAINS = [
+        'yopmail.com', 'yopmail.fr', 'yopmail.net',
+        'tempmail.com', 'temp-mail.org', 'temp-mail.io',
+        '10minutemail.com', '10minutemail.net',
+        'guerrillamail.com', 'guerrillamail.org', 'guerrillamail.net', 'grr.la',
+        'mailinator.com', 'mailinator.net',
+        'throwaway.email', 'throwawaymail.com',
+        'fakeinbox.com', 'fakemailgenerator.com',
+        'sharklasers.com', 'guerrillamail.biz',
+        'dispostable.com', 'mailnesia.com',
+        'tempinbox.com', 'mohmal.com',
+        'getnada.com', 'emailondeck.com',
+        'trashmail.com', 'trashmail.net'
+      ];
+
+      const emailDomain = email.split('@')[1]?.toLowerCase();
+      if (emailDomain && BLOCKED_EMAIL_DOMAINS.includes(emailDomain)) {
+        console.warn('🚫 Blocked temporary email domain:', emailDomain);
+        toast.error('🚫 No se permiten correos temporales. Por favor, utiliza un email real.');
+        return {
+          error: { message: 'Los correos temporales no están permitidos' },
+          success: false
+        };
+      }
+
       // In demo mode, simply register without requiring confirmation
       if (isSupabaseDemoMode) {
         const { data, error } = await supabase.auth.signUp({

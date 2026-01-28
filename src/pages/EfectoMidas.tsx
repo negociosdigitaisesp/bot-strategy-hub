@@ -36,6 +36,7 @@ import { useMarketingMode } from '../hooks/useMarketingMode';
 import { FreemiumProgressBar } from '../components/FreemiumProgressBar';
 import { SystemLimitModal } from '../components/SystemLimitModal';
 import RecentGainsTicker from '../components/RecentGainsTicker';
+import { SpecialOfferModal } from '../components/SpecialOfferModal';
 
 const EfectoMidas = () => {
     const navigate = useNavigate();
@@ -68,8 +69,12 @@ const EfectoMidas = () => {
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
     // Freemium limiter
-    const { isFree, checkStakeLimit, isLimitReached, currentProfit } = useFreemiumLimiter();
+    const { isFree, checkStakeLimit, isLimitReached, currentProfit, daysLeft } = useFreemiumLimiter();
     const [showLimitModal, setShowLimitModal] = useState(false);
+    const [showOfferModal, setShowOfferModal] = useState(false);
+
+    // Check if trial expired
+    const isExpired = daysLeft !== null && daysLeft <= 0;
 
     // Check if profit limit reached and show modal
     useEffect(() => {
@@ -109,6 +114,15 @@ const EfectoMidas = () => {
             if (!isConnected) {
                 toast.error('Primero debe conectar su cuenta Deriv');
                 return;
+            }
+
+            // 🚀 CONVERSION INTERCEPTION: Show offer modal for free users
+            if (isFree) {
+                setShowOfferModal(true);
+                toast.info('💡 Desbloquea el acceso completo con nuestra oferta especial', {
+                    duration: 4000,
+                });
+                return; // Stop bot start - user needs to upgrade or dismiss
             }
 
             const stakeVal = parseFloat(stake);
@@ -792,6 +806,14 @@ const EfectoMidas = () => {
                 isOpen={showLimitModal}
                 limitAmount={currentProfit}
                 onClose={() => setShowLimitModal(false)}
+            />
+
+            {/* Special Offer Modal for Free Users */}
+            <SpecialOfferModal
+                isOpen={showOfferModal}
+                onClose={() => setShowOfferModal(false)}
+                onContinueFree={() => setShowOfferModal(false)}
+                isExpired={isExpired}
             />
         </div>
     );

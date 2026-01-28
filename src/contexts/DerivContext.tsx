@@ -1,6 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { convertLoginIdForMarketing, getCurrentUserEmail } from '../hooks/useMarketingMode';
+import { supabase } from '../lib/supabaseClient';
+
+// Marketing accounts - always bypass real account restrictions
+const MARKETING_EMAILS = ['brendacostatmktcp@outlook.com'];
+
+// Paid plans list (same as useFreemiumLimiter)
+const PAID_PLANS = ['pro', 'premium', 'elite', 'whale', 'vitalicio', 'iniciado', 'mensual', 'anual'];
+
+// Helper function to check if loginid is a REAL account (not demo)
+const isRealAccount = (loginid: string): boolean => {
+  // Real accounts start with CR or CRTC
+  // Demo accounts start with VR or VRTC
+  return loginid.startsWith('CR') || loginid.startsWith('CRTC');
+};
 
 // Define types for Deriv API
 interface DerivAccount {
@@ -111,29 +125,178 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.msg_type === 'authorize') {
-        setIsConnected(true);
-        setIsConnecting(false);
         const { loginid, fullname, email } = data.authorize;
-        setAccount(prev => ({
-          ...prev,
-          loginid,
-          fullname,
-          email,
-          balance: '...',
-          currency: '...'
-        }));
 
-        // Save token if successful
-        setToken(apiToken);
-        localStorage.setItem('deriv_active_token', apiToken);
+        // Check if this is a REAL account
+        const isReal = isRealAccount(loginid);
 
-        // Request balance
-        ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+        if (isReal) {
+          // Need to verify if user has a paid plan
+          // First check if it's a marketing account (bypass restrictions)
+          const userEmail = getCurrentUserEmail();
+          const isMarketingAccount = MARKETING_EMAILS.includes(userEmail?.toLowerCase() || '');
 
-        // Convert loginid for marketing mode display
-        const userEmail = getCurrentUserEmail();
-        const displayLoginId = convertLoginIdForMarketing(loginid, userEmail);
-        toast.success(`Conectado: ${displayLoginId}`);
+          if (!isMarketingAccount) {
+            // Fetch user plan from Supabase to check if they have a paid plan
+            (async () => {
+              try {
+                // Get user ID from localStorage or session
+                const sessionData = localStorage.getItem('supabase.auth.token');
+                let userId: string | null = null;
+
+                if (sessionData) {
+                  try {
+                    const parsed = JSON.parse(sessionData);
+                    userId = parsed?.currentSession?.user?.id || null;
+                  } catch {
+                    // Ignore parse errors
+                  }
+                }
+
+                if (!userId) {
+                  // Try alternative method to get user
+                  const { data: authData } = await supabase.auth.getUser();
+                  userId = authData?.user?.id || null;
+                }
+
+                if (userId) {
+                  const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('plan_type')
+                    .eq('id', userId)
+                    .single();
+
+                  if (!profileError && profileData) {
+                    const planType = profileData.plan_type?.toLowerCase() || 'free';
+                    const isPaidPlan = PAID_PLANS.includes(planType);
+
+                    if (!isPaidPlan) {
+                      // FREE USER TRYING TO USE REAL ACCOUNT - BLOCK IT!
+                      console.warn('🚫 Cuenta Real bloqueada para plan gratuito:', loginid);
+
+                      // Close connection
+                      shouldReconnect.current = false;
+                      ws.close();
+
+                      // Clear any saved token
+                      localStorage.removeItem('deriv_active_token');
+                      setToken(null);
+                      setIsConnected(false);
+                      setIsConnecting(false);
+                      setAccount(null);
+
+                      // Set error message in Spanish
+                      setLastError('🔒 Cuenta Real no disponible en Plan Gratuito. Usa una cuenta Demo o actualiza tu plan a PRO.');
+
+                      toast.error(
+                        '🚫 Acceso Restringido: Las cuentas reales solo están disponibles para usuarios PRO. Por favor, utiliza una cuenta Demo o actualiza tu plan.',
+                        { duration: 8000 }
+                      );
+
+                      return; // Stop execution
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error('Error checking user plan for real account:', err);
+              }
+
+              // If we reach here, user has a paid plan or we couldn't verify - allow connection
+              completeAuthorization();
+            })();
+
+            return; // Wait for async check
+          }
+        }
+
+        // Complete authorization for demo accounts, marketing accounts, or paid users
+        completeAuthorization();
+
+        async function completeAuthorization() {
+          // 🛡️ ANTI-ABUSE: Registrar conta Deriv e verificar se já foi usada por outro usuário
+          try {
+            // Get user ID for anti-abuse check
+            let currentUserId: string | null = null;
+            const sessionData = localStorage.getItem('supabase.auth.token');
+
+            if (sessionData) {
+              try {
+                const parsed = JSON.parse(sessionData);
+                currentUserId = parsed?.currentSession?.user?.id || null;
+              } catch {
+                // Ignore parse errors
+              }
+            }
+
+            if (!currentUserId) {
+              const { data: authData } = await supabase.auth.getUser();
+              currentUserId = authData?.user?.id || null;
+            }
+
+            if (currentUserId) {
+              // Call RPC to register Deriv account (validates uniqueness)
+              const { data: registerResult, error: rpcError } = await supabase.rpc('register_deriv_account', {
+                p_user_id: currentUserId,
+                p_deriv_account_id: loginid
+              });
+
+              if (rpcError) {
+                console.error('Error calling register_deriv_account RPC:', rpcError);
+                // Continue anyway if RPC fails (don't block user due to DB issues)
+              } else if (registerResult && !registerResult.success) {
+                // 🚫 BLOQUEIO: Conta Deriv já usada por outro usuário!
+                console.error('🚫 ANTI-ABUSE BLOCK:', registerResult.error, registerResult.message);
+
+                shouldReconnect.current = false;
+                ws.close();
+
+                localStorage.removeItem('deriv_active_token');
+                setToken(null);
+                setIsConnected(false);
+                setIsConnecting(false);
+                setAccount(null);
+
+                setLastError('🚫 Esta cuenta Deriv ya fue utilizada en nuestro sistema. Por favor, inicia sesión en tu cuenta original o suscríbete al plan PRO.');
+
+                toast.error(
+                  '🚫 Esta cuenta Deriv ya fue utilizada en nuestro sistema. Por favor, inicia sesión en tu cuenta original o suscríbete al plan PRO.',
+                  { duration: 12000 }
+                );
+
+                return; // Stop authorization
+              } else {
+                console.log('✅ Cuenta Deriv registrada/verificada:', loginid);
+              }
+            }
+          } catch (antiAbuseError) {
+            console.error('Anti-abuse check error (non-blocking):', antiAbuseError);
+            // Continue anyway - don't block users due to anti-abuse system errors
+          }
+
+          // ✅ Authorization complete - set connected state
+          setIsConnected(true);
+          setIsConnecting(false);
+          setAccount(prev => ({
+            ...prev,
+            loginid,
+            fullname,
+            email,
+            balance: '...',
+            currency: '...'
+          }));
+
+          // Save token if successful
+          setToken(apiToken);
+          localStorage.setItem('deriv_active_token', apiToken);
+
+          // Request balance
+          ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+
+          // Convert loginid for marketing mode display
+          const userEmail = getCurrentUserEmail();
+          const displayLoginId = convertLoginIdForMarketing(loginid, userEmail);
+          toast.success(`Conectado: ${displayLoginId}`);
+        }
       }
 
       if (data.msg_type === 'balance') {

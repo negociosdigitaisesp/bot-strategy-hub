@@ -3,12 +3,32 @@ import { DerivConnectionForm } from '../components/DerivConnectionForm';
 import { AccountSwitcher } from '../components/AccountSwitcher';
 import { Shield, PlusCircle } from 'lucide-react';
 import { useDeriv } from '../contexts/DerivContext';
-import { cn } from '../lib/utils'; // Assumindo existência, se não, remover
+import { cn } from '../lib/utils';
 import RecentGainsTicker from '../components/RecentGainsTicker';
+import { SpecialOfferModal } from '../components/SpecialOfferModal';
+import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
 
 const DerivConnectionPage = () => {
     const { isConnected, account, token } = useDeriv();
     const [showConnectionForm, setShowConnectionForm] = useState(false);
+    const [showOfferModal, setShowOfferModal] = useState(false);
+    const { isFree, isPro, daysLeft } = useFreemiumLimiter();
+
+    // Check if trial expired
+    const isExpired = daysLeft !== null && daysLeft <= 0;
+
+    // Show offer modal for free users when they access the page (only once per session)
+    useEffect(() => {
+        const hasSeenOffer = sessionStorage.getItem('deriv_page_offer_shown');
+        if (isFree && !isPro && !hasSeenOffer && !isConnected) {
+            // Small delay for better UX
+            const timer = setTimeout(() => {
+                setShowOfferModal(true);
+                sessionStorage.setItem('deriv_page_offer_shown', 'true');
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [isFree, isPro, isConnected]);
 
     // Efeito para salvar conta automaticamente ao conectar com sucesso
     useEffect(() => {
@@ -142,6 +162,14 @@ const DerivConnectionPage = () => {
                     </button>
                 </div>
             )}
+
+            {/* Special Offer Modal for Free Users */}
+            <SpecialOfferModal
+                isOpen={showOfferModal}
+                onClose={() => setShowOfferModal(false)}
+                onContinueFree={() => setShowOfferModal(false)}
+                isExpired={isExpired}
+            />
         </div>
     );
 };

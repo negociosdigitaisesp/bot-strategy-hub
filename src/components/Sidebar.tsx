@@ -24,7 +24,9 @@ import {
     Bug,
     Infinity,
     Handshake,
-    Gem
+    Gem,
+    Hourglass,
+    AlertTriangle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +35,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
 import { useMarketingMode } from '../hooks/useMarketingMode';
 import { PlanBadge } from './PlanBadge';
+import { SpecialOfferModal } from './SpecialOfferModal';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -47,10 +50,16 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState<string>('');
     const [isMobile, setIsMobile] = useState(false);
+    const [showOfferModal, setShowOfferModal] = useState(false);
 
     // Get plan details
     const { isPro, daysLeft, planType } = useFreemiumLimiter();
     const { isMarketingMode, showTraderDiamondBadge } = useMarketingMode();
+
+    // Calculate trial status
+    const isExpired = daysLeft !== null && daysLeft <= 0;
+    const isLastDay = daysLeft !== null && daysLeft === 1;
+    const isUrgent = daysLeft !== null && daysLeft <= 1;
 
     // Detectar se é mobile
     useEffect(() => {
@@ -465,6 +474,75 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                             </div>
                         </div>
 
+                        {/* Trial Countdown Card - Only show for free users */}
+                        {!isPro && !showTraderDiamondBadge && daysLeft !== null && (
+                            <button
+                                onClick={() => setShowOfferModal(true)}
+                                className={cn(
+                                    "group w-full mx-4 mb-3 p-3 rounded-xl transition-all duration-300 flex items-center gap-3 border",
+                                    isExpired
+                                        ? "bg-red-500/10 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50"
+                                        : isUrgent
+                                            ? "bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-500/50"
+                                            : "bg-cyan-500/10 border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-500/50",
+                                    collapsed && !isMobile && "justify-center mx-2 px-2"
+                                )}
+                                style={{ width: collapsed && !isMobile ? 'calc(100% - 16px)' : 'calc(100% - 32px)' }}
+                            >
+                                {/* Icon */}
+                                <div className={cn(
+                                    "flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all",
+                                    isExpired
+                                        ? "bg-red-500/20 text-red-400"
+                                        : isUrgent
+                                            ? "bg-orange-500/20 text-orange-400"
+                                            : "bg-cyan-500/20 text-cyan-400"
+                                )}>
+                                    {isExpired ? (
+                                        <AlertTriangle size={18} className="animate-pulse" />
+                                    ) : (
+                                        <Hourglass size={18} className={isUrgent ? "animate-pulse" : ""} />
+                                    )}
+                                </div>
+
+                                {/* Text */}
+                                {(!collapsed || isMobile) && (
+                                    <div className="flex-1 text-left">
+                                        <span className={cn(
+                                            "block text-sm font-bold",
+                                            isExpired
+                                                ? "text-red-400"
+                                                : isUrgent
+                                                    ? "text-orange-400"
+                                                    : "text-cyan-400"
+                                        )}>
+                                            {isExpired
+                                                ? "Plan Expirado"
+                                                : isLastDay
+                                                    ? "Últimas 24 Horas"
+                                                    : `${daysLeft} Días Restantes`}
+                                        </span>
+                                        <span className="block text-[10px] text-white/40 mt-0.5">
+                                            {isExpired
+                                                ? "Activa tu plan PRO"
+                                                : "Toca para ver oferta"}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Chevron */}
+                                {(!collapsed || isMobile) && (
+                                    <ChevronRight
+                                        size={16}
+                                        className={cn(
+                                            "text-white/30 transition-all group-hover:translate-x-1",
+                                            isExpired ? "group-hover:text-red-400" : isUrgent ? "group-hover:text-orange-400" : "group-hover:text-cyan-400"
+                                        )}
+                                    />
+                                )}
+                            </button>
+                        )}
+
                         <button
                             onClick={handleLogout}
                             className={cn(
@@ -495,6 +573,14 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                     </div>
                 </div>
             </div>
+
+            {/* Special Offer Modal */}
+            <SpecialOfferModal
+                isOpen={showOfferModal}
+                onClose={() => setShowOfferModal(false)}
+                onContinueFree={() => setShowOfferModal(false)}
+                isExpired={isExpired}
+            />
         </>
     );
 };
