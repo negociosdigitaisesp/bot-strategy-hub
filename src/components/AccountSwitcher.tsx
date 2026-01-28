@@ -327,13 +327,9 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                     {/* Botão Nova Conta */}
                     <button
                         onClick={() => {
-                            // Marketing mode bypasses restrictions
-                            if (!isMarketingMode && isFree) {
-                                openPricingModal();
-                            } else {
-                                setIsOpen(false);
-                                onAddAccount();
-                            }
+                            // Scroll to connection form for all users (free and pro)
+                            setIsOpen(false);
+                            onAddAccount();
                         }}
                         className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/20 text-slate-400 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all group"
                     >
