@@ -7,16 +7,23 @@ interface SpecialOfferModalProps {
     onClose: () => void;
     onContinueFree?: () => void;
     isExpired?: boolean; // If true, user cannot continue with free plan (hard lock)
+    showDiscount?: boolean; // If true, show discounted price ($24), else show normal ($30)
 }
+
+// Checkout links
+const NORMAL_CHECKOUT_URL = 'https://pay.hotmart.com/Q103866199O'; // Normal annual price ($30)
+const DISCOUNT_CHECKOUT_URL = 'https://pay.hotmart.com/Q103866199O?off=itafpp2z'; // Discount price ($24)
 
 export const SpecialOfferModal: React.FC<SpecialOfferModalProps> = ({
     isOpen,
     onClose,
     onContinueFree,
     isExpired = false,
+    showDiscount = true, // Default to discount for backward compatibility
 }) => {
     const handleActivateOffer = () => {
-        window.open('https://pay.hotmart.com/Q103866199O?off=itafpp2z', '_blank');
+        const checkoutUrl = showDiscount ? DISCOUNT_CHECKOUT_URL : NORMAL_CHECKOUT_URL;
+        window.open(checkoutUrl, '_blank');
     };
 
     const handleContinueFree = () => {
@@ -117,12 +124,13 @@ export const SpecialOfferModal: React.FC<SpecialOfferModalProps> = ({
 
                             {/* Title */}
                             <motion.h2
+                                key={showDiscount ? 'discount' : 'normal'}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.3 }}
                                 className="text-xl font-bold text-center text-white mb-2"
                             >
-                                Oportunidad de Permanencia Detectada
+                                {showDiscount ? 'Oportunidad de Permanencia Detectada' : 'Desbloquea Acceso Ilimitado'}
                             </motion.h2>
 
                             {/* Subtitle */}
@@ -132,7 +140,9 @@ export const SpecialOfferModal: React.FC<SpecialOfferModalProps> = ({
                                 transition={{ delay: 0.35 }}
                                 className="text-center text-amber-200/60 text-sm mb-8"
                             >
-                                Hemos reservado un cupón exclusivo para tu cuenta.
+                                {showDiscount
+                                    ? 'Hemos reservado un cupón exclusivo para tu cuenta.'
+                                    : 'Opera sin límites y sin tiempos de espera.'}
                             </motion.p>
 
                             {/* Price Section */}
@@ -143,18 +153,29 @@ export const SpecialOfferModal: React.FC<SpecialOfferModalProps> = ({
                                 className="bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent border border-amber-500/20 rounded-xl p-6 mb-6"
                             >
                                 <div className="text-center mb-4">
-                                    <div className="flex items-center justify-center gap-3 mb-2">
-                                        <span className="text-gray-500 line-through text-lg">$30.00</span>
-                                        <span className="text-amber-400 font-bold text-3xl">$24.00</span>
-                                        <span className="text-amber-200/50 text-sm">/año</span>
-                                    </div>
-                                    <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
-                                        <span className="text-emerald-400 text-xs font-bold uppercase tracking-wide">Ahorras 20%</span>
-                                    </div>
+                                    {showDiscount ? (
+                                        <>
+                                            <div className="flex items-center justify-center gap-3 mb-2">
+                                                <span className="text-gray-500 line-through text-lg">$30.00</span>
+                                                <span className="text-amber-400 font-bold text-3xl">$24.00</span>
+                                                <span className="text-amber-200/50 text-sm">/año</span>
+                                            </div>
+                                            <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1">
+                                                <span className="text-emerald-400 text-xs font-bold uppercase tracking-wide">Ahorras 20%</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex items-center justify-center gap-2 mb-2">
+                                            <span className="text-amber-400 font-bold text-3xl">$30.00</span>
+                                            <span className="text-amber-200/50 text-sm">/año</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <p className="text-center text-amber-100/70 text-sm">
-                                    Equivale a <strong className="text-amber-300">$2.00 al mes</strong>. Acceso total sin interrupciones.
+                                    {showDiscount
+                                        ? <>Equivale a <strong className="text-amber-300">$2.00 al mes</strong>. Acceso total sin interrupciones.</>
+                                        : <>Equivale a <strong className="text-amber-300">$2.50 al mes</strong>. Sin límites de ganancias.</>}
                                 </p>
                             </motion.div>
 
@@ -181,6 +202,7 @@ export const SpecialOfferModal: React.FC<SpecialOfferModalProps> = ({
 
                             {/* CTA Button */}
                             <motion.button
+                                key={showDiscount ? 'discount-cta' : 'normal-cta'}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.5 }}
@@ -190,7 +212,7 @@ export const SpecialOfferModal: React.FC<SpecialOfferModalProps> = ({
                                 className="w-full py-4 px-6 rounded-xl font-bold text-sm uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-black hover:from-amber-400 hover:via-amber-300 hover:to-amber-400 shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all duration-300 flex items-center justify-center gap-2"
                             >
                                 <span>🔓</span>
-                                <span>ACTIVAR OFERTA ANUAL</span>
+                                <span>{showDiscount ? 'ACTIVAR OFERTA ANUAL' : 'ACTIVAR PLAN ANUAL'}</span>
                             </motion.button>
 
                             {/* Secondary Button (only if not expired) */}

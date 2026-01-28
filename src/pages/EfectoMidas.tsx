@@ -116,13 +116,13 @@ const EfectoMidas = () => {
                 return;
             }
 
-            // 🚀 CONVERSION INTERCEPTION: Show offer modal for free users
-            if (isFree) {
+            // 🚀 TRIAL EXPIRED: Block users whose free trial has ended
+            if (isFree && isExpired) {
                 setShowOfferModal(true);
-                toast.info('💡 Desbloquea el acceso completo con nuestra oferta especial', {
-                    duration: 4000,
+                toast.warning('Tu período de prueba ha expirado. Activa tu plan para continuar.', {
+                    duration: 5000,
                 });
-                return; // Stop bot start - user needs to upgrade or dismiss
+                return; // Stop bot start - trial expired, user must upgrade
             }
 
             const stakeVal = parseFloat(stake);
@@ -808,12 +808,13 @@ const EfectoMidas = () => {
                 onClose={() => setShowLimitModal(false)}
             />
 
-            {/* Special Offer Modal for Free Users */}
+            {/* Special Offer Modal for Expired Trial */}
             <SpecialOfferModal
                 isOpen={showOfferModal}
                 onClose={() => setShowOfferModal(false)}
                 onContinueFree={() => setShowOfferModal(false)}
                 isExpired={isExpired}
+                showDiscount={true}
             />
         </div>
     );

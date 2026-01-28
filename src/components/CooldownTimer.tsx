@@ -19,7 +19,8 @@ export const CooldownTimer: React.FC<CooldownTimerProps> = ({ className }) => {
         getFormattedCooldownTime,
         cooldownRemainingMs,
         scheduleNotification,
-        requestNotificationPermission
+        requestNotificationPermission,
+        daysLeft
     } = useFreemiumLimiter();
 
     const [notificationScheduled, setNotificationScheduled] = useState(false);
@@ -27,8 +28,18 @@ export const CooldownTimer: React.FC<CooldownTimerProps> = ({ className }) => {
 
     const formattedTime = getFormattedCooldownTime();
 
+    // Check if trial is still active (if daysLeft > 0, trial is active)
+    const isTrialActive = daysLeft !== null && daysLeft > 0;
+
+    // Checkout URLs - normal for active trial, discount for expired
+    const NORMAL_CHECKOUT_URL = 'https://pay.hotmart.com/Q103866199O';
+    const DISCOUNT_CHECKOUT_URL = 'https://pay.hotmart.com/Q103866199O?off=itafpp2z';
+
     const handleUpgrade = () => {
-        openPricingModal();
+        // During active trial: show normal price
+        // After trial expires: show discount price
+        const checkoutUrl = isTrialActive ? NORMAL_CHECKOUT_URL : DISCOUNT_CHECKOUT_URL;
+        window.open(checkoutUrl, '_blank');
     };
 
     const handleNotifyMe = async () => {

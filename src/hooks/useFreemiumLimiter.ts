@@ -160,8 +160,8 @@ export const useFreemiumLimiter = () => {
                     // Pro users: use expiration_date
                     expirationDate = data?.expiration_date;
                 } else {
-                    // Free users: use trial_end
-                    expirationDate = data?.trial_end;
+                    // Free users: use trial_ends_at (3-day trial from signup)
+                    expirationDate = data?.trial_ends_at;
                 }
 
                 if (expirationDate) {

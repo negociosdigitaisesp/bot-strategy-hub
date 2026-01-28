@@ -580,6 +580,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                 onClose={() => setShowOfferModal(false)}
                 onContinueFree={() => setShowOfferModal(false)}
                 isExpired={isExpired}
+                showDiscount={isExpired}
             />
         </>
     );
