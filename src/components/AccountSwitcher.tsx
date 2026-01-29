@@ -97,6 +97,12 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
     // Get currency symbol for marketing mode
     const currencySymbol = getCurrencySymbol();
 
+    // 🔒 HIDE ENTIRELY: Don't show AccountSwitcher at all until user connects
+    // Only show when there's an active account or saved accounts
+    if (!account && savedAccounts.length === 0) {
+        return null;
+    }
+
     const handleSwitchAccount = async (acc: SavedAccount) => {
         // Check if trying to switch to Real account while on Free plan
         const targetIsReal = isRealAccount(acc.loginid);
@@ -327,9 +333,13 @@ export const AccountSwitcher: React.FC<AccountSwitcherProps> = ({ onAddAccount, 
                     {/* Botão Nova Conta */}
                     <button
                         onClick={() => {
-                            // Scroll to connection form for all users (free and pro)
-                            setIsOpen(false);
-                            onAddAccount();
+                            // Marketing mode bypasses restrictions
+                            if (!isMarketingMode && isFree) {
+                                openPricingModal();
+                            } else {
+                                setIsOpen(false);
+                                onAddAccount();
+                            }
                         }}
                         className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/20 text-slate-400 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all group"
                     >
