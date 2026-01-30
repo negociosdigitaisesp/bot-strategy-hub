@@ -27,7 +27,9 @@ import {
     Scan,
     Lock,
     Snowflake,
-    RotateCcw
+    RotateCcw,
+    Flame,
+    HeartPulse
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -64,7 +66,13 @@ const EfectoMidas = () => {
         cooldownRemaining,
         // 📊 Session Accumulator
         sessionData,
-        resetSession
+        resetSession,
+        // 🔥 WARM-UP & MARKET HEALTH
+        isWarmingUp,
+        warmUpRemaining,
+        warmUpTicks,
+        marketHealth,
+        lastEntryScore
     } = useEfectoMidas();
 
     // Estados de configuración
@@ -779,6 +787,72 @@ const EfectoMidas = () => {
                                     className="h-full bg-gradient-to-r from-cyan-400 to-cyan-600 transition-all duration-1000 ease-linear"
                                     style={{ width: `${((60 - cooldownRemaining) / 60) * 100}%` }}
                                 />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🔥 WARM-UP Display */}
+                    {isWarmingUp && (
+                        <div className="relative bg-gradient-to-r from-orange-500/10 to-orange-600/5 border border-orange-500/30 rounded-xl p-4 overflow-hidden">
+                            {/* Fire animation */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-orange-400/5 to-transparent animate-pulse" />
+
+                            <div className="relative flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <Flame size={20} className="text-orange-400 animate-pulse" />
+                                        <div className="absolute inset-0 bg-orange-400/20 blur-md rounded-full" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-orange-300">🔥 Warm-Up Ativo</p>
+                                        <p className="text-[10px] text-orange-400/60">Analisando mercado... {warmUpTicks} ticks</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-2xl font-mono font-bold text-orange-400">{warmUpRemaining}s</span>
+                                </div>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="relative h-1.5 bg-black/40 rounded-full overflow-hidden mt-3">
+                                <div
+                                    className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-1000 ease-linear"
+                                    style={{ width: `${((45 - warmUpRemaining) / 45) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📈 Market Health Indicator */}
+                    {isRunning && !isWarmingUp && marketHealth !== 'unknown' && (
+                        <div className={cn(
+                            "relative rounded-xl p-3 border overflow-hidden",
+                            marketHealth === 'healthy'
+                                ? "bg-emerald-500/10 border-emerald-500/30"
+                                : marketHealth === 'caution'
+                                    ? "bg-amber-500/10 border-amber-500/30"
+                                    : "bg-rose-500/10 border-rose-500/30"
+                        )}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <HeartPulse size={16} className={cn(
+                                        marketHealth === 'healthy' ? "text-emerald-400" :
+                                            marketHealth === 'caution' ? "text-amber-400" : "text-rose-400"
+                                    )} />
+                                    <span className={cn(
+                                        "text-xs font-medium",
+                                        marketHealth === 'healthy' ? "text-emerald-300" :
+                                            marketHealth === 'caution' ? "text-amber-300" : "text-rose-300"
+                                    )}>
+                                        {marketHealth === 'healthy' ? '✓ Mercado Saudável' :
+                                            marketHealth === 'caution' ? '⚠ Mercado Cauteloso' : '✗ Mercado Perigoso'}
+                                    </span>
+                                </div>
+                                {lastEntryScore > 0 && (
+                                    <span className="text-[10px] font-mono text-white/50">
+                                        Score: {lastEntryScore}/8
+                                    </span>
+                                )}
                             </div>
                         </div>
                     )}
