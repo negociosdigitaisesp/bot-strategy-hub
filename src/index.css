@@ -1092,3 +1092,46 @@ html {
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 245, 212, 0.4);
 }
+
+/* ========== EFECTO MIDAS WARM-UP ANIMATIONS ========== */
+
+/* Warm-up scan effect - horizontal gradient sweep */
+@keyframes warmupScan {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Decode scan effect - vertical sweep for scanner panel */
+@keyframes decodeScan {
+  0% {
+    top: 0;
+  }
+
+  50% {
+    top: 100%;
+  }
+
+  100% {
+    top: 0;
+  }
+}
+
+/* Decode horizontal scan */
+@keyframes decodeScanH {
+  0% {
+    left: 0;
+  }
+
+  50% {
+    left: 100%;
+  }
+
+  100% {
+    left: 0;
+  }
+}

@@ -463,33 +463,112 @@ const EfectoMidas = () => {
                             <div className="flex items-center gap-3">
                                 <div className={cn(
                                     "w-10 h-10 rounded-xl flex items-center justify-center transition-all border",
-                                    anomalyDetected
-                                        ? "bg-amber-500/10 border-amber-500/30"
-                                        : "bg-white/[0.03] border-white/[0.08]"
+                                    isWarmingUp
+                                        ? "bg-orange-500/10 border-orange-500/30"
+                                        : anomalyDetected
+                                            ? "bg-amber-500/10 border-amber-500/30"
+                                            : "bg-white/[0.03] border-white/[0.08]"
                                 )}>
-                                    <Scan size={18} className={cn(
-                                        "transition-colors",
-                                        anomalyDetected ? "text-amber-400" : "text-white/50",
-                                        isRunning && "animate-pulse"
-                                    )} />
+                                    {isWarmingUp ? (
+                                        <Flame size={18} className="text-orange-400" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+                                    ) : (
+                                        <Scan size={18} className={cn(
+                                            "transition-colors",
+                                            anomalyDetected ? "text-amber-400" : "text-white/50",
+                                            isRunning && "animate-pulse"
+                                        )} />
+                                    )}
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                                        Scanner de Anomalías
-                                        {isRunning && (
-                                            <span className="flex items-center gap-1">
-                                                <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
-                                                <span className="w-1 h-1 rounded-full bg-amber-400/60 animate-pulse" style={{ animationDelay: '0.2s' }} />
-                                                <span className="w-1 h-1 rounded-full bg-amber-400/30 animate-pulse" style={{ animationDelay: '0.4s' }} />
-                                            </span>
+                                        {isWarmingUp ? (
+                                            <>
+                                                <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+                                                    Calibrando Sistema
+                                                </span>
+                                                <span className="flex items-center gap-0.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400" style={{ animation: 'pulse 0.8s ease-in-out infinite' }} />
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400/60" style={{ animation: 'pulse 0.8s ease-in-out infinite 0.2s' }} />
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400/30" style={{ animation: 'pulse 0.8s ease-in-out infinite 0.4s' }} />
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                Scanner de Anomalías
+                                                {isRunning && (
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                                        <span className="w-1 h-1 rounded-full bg-amber-400/60 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                                        <span className="w-1 h-1 rounded-full bg-amber-400/30 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                                                    </span>
+                                                )}
+                                            </>
                                         )}
                                     </h3>
-                                    <p className="text-[11px] text-white/40 font-mono">DECODE_PROTOCOL_25</p>
+                                    <p className="text-[11px] text-white/40 font-mono">
+                                        {isWarmingUp ? 'ANÁLISIS_PRE_MERCADO' : 'DECODE_PROTOCOL_25'}
+                                    </p>
                                 </div>
                             </div>
 
+                            {/* Warm-Up Status Badge */}
+                            {isWarmingUp && (
+                                <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-orange-500/15 to-amber-500/10 border border-orange-500/30 rounded-xl">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-orange-300/70 uppercase tracking-wider font-medium">
+                                            Recopilando datos
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg font-mono font-bold text-orange-400">
+                                                {warmUpRemaining}s
+                                            </span>
+                                            <span className="text-[10px] text-white/40 font-mono">
+                                                ({warmUpTicks} ticks)
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* Mini progress bar */}
+                                    <div className="w-16 h-1.5 bg-black/40 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-orange-400 to-amber-500 transition-all duration-1000"
+                                            style={{ width: `${Math.min(((45 - warmUpRemaining) / 45) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Market Health Badge */}
+                            {isRunning && !isWarmingUp && marketHealth !== 'unknown' && (
+                                <div className={cn(
+                                    "flex items-center gap-2 px-3 py-2 rounded-xl border",
+                                    marketHealth === 'healthy'
+                                        ? "bg-emerald-500/10 border-emerald-500/30"
+                                        : marketHealth === 'caution'
+                                            ? "bg-amber-500/10 border-amber-500/30"
+                                            : "bg-rose-500/10 border-rose-500/30"
+                                )}>
+                                    <HeartPulse size={14} className={cn(
+                                        marketHealth === 'healthy' ? "text-emerald-400" :
+                                            marketHealth === 'caution' ? "text-amber-400" : "text-rose-400"
+                                    )} />
+                                    <span className={cn(
+                                        "text-[10px] font-medium uppercase tracking-wider",
+                                        marketHealth === 'healthy' ? "text-emerald-300" :
+                                            marketHealth === 'caution' ? "text-amber-300" : "text-rose-300"
+                                    )}>
+                                        {marketHealth === 'healthy' ? 'Mercado Óptimo' :
+                                            marketHealth === 'caution' ? 'Precaución' : 'Peligro'}
+                                    </span>
+                                    {lastEntryScore > 0 && (
+                                        <span className="text-[9px] font-mono text-white/40 ml-1">
+                                            {lastEntryScore}/8
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Anomaly Alert */}
-                            {anomalyDetected && (
+                            {anomalyDetected && !isWarmingUp && (
                                 <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl">
                                     <Sparkles size={16} className="text-amber-400" />
                                     <span className="text-xs font-medium text-amber-300">
@@ -498,6 +577,64 @@ const EfectoMidas = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* 🔥 WARM-UP OVERLAY - Profesional con animaciones suaves */}
+                        {isWarmingUp && (
+                            <div className="mb-6 p-4 bg-gradient-to-br from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/20 rounded-xl relative overflow-hidden">
+                                {/* Subtle scan effect */}
+                                <div
+                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/5 to-transparent"
+                                    style={{ animation: 'warmupScan 2s ease-in-out infinite' }}
+                                />
+
+                                <div className="relative">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="p-2 bg-orange-500/20 rounded-lg">
+                                            <Activity size={16} className="text-orange-400" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="text-sm font-semibold text-orange-300 mb-1">
+                                                🔥 Sistema en Calibración
+                                            </h4>
+                                            <p className="text-[11px] text-white/50 leading-relaxed">
+                                                Analizando patrones del mercado para máxima precisión.
+                                                Por favor espere mientras el algoritmo se sincroniza.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress section */}
+                                    <div className="grid grid-cols-3 gap-3 text-center">
+                                        <div className="p-2 bg-black/20 rounded-lg">
+                                            <span className="text-lg font-mono font-bold text-orange-400">{warmUpTicks}</span>
+                                            <p className="text-[9px] text-white/40 uppercase tracking-wider">Ticks</p>
+                                        </div>
+                                        <div className="p-2 bg-black/20 rounded-lg">
+                                            <span className="text-lg font-mono font-bold text-amber-400">{warmUpRemaining}s</span>
+                                            <p className="text-[9px] text-white/40 uppercase tracking-wider">Restante</p>
+                                        </div>
+                                        <div className="p-2 bg-black/20 rounded-lg">
+                                            <span className="text-lg font-mono font-bold text-white/60">
+                                                {Math.min(Math.round((warmUpTicks / 50) * 100), 100)}%
+                                            </span>
+                                            <p className="text-[9px] text-white/40 uppercase tracking-wider">Datos</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Full progress bar */}
+                                    <div className="mt-3 h-2 bg-black/30 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 transition-all duration-500"
+                                            style={{
+                                                width: `${Math.min(((45 - warmUpRemaining) / 45) * 100, 100)}%`,
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 2s linear infinite'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Digit Matrix */}
                         <div className="flex justify-center gap-1.5 md:gap-2 mb-4 flex-wrap">
@@ -787,72 +924,6 @@ const EfectoMidas = () => {
                                     className="h-full bg-gradient-to-r from-cyan-400 to-cyan-600 transition-all duration-1000 ease-linear"
                                     style={{ width: `${((60 - cooldownRemaining) / 60) * 100}%` }}
                                 />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 🔥 WARM-UP Display */}
-                    {isWarmingUp && (
-                        <div className="relative bg-gradient-to-r from-orange-500/10 to-orange-600/5 border border-orange-500/30 rounded-xl p-4 overflow-hidden">
-                            {/* Fire animation */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-orange-400/5 to-transparent animate-pulse" />
-
-                            <div className="relative flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="relative">
-                                        <Flame size={20} className="text-orange-400 animate-pulse" />
-                                        <div className="absolute inset-0 bg-orange-400/20 blur-md rounded-full" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-orange-300">🔥 Warm-Up Ativo</p>
-                                        <p className="text-[10px] text-orange-400/60">Analisando mercado... {warmUpTicks} ticks</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-2xl font-mono font-bold text-orange-400">{warmUpRemaining}s</span>
-                                </div>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="relative h-1.5 bg-black/40 rounded-full overflow-hidden mt-3">
-                                <div
-                                    className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-1000 ease-linear"
-                                    style={{ width: `${((45 - warmUpRemaining) / 45) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 📈 Market Health Indicator */}
-                    {isRunning && !isWarmingUp && marketHealth !== 'unknown' && (
-                        <div className={cn(
-                            "relative rounded-xl p-3 border overflow-hidden",
-                            marketHealth === 'healthy'
-                                ? "bg-emerald-500/10 border-emerald-500/30"
-                                : marketHealth === 'caution'
-                                    ? "bg-amber-500/10 border-amber-500/30"
-                                    : "bg-rose-500/10 border-rose-500/30"
-                        )}>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <HeartPulse size={16} className={cn(
-                                        marketHealth === 'healthy' ? "text-emerald-400" :
-                                            marketHealth === 'caution' ? "text-amber-400" : "text-rose-400"
-                                    )} />
-                                    <span className={cn(
-                                        "text-xs font-medium",
-                                        marketHealth === 'healthy' ? "text-emerald-300" :
-                                            marketHealth === 'caution' ? "text-amber-300" : "text-rose-300"
-                                    )}>
-                                        {marketHealth === 'healthy' ? '✓ Mercado Saudável' :
-                                            marketHealth === 'caution' ? '⚠ Mercado Cauteloso' : '✗ Mercado Perigoso'}
-                                    </span>
-                                </div>
-                                {lastEntryScore > 0 && (
-                                    <span className="text-[10px] font-mono text-white/50">
-                                        Score: {lastEntryScore}/8
-                                    </span>
-                                )}
                             </div>
                         </div>
                     )}
