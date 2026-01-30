@@ -132,6 +132,13 @@ export const useEfectoMidas = () => {
     const WARM_UP_DURATION = 45; // segundos
     const WARM_UP_MIN_TICKS = 50; // mínimo de ticks para análise
 
+    // ⚡ KINETIC ACCELERATION FILTER - Sistema de Inercia Algorítmica
+    const [kineticAcceleration, setKineticAcceleration] = useState<number>(0);
+    const [isKineticBlocked, setIsKineticBlocked] = useState<boolean>(false);
+    const [kineticCooldown, setKineticCooldown] = useState<number>(0);
+    const kineticBlockedUntilRef = useRef<number>(0);
+    const KINETIC_THRESHOLD = 2.5; // Umbral de aceleración
+
     // 💾 Save session to localStorage
     const saveSession = useCallback((data: SessionData) => {
         try {
@@ -478,6 +485,77 @@ export const useEfectoMidas = () => {
         }
     }, []);
 
+    // ⚡ CHECK KINETIC ACCELERATION - Filtro de Inercia Algorítmica
+    // Detecta explosões direcionais que causam "arraste" nos dígitos
+    const checkKineticAcceleration = useCallback((priceHistory: number[]): {
+        safe: boolean;
+        acceleration: number;
+        cooldownSeconds: number;
+        velocity1: number;
+        velocity2: number;
+    } => {
+        // Necesitamos mínimo 3 precios para calcular aceleración
+        if (priceHistory.length < 3) {
+            return { safe: true, acceleration: 0, cooldownSeconds: 0, velocity1: 0, velocity2: 0 };
+        }
+
+        const prices = priceHistory.slice(-3);
+        const [P0, P1, P2] = prices;
+
+        // Calcular velocidades
+        const V1 = Math.abs(P1 - P0);
+        const V2 = Math.abs(P2 - P1);
+
+        // Protección división por cero - si V1 ≈ 0, mercado estable = seguro
+        if (V1 < 0.00001) {
+            return { safe: true, acceleration: 0, cooldownSeconds: 0, velocity1: V1, velocity2: V2 };
+        }
+
+        // Calcular aceleración (segunda derivada)
+        const acceleration = V2 / V1;
+
+        // Verificar si la aceleración supera el umbral
+        if (acceleration > KINETIC_THRESHOLD) {
+            // ⚡ COOLDOWN EXPONENCIAL basado en magnitud de aceleración
+            // A = 2.5 → 1.5s | A = 5.0 → 3s | A = 10.0 → 5s
+            const cooldownSeconds = Math.min(Math.round((acceleration - 1) * 1.2), 8);
+
+            return {
+                safe: false,
+                acceleration,
+                cooldownSeconds,
+                velocity1: V1,
+                velocity2: V2
+            };
+        }
+
+        return { safe: true, acceleration, cooldownSeconds: 0, velocity1: V1, velocity2: V2 };
+    }, [KINETIC_THRESHOLD]);
+
+    // ⚡ ACTIVATE KINETIC BLOCK - Activa el bloqueo con cooldown
+    const activateKineticBlock = useCallback((cooldownSeconds: number, acceleration: number) => {
+        const blockUntil = Date.now() + (cooldownSeconds * 1000);
+        kineticBlockedUntilRef.current = blockUntil;
+        setIsKineticBlocked(true);
+        setKineticCooldown(cooldownSeconds);
+        setKineticAcceleration(acceleration);
+
+        addLog(`⚡ BLOQUEO CINÉTICO: Aceleración ${acceleration.toFixed(2)}x detectada. Veto por ${cooldownSeconds}s`, 'warning');
+
+        // Timer para actualizar el countdown y liberar
+        const interval = setInterval(() => {
+            const remaining = Math.max(0, Math.ceil((kineticBlockedUntilRef.current - Date.now()) / 1000));
+            setKineticCooldown(remaining);
+
+            if (remaining <= 0) {
+                clearInterval(interval);
+                setIsKineticBlocked(false);
+                setKineticCooldown(0);
+                addLog(`✅ Bloqueo cinético liberado. Operaciones permitidas.`, 'info');
+            }
+        }, 200);
+    }, [addLog]);
+
     // 🔥 START WARM-UP - Inicia período de aquecimento
     const startWarmUp = useCallback(() => {
         isWarmingUpRef.current = true;
@@ -739,7 +817,26 @@ export const useEfectoMidas = () => {
                         reasons.forEach(r => addLog(`   ${r}`, 'info'));
                         return;
                     }
-                    addLog(`📊 Score de confiança: ${score}/8 ✓`, 'gold');
+                    addLog(`📊 Score de confianza: ${score}/8 ✓`, 'gold');
+
+                    // ⚡ VETO FINAL: KINETIC ACCELERATION FILTER
+                    // Detecta explosões de preço que causam "arraste" nos dígitos
+                    const kineticCheck = checkKineticAcceleration(lastPricesRef.current);
+                    setKineticAcceleration(kineticCheck.acceleration);
+
+                    // Verificar si estamos en periodo de bloqueo cinético
+                    if (Date.now() < kineticBlockedUntilRef.current) {
+                        const remaining = Math.ceil((kineticBlockedUntilRef.current - Date.now()) / 1000);
+                        addLog(`⚡ VETO CINÉTICO activo. Esperando ${remaining}s...`, 'warning');
+                        return;
+                    }
+
+                    // Verificar aceleración actual
+                    if (!kineticCheck.safe) {
+                        activateKineticBlock(kineticCheck.cooldownSeconds, kineticCheck.acceleration);
+                        addLog(`📉 V1=${kineticCheck.velocity1.toFixed(5)} → V2=${kineticCheck.velocity2.toFixed(5)}`, 'info');
+                        return;
+                    }
 
                     // --- EXECUTION ---
                     setIsShadowMode(false);
@@ -1205,5 +1302,9 @@ export const useEfectoMidas = () => {
         warmUpTicks,
         marketHealth,
         lastEntryScore,
+        // ⚡ KINETIC ACCELERATION FILTER exports
+        kineticAcceleration,
+        isKineticBlocked,
+        kineticCooldown,
     };
 };

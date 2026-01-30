@@ -29,7 +29,8 @@ import {
     Snowflake,
     RotateCcw,
     Flame,
-    HeartPulse
+    HeartPulse,
+    Zap
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -72,7 +73,11 @@ const EfectoMidas = () => {
         warmUpRemaining,
         warmUpTicks,
         marketHealth,
-        lastEntryScore
+        lastEntryScore,
+        // ⚡ KINETIC ACCELERATION FILTER
+        kineticAcceleration,
+        isKineticBlocked,
+        kineticCooldown
     } = useEfectoMidas();
 
     // Estados de configuración
@@ -567,7 +572,58 @@ const EfectoMidas = () => {
                                 </div>
                             )}
 
-                            {/* Anomaly Alert */}
+                            {/* ⚡ Kinetic Veto Badge - Bloqueo Cinético */}
+                            {isRunning && !isWarmingUp && isKineticBlocked && (
+                                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-violet-500/15 to-purple-500/10 border border-violet-500/30 rounded-xl relative overflow-hidden">
+                                    {/* Animated pulse background */}
+                                    <div className="absolute inset-0 bg-violet-400/5" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+                                    <Zap size={14} className="text-violet-400 relative" style={{ animation: 'pulse 0.6s ease-in-out infinite' }} />
+                                    <div className="relative flex flex-col">
+                                        <span className="text-[9px] text-violet-300/70 uppercase tracking-wider">
+                                            Veto Cinético
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-sm font-mono font-bold text-violet-400">
+                                                {kineticCooldown}s
+                                            </span>
+                                            <span className="text-[9px] text-white/30 font-mono">
+                                                A={kineticAcceleration.toFixed(1)}x
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* Mini cooldown bar */}
+                                    <div className="w-12 h-1 bg-black/30 rounded-full overflow-hidden ml-1">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-violet-400 to-purple-500 transition-all duration-200"
+                                            style={{ width: `${Math.max(0, (kineticCooldown / 8) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Kinetic Acceleration Display (subtle when not blocked) */}
+                            {isRunning && !isWarmingUp && !isKineticBlocked && kineticAcceleration > 0 && (
+                                <div className={cn(
+                                    "flex items-center gap-1.5 px-2 py-1 rounded-lg border",
+                                    kineticAcceleration < 1.5
+                                        ? "bg-emerald-500/5 border-emerald-500/20"
+                                        : kineticAcceleration < 2.0
+                                            ? "bg-amber-500/5 border-amber-500/20"
+                                            : "bg-violet-500/5 border-violet-500/20"
+                                )}>
+                                    <Zap size={10} className={cn(
+                                        kineticAcceleration < 1.5 ? "text-emerald-400/60" :
+                                            kineticAcceleration < 2.0 ? "text-amber-400/60" : "text-violet-400/60"
+                                    )} />
+                                    <span className={cn(
+                                        "text-[9px] font-mono",
+                                        kineticAcceleration < 1.5 ? "text-emerald-300/50" :
+                                            kineticAcceleration < 2.0 ? "text-amber-300/50" : "text-violet-300/50"
+                                    )}>
+                                        {kineticAcceleration.toFixed(2)}x
+                                    </span>
+                                </div>
+                            )}
                             {anomalyDetected && !isWarmingUp && (
                                 <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl">
                                     <Sparkles size={16} className="text-amber-400" />
