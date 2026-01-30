@@ -24,7 +24,10 @@ import {
     ArrowLeft,
     Wifi,
     WifiOff,
-    Scan
+    Scan,
+    Lock,
+    Snowflake,
+    RotateCcw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -54,7 +57,14 @@ const EfectoMidas = () => {
         repeatedDigit,
         startBot,
         stopBot,
-        trendStatus
+        trendStatus,
+        // Bóveda Inteligente
+        vaultAccumulated,
+        isVaultCooldown,
+        cooldownRemaining,
+        // 📊 Session Accumulator
+        sessionData,
+        resetSession
     } = useEfectoMidas();
 
     // Estados de configuración
@@ -64,6 +74,10 @@ const EfectoMidas = () => {
     const [maxLosses, setMaxLosses] = useState<string>(() => localStorage.getItem('midas_maxlosses') || '2');
     const [useMartingale, setUseMartingale] = useState<boolean>(() => localStorage.getItem('midas_martingale') !== 'false');
     const [martingaleFactor, setMartingaleFactor] = useState<string>(() => localStorage.getItem('midas_factor') || '11.0');
+
+    // 🔒 Bóveda Inteligente config
+    const [vaultEnabled, setVaultEnabled] = useState<boolean>(() => localStorage.getItem('midas_vault_enabled') !== 'false');
+    const [vaultTarget, setVaultTarget] = useState<string>(() => localStorage.getItem('midas_vault_target') || '3.00');
 
     const logsEndRef = useRef<HTMLDivElement>(null);
     const logsContainerRef = useRef<HTMLDivElement>(null);
@@ -93,7 +107,9 @@ const EfectoMidas = () => {
         localStorage.setItem('midas_maxlosses', maxLosses);
         localStorage.setItem('midas_martingale', String(useMartingale));
         localStorage.setItem('midas_factor', martingaleFactor);
-    }, [stake, stopLoss, takeProfit, maxLosses, useMartingale, martingaleFactor]);
+        localStorage.setItem('midas_vault_enabled', String(vaultEnabled));
+        localStorage.setItem('midas_vault_target', vaultTarget);
+    }, [stake, stopLoss, takeProfit, maxLosses, useMartingale, martingaleFactor, vaultEnabled, vaultTarget]);
 
     // Smart scroll - only auto-scroll if user is near bottom
     useEffect(() => {
@@ -151,6 +167,8 @@ const EfectoMidas = () => {
                 symbol: '1HZ100V',
                 useMartingale,
                 martingaleMultiplier: martingaleFactorVal || 11,
+                vaultEnabled,
+                vaultTarget: parseFloat(vaultTarget) || 3.0,
             });
 
             if (success) {
@@ -531,10 +549,10 @@ const EfectoMidas = () => {
                                 </div>
                             </div>
 
-                            {/* Max Losses */}
+                            {/* Martingale Recovery Levels */}
                             <div>
                                 <label className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 block font-medium">
-                                    Stop de Seguridad
+                                    Níveis de Recuperação (Gale)
                                 </label>
                                 <select
                                     value={maxLosses}
@@ -542,9 +560,9 @@ const EfectoMidas = () => {
                                     disabled={isRunning}
                                     className="w-full px-3 py-2.5 bg-black/30 border border-white/[0.08] rounded-lg text-white font-mono focus:border-amber-500/40 focus:outline-none transition-colors disabled:opacity-50 appearance-none cursor-pointer"
                                 >
-                                    <option value="1">1 Pérdida → Detener</option>
-                                    <option value="2">2 Pérdidas → Detener</option>
-                                    <option value="3">3 Pérdidas → Detener</option>
+                                    <option value="1">1 Martingale (Conservador)</option>
+                                    <option value="2">2 Martingales (Moderado)</option>
+                                    <option value="3">3 Martingales (Agressivo)</option>
                                 </select>
                             </div>
 
@@ -617,25 +635,75 @@ const EfectoMidas = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* 🔒 Bóveda Inteligente */}
+                            <div className="p-3 bg-gradient-to-r from-amber-500/5 to-transparent border border-amber-500/20 rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Lock size={14} className="text-amber-400" />
+                                        <span className="text-[10px] text-white/60 uppercase tracking-wider font-medium">Bóveda Inteligente</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setVaultEnabled(!vaultEnabled)}
+                                        disabled={isRunning}
+                                        className={cn(
+                                            "relative w-10 h-5 rounded-full transition-colors disabled:opacity-50",
+                                            vaultEnabled ? "bg-gradient-to-r from-amber-500/40 to-amber-600/40" : "bg-white/10"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all shadow",
+                                            vaultEnabled ? "left-5" : "left-0.5"
+                                        )} />
+                                    </button>
+                                </div>
+
+                                {vaultEnabled && (
+                                    <div className="pt-2">
+                                        <label className="text-[9px] text-amber-400/60 uppercase tracking-wider mb-1 block">
+                                            Meta de Bóveda ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={vaultTarget}
+                                            onChange={(e) => setVaultTarget(e.target.value)}
+                                            disabled={isRunning}
+                                            step="0.5"
+                                            min="1"
+                                            className="w-full px-2.5 py-1.5 bg-black/30 border border-amber-500/20 rounded text-amber-400 font-mono text-xs focus:border-amber-500/40 focus:outline-none transition-colors disabled:opacity-50"
+                                        />
+                                        <p className="text-[9px] text-white/30 mt-1.5 leading-relaxed">
+                                            Pausa cada ${parseFloat(vaultTarget || '3').toFixed(2)} para asegurar ganancias y enfriar el algoritmo.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     {/* Control Button */}
                     <button
                         onClick={handleToggleBot}
-                        disabled={!isConnected}
+                        disabled={!isConnected || isVaultCooldown}
                         className={cn(
                             "w-full py-4 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed group",
                             isRunning
                                 ? "bg-rose-500/10 hover:bg-rose-500/15 text-rose-400 border border-rose-500/20"
-                                : "bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/35"
+                                : isVaultCooldown
+                                    ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 cursor-wait"
+                                    : "bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25 hover:shadow-amber-500/35"
                         )}
                     >
                         {/* Shine effect */}
-                        {!isRunning && (
+                        {!isRunning && !isVaultCooldown && (
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-all duration-700" />
                         )}
-                        {isRunning ? (
+                        {isVaultCooldown ? (
+                            <>
+                                <Snowflake size={16} className="animate-pulse" />
+                                <span>ENFRIANDO...</span>
+                            </>
+                        ) : isRunning ? (
                             <>
                                 <Square fill="currentColor" size={16} />
                                 <span>DETENER</span>
@@ -647,6 +715,73 @@ const EfectoMidas = () => {
                             </>
                         )}
                     </button>
+
+                    {/* 🔒 Vault Progress Bar */}
+                    {vaultEnabled && isRunning && (
+                        <div className="relative bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl p-4 overflow-hidden">
+                            {/* Shimmer effect when near full */}
+                            {vaultAccumulated >= parseFloat(vaultTarget) * 0.8 && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/10 to-transparent animate-pulse" />
+                            )}
+
+                            <div className="relative flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <Lock size={14} className={cn(
+                                        "text-amber-400 transition-all",
+                                        vaultAccumulated >= parseFloat(vaultTarget) * 0.8 && "animate-bounce"
+                                    )} />
+                                    <span className="text-xs text-amber-300 font-medium">Progreso de Bóveda</span>
+                                </div>
+                                <span className="text-xs font-mono text-amber-400 font-bold">
+                                    ${vaultAccumulated.toFixed(2)} / ${parseFloat(vaultTarget).toFixed(2)}
+                                </span>
+                            </div>
+
+                            <div className="relative h-2.5 bg-black/40 rounded-full overflow-hidden border border-amber-500/20">
+                                <div
+                                    className="h-full bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 transition-all duration-500 ease-out"
+                                    style={{ width: `${Math.min((vaultAccumulated / parseFloat(vaultTarget)) * 100, 100)}%` }}
+                                />
+                                {/* Glow effect on bar */}
+                                <div
+                                    className="absolute top-0 h-full bg-gradient-to-r from-amber-300/50 to-transparent blur-sm"
+                                    style={{ width: `${Math.min((vaultAccumulated / parseFloat(vaultTarget)) * 100, 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ❄️ Vault Cooldown Display */}
+                    {isVaultCooldown && (
+                        <div className="relative bg-gradient-to-r from-cyan-500/10 to-cyan-600/5 border border-cyan-500/30 rounded-xl p-4 overflow-hidden">
+                            {/* Frost animation */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-cyan-400/5 to-transparent animate-pulse" />
+
+                            <div className="relative flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <Snowflake size={20} className="text-cyan-400 animate-spin" style={{ animationDuration: '3s' }} />
+                                        <div className="absolute inset-0 bg-cyan-400/20 blur-md rounded-full" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-cyan-300">❄️ Enfriando Algoritmo</p>
+                                        <p className="text-[10px] text-cyan-400/60">Ganancias aseguradas. Reinicio automático...</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-2xl font-mono font-bold text-cyan-400">{cooldownRemaining}s</span>
+                                </div>
+                            </div>
+
+                            {/* Progress bar for cooldown */}
+                            <div className="relative h-1.5 bg-black/40 rounded-full overflow-hidden mt-3">
+                                <div
+                                    className="h-full bg-gradient-to-r from-cyan-400 to-cyan-600 transition-all duration-1000 ease-linear"
+                                    style={{ width: `${((60 - cooldownRemaining) / 60) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Freemium Progress Bar - only for free users */}
                     {isFree && (
@@ -670,6 +805,9 @@ const EfectoMidas = () => {
 
                 {/* Right Panel - Stats & Logs */}
                 <div className="lg:col-span-9 space-y-4 order-2 lg:order-3">
+                    {/* 🏦 BÓVEDA TOTAL - Acumulado Sagrado (Visualmente removido, lógica mantida) */}
+                    {/* {vaultEnabled && sessionData.vaultCount > 0 && ( ... )} */}
+
                     {/* Stats Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                         {/* Total Profit */}
@@ -816,7 +954,7 @@ const EfectoMidas = () => {
                 isExpired={isExpired}
                 showDiscount={true}
             />
-        </div>
+        </div >
     );
 };
 
