@@ -28,8 +28,7 @@ import {
     Lock,
     Snowflake,
     RotateCcw,
-    Flame,
-    HeartPulse
+    Flame
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -71,7 +70,6 @@ const EfectoMidas = () => {
         isWarmingUp,
         warmUpRemaining,
         warmUpTicks,
-        marketHealth,
         lastEntryScore
     } = useEfectoMidas();
 
@@ -534,36 +532,6 @@ const EfectoMidas = () => {
                                             style={{ width: `${Math.min(((45 - warmUpRemaining) / 45) * 100, 100)}%` }}
                                         />
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Market Health Badge */}
-                            {isRunning && !isWarmingUp && marketHealth !== 'unknown' && (
-                                <div className={cn(
-                                    "flex items-center gap-2 px-3 py-2 rounded-xl border",
-                                    marketHealth === 'healthy'
-                                        ? "bg-emerald-500/10 border-emerald-500/30"
-                                        : marketHealth === 'caution'
-                                            ? "bg-amber-500/10 border-amber-500/30"
-                                            : "bg-rose-500/10 border-rose-500/30"
-                                )}>
-                                    <HeartPulse size={14} className={cn(
-                                        marketHealth === 'healthy' ? "text-emerald-400" :
-                                            marketHealth === 'caution' ? "text-amber-400" : "text-rose-400"
-                                    )} />
-                                    <span className={cn(
-                                        "text-[10px] font-medium uppercase tracking-wider",
-                                        marketHealth === 'healthy' ? "text-emerald-300" :
-                                            marketHealth === 'caution' ? "text-amber-300" : "text-rose-300"
-                                    )}>
-                                        {marketHealth === 'healthy' ? 'Mercado Óptimo' :
-                                            marketHealth === 'caution' ? 'Precaución' : 'Peligro'}
-                                    </span>
-                                    {lastEntryScore > 0 && (
-                                        <span className="text-[9px] font-mono text-white/40 ml-1">
-                                            {lastEntryScore}/8
-                                        </span>
-                                    )}
                                 </div>
                             )}
 

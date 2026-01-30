@@ -94,8 +94,6 @@ export const useEfectoMidas = () => {
     const [warmUpRemaining, setWarmUpRemaining] = useState(0);
     const [warmUpTicks, setWarmUpTicks] = useState(0);
 
-    // 📈 MARKET HEALTH STATUS
-    const [marketHealth, setMarketHealth] = useState<'unknown' | 'healthy' | 'caution' | 'dangerous'>('unknown');
     const [lastEntryScore, setLastEntryScore] = useState<number>(0);
 
     // Referencias
@@ -335,17 +333,8 @@ export const useEfectoMidas = () => {
     }, []);
 
     const checkHotDigitSafety = useCallback((digit: number, history: number[]) => {
-        // Analisar últimos 100 ticks (ou o que tivermos)
-        const sampleSize = Math.min(history.length, 100);
-        const sample = history.slice(-sampleSize);
-
-        const count = sample.filter(d => d === digit).length;
-        const frequency = count / sampleSize;
-
-        if (frequency > 0.15) { // 15% threshold
-            return { safe: false, message: `🚫 Entrada Bloqueada: Dígito [${digit}] Super Quente (${(frequency * 100).toFixed(1)}%)` };
-        }
-
+        // Para estratégia de Reversão (Digit Differs após Repetição),
+        // dígito quente é BOM sinal (tendência a não repetir 3x)
         return { safe: true, message: '' };
     }, []);
 
@@ -360,11 +349,11 @@ export const useEfectoMidas = () => {
         const occurrences = recentHistory.filter(d => d === digit).length;
         const frequency = occurrences / recentHistory.length;
 
-        // Se dígito apareceu > 30% nos últimos 10 ticks
-        if (frequency > 0.30) {
+        // Se dígito apareceu > 40% nos últimos 10 ticks (aumentado de 30% para 40%)
+        if (frequency > 0.40) {
             return {
                 safe: false,
-                message: `🚫 Streak Ativo: Dígito [${digit}] em ${(frequency * 100).toFixed(0)}% dos últimos 10 ticks`
+                message: `🚫 Streak Extremo: Dígito [${digit}] em ${(frequency * 100).toFixed(0)}% dos últimos 10 ticks`
             };
         }
 
@@ -390,17 +379,17 @@ export const useEfectoMidas = () => {
             reasons.push('⚠️ Tendência forte');
         }
 
-        // 2. DIGIT TEMPERATURE (+2 se frio, -1 se quente)
+        // 2. DIGIT TEMPERATURE (Invertido: +2 se quente, preferível para reversão)
         const sampleSize = Math.min(digitHistory.length, 50);
         const sample = digitHistory.slice(-sampleSize);
         const digitFreq = sample.filter(d => d === digit).length / sampleSize;
 
-        if (digitFreq < 0.08) {
+        if (digitFreq > 0.12) { // > 12% (Quente)
             score += 2;
-            reasons.push(`✅ Dígito [${digit}] frio (${(digitFreq * 100).toFixed(1)}%)`);
-        } else if (digitFreq > 0.15) {
+            reasons.push(`🔥 Dígito [${digit}] quente (${(digitFreq * 100).toFixed(1)}%) - Bom para Reversão`);
+        } else if (digitFreq < 0.08) { // < 8% (Frio)
             score -= 1;
-            reasons.push(`⚠️ Dígito [${digit}] quente`);
+            reasons.push(`❄️ Dígito [${digit}] muito frio - Cuidado`);
         } else {
             score += 1;
             reasons.push(`➖ Dígito [${digit}] normal`);
@@ -436,47 +425,8 @@ export const useEfectoMidas = () => {
         return { score, reasons };
     }, []);
 
-    // 🏥 MARKET HEALTH CHECK - Verifica saúde do mercado
-    const checkMarketHealth = useCallback((digitHistory: number[], priceHistory: number[]): 'healthy' | 'caution' | 'dangerous' => {
-        if (digitHistory.length < 30) return 'caution';
+    // 🏥 MARKET HEALTH CHECK REMOVED
 
-        // 1. Verificar entropia (aleatoriedade)
-        const last30 = digitHistory.slice(-30);
-        const counts: Record<number, number> = {};
-        for (const d of last30) {
-            counts[d] = (counts[d] || 0) + 1;
-        }
-        let entropy = 0;
-        for (const count of Object.values(counts)) {
-            const p = count / last30.length;
-            if (p > 0) entropy -= p * Math.log2(p);
-        }
-        const isEntropyOK = entropy > 2.0;
-
-        // 2. Verificar volatilidade de tendência
-        const prices = priceHistory.slice(-10);
-        let sameDirection = 0;
-        for (let i = 2; i < prices.length; i++) {
-            const prev = prices[i - 1] > prices[i - 2];
-            const curr = prices[i] > prices[i - 1];
-            if (prev === curr) sameDirection++;
-        }
-        const isTrendOK = sameDirection < 6;
-
-        // 3. Verificar se algum dígito está dominando
-        const maxFreq = Math.max(...Array.from({ length: 10 }, (_, i) =>
-            last30.filter(d => d === i).length / 30
-        ));
-        const isDistributionOK = maxFreq < 0.25;
-
-        if (isEntropyOK && isTrendOK && isDistributionOK) {
-            return 'healthy';
-        } else if (!isEntropyOK && !isTrendOK) {
-            return 'dangerous';
-        } else {
-            return 'caution';
-        }
-    }, []);
 
     // 🔥 START WARM-UP - Inicia período de aquecimento
     const startWarmUp = useCallback(() => {
@@ -485,7 +435,7 @@ export const useEfectoMidas = () => {
         setIsWarmingUp(true);
         setWarmUpTicks(0);
         setWarmUpRemaining(WARM_UP_DURATION);
-        setMarketHealth('unknown');
+
 
         addLog(`🔥 WARM-UP INICIADO: Analizando mercado por ${WARM_UP_DURATION}s...`, 'gold');
 
@@ -511,19 +461,10 @@ export const useEfectoMidas = () => {
 
                 // Check if we have enough ticks
                 if (currentTicks >= WARM_UP_MIN_TICKS) {
-                    // Complete warm-up and check market health
-                    const health = checkMarketHealth(lastDigitsRef.current, lastPricesRef.current);
-                    setMarketHealth(health);
+                    // Complete warm-up
                     isWarmingUpRef.current = false;
                     setIsWarmingUp(false);
-
-                    if (health === 'healthy') {
-                        addLog(`✅ WARM-UP COMPLETO: Mercado ÓPTIMO. ¡Operaciones liberadas!`, 'gold');
-                    } else if (health === 'caution') {
-                        addLog(`⚠️ WARM-UP COMPLETO: Mercado en PRECAUCIÓN. Operando con filtros extras.`, 'warning');
-                    } else {
-                        addLog(`🚫 WARM-UP COMPLETO: Mercado PELIGROSO. Aguardando mejora...`, 'error');
-                    }
+                    addLog(`✅ WARM-UP COMPLETO: Operações liberadas!`, 'gold');
                 } else {
                     // Not enough ticks - extend warm-up
                     addLog(`⏳ Ticks insuficientes (${currentTicks}/${WARM_UP_MIN_TICKS}). Extendiendo 15s...`, 'info');
@@ -542,8 +483,6 @@ export const useEfectoMidas = () => {
                             }
 
                             // Force complete after extension
-                            const health = checkMarketHealth(lastDigitsRef.current, lastPricesRef.current);
-                            setMarketHealth(health);
                             isWarmingUpRef.current = false;
                             setIsWarmingUp(false);
                             addLog(`✅ WARM-UP FINALIZADO después de extensión.`, 'gold');
@@ -552,7 +491,7 @@ export const useEfectoMidas = () => {
                 }
             }
         }, 1000);
-    }, [addLog, checkMarketHealth, WARM_UP_DURATION, WARM_UP_MIN_TICKS]);
+    }, [addLog, WARM_UP_DURATION, WARM_UP_MIN_TICKS]);
 
     // 🧊 Sistema de Resfriamento Inteligente Adaptativo
     const startAdaptiveCooldown = useCallback((reason: 'vault_complete' | 'excessive_losses') => {
@@ -692,17 +631,10 @@ export const useEfectoMidas = () => {
                     // ✅ CONFIRMAÇÃO RECEBIDA! Aplicar filtros de segurança
                     addLog(`✅ Confirmação recebida para dígito [${confirmedDigit}]`, 'gold');
 
+
                     // 🔥 WARM-UP CHECK - Bloquear durante aquecimento
                     if (isWarmingUpRef.current) {
                         addLog(`⏳ WARM-UP ativo. Sinal ignorado...`, 'info');
-                        return;
-                    }
-
-                    // 🏥 MARKET HEALTH CHECK - Bloquear em mercado perigoso
-                    const currentHealth = checkMarketHealth(lastDigitsRef.current, lastPricesRef.current);
-                    setMarketHealth(currentHealth);
-                    if (currentHealth === 'dangerous') {
-                        addLog(`🚫 Mercado PERIGOSO. Entrada bloqueada.`, 'error');
                         return;
                     }
 
@@ -733,7 +665,7 @@ export const useEfectoMidas = () => {
                     const { score, reasons } = calculateEntryScore(confirmedDigit, lastDigitsRef.current, lastPricesRef.current);
                     setLastEntryScore(score);
 
-                    const minScore = currentHealth === 'caution' ? 6 : 5; // Score maior em mercado cauteloso
+                    const minScore = 5; // Score fixo
                     if (score < minScore) {
                         addLog(`📊 Score ${score}/${minScore} insuficiente. Entrada bloqueada.`, 'warning');
                         reasons.forEach(r => addLog(`   ${r}`, 'info'));
@@ -758,7 +690,7 @@ export const useEfectoMidas = () => {
                         price: 100,
                         parameters: {
                             contract_type: 'DIGITDIFF',
-                            symbol: configRef.current.symbol || '1HZ100V',
+                            symbol: configRef.current?.symbol || '1HZ100V',
                             currency: 'USD',
                             amount: stakeAmount,
                             basis: 'stake',
@@ -1136,7 +1068,7 @@ export const useEfectoMidas = () => {
         isWarmingUpRef.current = false;
         setIsWarmingUp(false);
         setWarmUpRemaining(0);
-        setMarketHealth('unknown');
+        // setMarketHealth('unknown'); // Removed
 
         setActiveBot(null);
         addLog('🛑 Protocolo Midas desactivado', 'warning');
@@ -1203,7 +1135,6 @@ export const useEfectoMidas = () => {
         isWarmingUp,
         warmUpRemaining,
         warmUpTicks,
-        marketHealth,
         lastEntryScore,
     };
 };
