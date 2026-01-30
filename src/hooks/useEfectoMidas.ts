@@ -487,42 +487,70 @@ export const useEfectoMidas = () => {
         setWarmUpRemaining(WARM_UP_DURATION);
         setMarketHealth('unknown');
 
-        addLog(`🔥 WARM-UP INICIADO: Analisando mercado por ${WARM_UP_DURATION}s...`, 'gold');
+        addLog(`🔥 WARM-UP INICIADO: Analizando mercado por ${WARM_UP_DURATION}s...`, 'gold');
 
         if (warmUpIntervalRef.current) {
             clearInterval(warmUpIntervalRef.current);
+            warmUpIntervalRef.current = null;
         }
 
+        let remainingTime = WARM_UP_DURATION;
+
         warmUpIntervalRef.current = setInterval(() => {
-            setWarmUpRemaining(prev => {
-                if (prev <= 1) {
-                    if (warmUpIntervalRef.current) {
-                        clearInterval(warmUpIntervalRef.current);
-                        warmUpIntervalRef.current = null;
-                    }
+            remainingTime -= 1;
+            setWarmUpRemaining(remainingTime);
 
-                    if (warmUpTicksRef.current >= WARM_UP_MIN_TICKS) {
-                        const health = checkMarketHealth(lastDigitsRef.current, lastPricesRef.current);
-                        setMarketHealth(health);
-                        isWarmingUpRef.current = false;
-                        setIsWarmingUp(false);
-
-                        if (health === 'healthy') {
-                            addLog(`✅ WARM-UP COMPLETO: Mercado SAUDÁVEL. Operações liberadas!`, 'gold');
-                        } else if (health === 'caution') {
-                            addLog(`⚠️ WARM-UP COMPLETO: Mercado em CAUTELA. Operando com filtros extras.`, 'warning');
-                        } else {
-                            addLog(`🚫 WARM-UP COMPLETO: Mercado PERIGOSO. Aguardando melhoria...`, 'error');
-                        }
-                    } else {
-                        addLog(`⏳ Ticks insuficientes (${warmUpTicksRef.current}/${WARM_UP_MIN_TICKS}). Aguardando...`, 'info');
-                        setWarmUpRemaining(15);
-                        return 15;
-                    }
-                    return 0;
+            if (remainingTime <= 0) {
+                // Timer finished - clean up interval
+                if (warmUpIntervalRef.current) {
+                    clearInterval(warmUpIntervalRef.current);
+                    warmUpIntervalRef.current = null;
                 }
-                return prev - 1;
-            });
+
+                const currentTicks = warmUpTicksRef.current;
+
+                // Check if we have enough ticks
+                if (currentTicks >= WARM_UP_MIN_TICKS) {
+                    // Complete warm-up and check market health
+                    const health = checkMarketHealth(lastDigitsRef.current, lastPricesRef.current);
+                    setMarketHealth(health);
+                    isWarmingUpRef.current = false;
+                    setIsWarmingUp(false);
+
+                    if (health === 'healthy') {
+                        addLog(`✅ WARM-UP COMPLETO: Mercado ÓPTIMO. ¡Operaciones liberadas!`, 'gold');
+                    } else if (health === 'caution') {
+                        addLog(`⚠️ WARM-UP COMPLETO: Mercado en PRECAUCIÓN. Operando con filtros extras.`, 'warning');
+                    } else {
+                        addLog(`🚫 WARM-UP COMPLETO: Mercado PELIGROSO. Aguardando mejora...`, 'error');
+                    }
+                } else {
+                    // Not enough ticks - extend warm-up
+                    addLog(`⏳ Ticks insuficientes (${currentTicks}/${WARM_UP_MIN_TICKS}). Extendiendo 15s...`, 'info');
+                    remainingTime = 15;
+                    setWarmUpRemaining(15);
+
+                    // Restart interval for extension
+                    warmUpIntervalRef.current = setInterval(() => {
+                        remainingTime -= 1;
+                        setWarmUpRemaining(remainingTime);
+
+                        if (remainingTime <= 0) {
+                            if (warmUpIntervalRef.current) {
+                                clearInterval(warmUpIntervalRef.current);
+                                warmUpIntervalRef.current = null;
+                            }
+
+                            // Force complete after extension
+                            const health = checkMarketHealth(lastDigitsRef.current, lastPricesRef.current);
+                            setMarketHealth(health);
+                            isWarmingUpRef.current = false;
+                            setIsWarmingUp(false);
+                            addLog(`✅ WARM-UP FINALIZADO después de extensión.`, 'gold');
+                        }
+                    }, 1000);
+                }
+            }
         }, 1000);
     }, [addLog, checkMarketHealth, WARM_UP_DURATION, WARM_UP_MIN_TICKS]);
 
