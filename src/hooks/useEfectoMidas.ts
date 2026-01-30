@@ -132,23 +132,6 @@ export const useEfectoMidas = () => {
     const WARM_UP_DURATION = 45; // segundos
     const WARM_UP_MIN_TICKS = 50; // mínimo de ticks para análise
 
-    // ⚡ KINETIC ACCELERATION FILTER - Sistema de Inercia Algorítmica
-    const [kineticAcceleration, setKineticAcceleration] = useState<number>(0);
-    const [isKineticBlocked, setIsKineticBlocked] = useState<boolean>(false);
-    const [kineticCooldown, setKineticCooldown] = useState<number>(0);
-    const kineticBlockedUntilRef = useRef<number>(0);
-    const KINETIC_THRESHOLD = 2.5; // Umbral de aceleración
-
-    // 🛡️ SAFETY COOLDOWN - Pausa de seguridad después de losses consecutivos
-    const [sessionLosses, setSessionLosses] = useState<number>(0);
-    const [isSafetyCooldown, setIsSafetyCooldown] = useState<boolean>(false);
-    const [safetyCooldownRemaining, setSafetyCooldownRemaining] = useState<number>(0);
-    const sessionLossesRef = useRef<number>(0);
-    const safetyCooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const SAFETY_LOSS_THRESHOLD = 3; // Activar cooldown después de 3 losses
-    const BASE_SAFETY_COOLDOWN = 20; // 20 segundos base
-    const COOLDOWN_INCREMENT = 15; // +15s por cada loss adicional
-
     // 💾 Save session to localStorage
     const saveSession = useCallback((data: SessionData) => {
         try {
@@ -495,134 +478,6 @@ export const useEfectoMidas = () => {
         }
     }, []);
 
-    // ⚡ CHECK KINETIC ACCELERATION - Filtro de Inercia Algorítmica
-    // Detecta explosões direcionais que causam "arraste" nos dígitos
-    const checkKineticAcceleration = useCallback((priceHistory: number[]): {
-        safe: boolean;
-        acceleration: number;
-        cooldownSeconds: number;
-        velocity1: number;
-        velocity2: number;
-    } => {
-        // Necesitamos mínimo 3 precios para calcular aceleración
-        if (priceHistory.length < 3) {
-            return { safe: true, acceleration: 0, cooldownSeconds: 0, velocity1: 0, velocity2: 0 };
-        }
-
-        const prices = priceHistory.slice(-3);
-        const [P0, P1, P2] = prices;
-
-        // Calcular velocidades
-        const V1 = Math.abs(P1 - P0);
-        const V2 = Math.abs(P2 - P1);
-
-        // Protección división por cero - si V1 ≈ 0, mercado estable = seguro
-        if (V1 < 0.00001) {
-            return { safe: true, acceleration: 0, cooldownSeconds: 0, velocity1: V1, velocity2: V2 };
-        }
-
-        // Calcular aceleración (segunda derivada)
-        const acceleration = V2 / V1;
-
-        // Verificar si la aceleración supera el umbral
-        if (acceleration > KINETIC_THRESHOLD) {
-            // ⚡ COOLDOWN EXPONENCIAL basado en magnitud de aceleración
-            // A = 2.5 → 1.5s | A = 5.0 → 3s | A = 10.0 → 5s
-            const cooldownSeconds = Math.min(Math.round((acceleration - 1) * 1.2), 8);
-
-            return {
-                safe: false,
-                acceleration,
-                cooldownSeconds,
-                velocity1: V1,
-                velocity2: V2
-            };
-        }
-
-        return { safe: true, acceleration, cooldownSeconds: 0, velocity1: V1, velocity2: V2 };
-    }, [KINETIC_THRESHOLD]);
-
-    // ⚡ ACTIVATE KINETIC BLOCK - Activa el bloqueo con cooldown
-    const activateKineticBlock = useCallback((cooldownSeconds: number, acceleration: number) => {
-        const blockUntil = Date.now() + (cooldownSeconds * 1000);
-        kineticBlockedUntilRef.current = blockUntil;
-        setIsKineticBlocked(true);
-        setKineticCooldown(cooldownSeconds);
-        setKineticAcceleration(acceleration);
-
-        addLog(`⚡ BLOQUEO CINÉTICO: Aceleración ${acceleration.toFixed(2)}x detectada. Veto por ${cooldownSeconds}s`, 'warning');
-
-        // Timer para actualizar el countdown y liberar
-        const interval = setInterval(() => {
-            const remaining = Math.max(0, Math.ceil((kineticBlockedUntilRef.current - Date.now()) / 1000));
-            setKineticCooldown(remaining);
-
-            if (remaining <= 0) {
-                clearInterval(interval);
-                setIsKineticBlocked(false);
-                setKineticCooldown(0);
-                addLog(`✅ Bloqueo cinético liberado. Operaciones permitidas.`, 'info');
-            }
-        }, 200);
-    }, [addLog]);
-
-    // 🛡️ START SAFETY COOLDOWN - Pausa de seguridad escalada
-    // Se activa después de 3+ losses en la sesión, con re-análisis de mercado antes de reanudar
-    // NOTA: Usa startWarmUpRef para evitar dependencia circular
-    const startWarmUpRef = useRef<(() => void) | null>(null);
-
-    const startSafetyCooldown = useCallback(() => {
-        const losses = sessionLossesRef.current;
-
-        // Calcular duración del cooldown (escalado exponencial)
-        // 3 losses → 20s | 4 losses → 35s | 5 losses → 50s | 6+ losses → capped at 90s
-        const additionalLosses = Math.max(0, losses - SAFETY_LOSS_THRESHOLD);
-        const cooldownDuration = Math.min(
-            BASE_SAFETY_COOLDOWN + (additionalLosses * COOLDOWN_INCREMENT),
-            90 // Cap máximo de 90 segundos
-        );
-
-        setIsSafetyCooldown(true);
-        setSafetyCooldownRemaining(cooldownDuration);
-
-        addLog(`🛡️ PAUSA DE SEGURIDAD: ${losses} losses detectados. Enfriando ${cooldownDuration}s...`, 'warning');
-        toast.warning(`⚠️ ${losses} losses en sesión. Pausa de seguridad: ${cooldownDuration}s`);
-
-        // Limpiar interval anterior si existe
-        if (safetyCooldownIntervalRef.current) {
-            clearInterval(safetyCooldownIntervalRef.current);
-        }
-
-        let remaining = cooldownDuration;
-
-        safetyCooldownIntervalRef.current = setInterval(() => {
-            remaining -= 1;
-            setSafetyCooldownRemaining(remaining);
-
-            if (remaining <= 0) {
-                if (safetyCooldownIntervalRef.current) {
-                    clearInterval(safetyCooldownIntervalRef.current);
-                    safetyCooldownIntervalRef.current = null;
-                }
-
-                setIsSafetyCooldown(false);
-                setSafetyCooldownRemaining(0);
-
-                // 📊 RE-ANÁLISIS DE MERCADO antes de reanudar
-                addLog(`🔄 Cooldown terminado. Iniciando re-análisis de mercado...`, 'info');
-
-                // Resetar contador de losses de sesión después del cooldown
-                sessionLossesRef.current = 0;
-                setSessionLosses(0);
-
-                // Iniciar warm-up para re-analizar el mercado (via ref)
-                if (startWarmUpRef.current) {
-                    startWarmUpRef.current();
-                }
-            }
-        }, 1000);
-    }, [addLog, BASE_SAFETY_COOLDOWN, COOLDOWN_INCREMENT, SAFETY_LOSS_THRESHOLD]);
-
     // 🔥 START WARM-UP - Inicia período de aquecimento
     const startWarmUp = useCallback(() => {
         isWarmingUpRef.current = true;
@@ -698,11 +553,6 @@ export const useEfectoMidas = () => {
             }
         }, 1000);
     }, [addLog, checkMarketHealth, WARM_UP_DURATION, WARM_UP_MIN_TICKS]);
-
-    // 🔗 Conectar startWarmUp a la ref para evitar dependencia circular
-    useEffect(() => {
-        startWarmUpRef.current = startWarmUp;
-    }, [startWarmUp]);
 
     // 🧊 Sistema de Resfriamento Inteligente Adaptativo
     const startAdaptiveCooldown = useCallback((reason: 'vault_complete' | 'excessive_losses') => {
@@ -856,12 +706,6 @@ export const useEfectoMidas = () => {
                         return;
                     }
 
-                    // 🛡️ SAFETY COOLDOWN CHECK - Bloquear durante pausa de seguridad
-                    if (isSafetyCooldown) {
-                        addLog(`🛡️ Pausa de seguridad activa (${safetyCooldownRemaining}s). Entrada bloqueada.`, 'warning');
-                        return;
-                    }
-
                     // --- FILTROS DE SEGURIDAD EXISTENTES ---
 
                     // 1. Check Trend Guard
@@ -895,26 +739,7 @@ export const useEfectoMidas = () => {
                         reasons.forEach(r => addLog(`   ${r}`, 'info'));
                         return;
                     }
-                    addLog(`📊 Score de confianza: ${score}/8 ✓`, 'gold');
-
-                    // ⚡ VETO FINAL: KINETIC ACCELERATION FILTER
-                    // Detecta explosões de preço que causam "arraste" nos dígitos
-                    const kineticCheck = checkKineticAcceleration(lastPricesRef.current);
-                    setKineticAcceleration(kineticCheck.acceleration);
-
-                    // Verificar si estamos en periodo de bloqueo cinético
-                    if (Date.now() < kineticBlockedUntilRef.current) {
-                        const remaining = Math.ceil((kineticBlockedUntilRef.current - Date.now()) / 1000);
-                        addLog(`⚡ VETO CINÉTICO activo. Esperando ${remaining}s...`, 'warning');
-                        return;
-                    }
-
-                    // Verificar aceleración actual
-                    if (!kineticCheck.safe) {
-                        activateKineticBlock(kineticCheck.cooldownSeconds, kineticCheck.acceleration);
-                        addLog(`📉 V1=${kineticCheck.velocity1.toFixed(5)} → V2=${kineticCheck.velocity2.toFixed(5)}`, 'info');
-                        return;
-                    }
+                    addLog(`📊 Score de confiança: ${score}/8 ✓`, 'gold');
 
                     // --- EXECUTION ---
                     setIsShadowMode(false);
@@ -1053,10 +878,6 @@ export const useEfectoMidas = () => {
 
                         cycleLossesCountRef.current += 1; // Apenas para cooldown adaptativo
 
-                        // 🛡️ INCREMENTAR CONTADOR DE LOSSES DA SESSÃO
-                        sessionLossesRef.current += 1;
-                        setSessionLosses(sessionLossesRef.current);
-
                         // Update stats with loss (sem incrementar consecutiveLosses)
                         setStats(prev => {
                             totalProfitRef.current = prev.totalProfit + profit;
@@ -1072,13 +893,6 @@ export const useEfectoMidas = () => {
                         // Manter stake fixo
                         currentStakeRef.current = initialStakeRef.current;
                         consecutiveLossesRef.current = 0;
-
-                        // 🛡️ SAFETY COOLDOWN - Pausa de seguridad después de 3+ losses
-                        if (sessionLossesRef.current >= SAFETY_LOSS_THRESHOLD && !isSafetyCooldown) {
-                            addLog(`🛡️ Umbral de seguridad alcanzado (${sessionLossesRef.current} losses)`, 'warning');
-                            startSafetyCooldown();
-                            return;
-                        }
 
                         // 🧊 COOLDOWN POR LOSSES EXCESSIVAS (6+ losses no ciclo)
                         if (cycleLossesCountRef.current >= 6 && vaultEnabledRef.current) {
@@ -1099,10 +913,6 @@ export const useEfectoMidas = () => {
                     consecutiveLossesRef.current += 1;
                     cycleLossesCountRef.current += 1;
 
-                    // 🛡️ INCREMENTAR CONTADOR DE LOSSES DA SESSÃO
-                    sessionLossesRef.current += 1;
-                    setSessionLosses(sessionLossesRef.current);
-
                     addLog(`💥 Pérdida: -$${lossAmount.toFixed(2)} (Gale ${consecutiveLossesRef.current}/${maxGale})`, 'error');
 
                     // Update stats with loss
@@ -1115,23 +925,6 @@ export const useEfectoMidas = () => {
                             consecutiveLosses: prev.consecutiveLosses + 1,
                         };
                     });
-
-                    // 🛡️ SAFETY COOLDOWN - Pausa de seguridad después de 3+ losses
-                    if (sessionLossesRef.current >= SAFETY_LOSS_THRESHOLD && !isSafetyCooldown) {
-                        addLog(`🛡️ Umbral de seguridad alcanzado (${sessionLossesRef.current} losses)`, 'warning');
-
-                        // Resetar Martingale antes del cooldown
-                        currentStakeRef.current = initialStakeRef.current;
-                        consecutiveLossesRef.current = 0;
-                        setStats(prev => ({
-                            ...prev,
-                            currentStake: initialStakeRef.current,
-                            consecutiveLosses: 0,
-                        }));
-
-                        startSafetyCooldown();
-                        return;
-                    }
 
                     // 🧊 COOLDOWN POR LOSSES EXCESSIVAS (6+ losses no ciclo)
                     if (cycleLossesCountRef.current >= 6 && vaultEnabledRef.current) {
@@ -1412,13 +1205,5 @@ export const useEfectoMidas = () => {
         warmUpTicks,
         marketHealth,
         lastEntryScore,
-        // ⚡ KINETIC ACCELERATION FILTER exports
-        kineticAcceleration,
-        isKineticBlocked,
-        kineticCooldown,
-        // 🛡️ SAFETY COOLDOWN exports
-        sessionLosses,
-        isSafetyCooldown,
-        safetyCooldownRemaining,
     };
 };
