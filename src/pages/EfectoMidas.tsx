@@ -76,7 +76,11 @@ const EfectoMidas = () => {
         // ⚡ KINETIC ACCELERATION FILTER
         kineticAcceleration,
         isKineticBlocked,
-        kineticCooldown
+        kineticCooldown,
+        // 🛡️ SAFETY COOLDOWN
+        sessionLosses,
+        isSafetyCooldown,
+        safetyCooldownRemaining
     } = useEfectoMidas();
 
     // Estados de configuración
@@ -620,6 +624,55 @@ const EfectoMidas = () => {
                                             kineticAcceleration < 2.0 ? "text-amber-300/50" : "text-violet-300/50"
                                     )}>
                                         {kineticAcceleration.toFixed(2)}x
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* 🛡️ Safety Cooldown Badge - Pausa de Seguridad */}
+                            {isRunning && isSafetyCooldown && (
+                                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-orange-500/15 to-red-500/10 border border-orange-500/30 rounded-xl relative overflow-hidden">
+                                    {/* Animated pulse background */}
+                                    <div className="absolute inset-0 bg-orange-400/5" style={{ animation: 'pulse 2s ease-in-out infinite' }} />
+                                    <Shield size={14} className="text-orange-400 relative" />
+                                    <div className="relative flex flex-col">
+                                        <span className="text-[9px] text-orange-300/70 uppercase tracking-wider">
+                                            Pausa de Seguridad
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-sm font-mono font-bold text-orange-400">
+                                                {safetyCooldownRemaining}s
+                                            </span>
+                                            <span className="text-[9px] text-white/30 font-mono">
+                                                ({sessionLosses} losses)
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* Mini cooldown bar */}
+                                    <div className="w-12 h-1 bg-black/30 rounded-full overflow-hidden ml-1">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-orange-400 to-red-500 transition-all duration-200"
+                                            style={{ width: `${Math.max(0, (safetyCooldownRemaining / 90) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Session Losses Counter (subtle when not in cooldown) */}
+                            {isRunning && !isSafetyCooldown && sessionLosses > 0 && (
+                                <div className={cn(
+                                    "flex items-center gap-1.5 px-2 py-1 rounded-lg border",
+                                    sessionLosses < 2
+                                        ? "bg-amber-500/5 border-amber-500/20"
+                                        : "bg-orange-500/10 border-orange-500/30"
+                                )}>
+                                    <Shield size={10} className={cn(
+                                        sessionLosses < 2 ? "text-amber-400/60" : "text-orange-400/80"
+                                    )} />
+                                    <span className={cn(
+                                        "text-[9px] font-mono",
+                                        sessionLosses < 2 ? "text-amber-300/50" : "text-orange-300/70"
+                                    )}>
+                                        {sessionLosses}/3 losses
                                     </span>
                                 </div>
                             )}
