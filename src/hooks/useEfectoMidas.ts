@@ -568,6 +568,9 @@ export const useEfectoMidas = () => {
 
     // 🛡️ START SAFETY COOLDOWN - Pausa de seguridad escalada
     // Se activa después de 3+ losses en la sesión, con re-análisis de mercado antes de reanudar
+    // NOTA: Usa startWarmUpRef para evitar dependencia circular
+    const startWarmUpRef = useRef<(() => void) | null>(null);
+
     const startSafetyCooldown = useCallback(() => {
         const losses = sessionLossesRef.current;
 
@@ -612,11 +615,13 @@ export const useEfectoMidas = () => {
                 sessionLossesRef.current = 0;
                 setSessionLosses(0);
 
-                // Iniciar warm-up para re-analizar el mercado
-                startWarmUp();
+                // Iniciar warm-up para re-analizar el mercado (via ref)
+                if (startWarmUpRef.current) {
+                    startWarmUpRef.current();
+                }
             }
         }, 1000);
-    }, [addLog, startWarmUp, BASE_SAFETY_COOLDOWN, COOLDOWN_INCREMENT, SAFETY_LOSS_THRESHOLD]);
+    }, [addLog, BASE_SAFETY_COOLDOWN, COOLDOWN_INCREMENT, SAFETY_LOSS_THRESHOLD]);
 
     // 🔥 START WARM-UP - Inicia período de aquecimento
     const startWarmUp = useCallback(() => {
@@ -693,6 +698,11 @@ export const useEfectoMidas = () => {
             }
         }, 1000);
     }, [addLog, checkMarketHealth, WARM_UP_DURATION, WARM_UP_MIN_TICKS]);
+
+    // 🔗 Conectar startWarmUp a la ref para evitar dependencia circular
+    useEffect(() => {
+        startWarmUpRef.current = startWarmUp;
+    }, [startWarmUp]);
 
     // 🧊 Sistema de Resfriamento Inteligente Adaptativo
     const startAdaptiveCooldown = useCallback((reason: 'vault_complete' | 'excessive_losses') => {
