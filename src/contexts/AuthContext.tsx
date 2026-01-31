@@ -17,7 +17,7 @@ interface AuthContextType {
     error: any | null;
     success: boolean;
   }>;
-  signUp: (email: string, password: string, name?: string) => Promise<{
+  signUp: (email: string, password: string, name?: string, whatsappNumber?: string) => Promise<{
     error: any | null;
     success: boolean;
   }>;
@@ -313,7 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string, name?: string) => {
+  const signUp = async (email: string, password: string, name?: string, whatsappNumber?: string) => {
     try {
       setLoading(true);
 
@@ -362,12 +362,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // In demo mode, we consider registration successful and direct the user
         toast.success('¡Cuenta creada con éxito! Iniciando sesión...');
         await signIn(email, password);
-        navigate('/');
         return { error: null, success: true };
       } else {
         // --- GET REFERRAL CODE BEFORE SIGNUP ---
         const referralCode = getReferralCodeFromStorage();
         console.log('[SignUp] Referral code from storage:', referralCode);
+
+        // Prepare metadata
+        const metadata: any = {
+          full_name: name || email.split('@')[0],
+          referral_code: referralCode || null,
+        };
+
+        if (whatsappNumber) {
+          metadata.whatsapp_number = whatsappNumber;
+          metadata.wa_status = 'pending_verification';
+        }
 
         // Normal behavior with real Supabase
         const { data, error } = await supabase.auth.signUp({
@@ -375,10 +385,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: {
-              full_name: name || email.split('@')[0],
-              referral_code: referralCode || null  // Pass referral code in metadata
-            }
+            data: metadata
           }
         });
 
@@ -403,6 +410,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: data.user.id,
             full_name: name || email.split('@')[0],
             is_active: false,
+            whatsapp_number: whatsappNumber || null,
+            wa_status: whatsappNumber ? 'pending_verification' : null
           };
 
           if (referredBy) {
@@ -422,6 +431,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               const updateData: any = {
                 full_name: name || email.split('@')[0],
+                whatsapp_number: whatsappNumber, // Ensure these are updated if trigger didn't capture them
+                wa_status: whatsappNumber ? 'pending_verification' : undefined
               };
 
               if (referredBy) {
@@ -478,7 +489,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Try to sign in automatically
             const signInResult = await signIn(email, password);
             if (signInResult.success) {
-              navigate('/');
               return { error: null, success: true };
             }
           } else {

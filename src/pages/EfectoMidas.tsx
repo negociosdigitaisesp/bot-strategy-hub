@@ -41,6 +41,7 @@ import { FreemiumProgressBar } from '../components/FreemiumProgressBar';
 import { SystemLimitModal } from '../components/SystemLimitModal';
 import RecentGainsTicker from '../components/RecentGainsTicker';
 import { SpecialOfferModal } from '../components/SpecialOfferModal';
+import { LossAversionModal } from '../components/LossAversionModal';
 
 const EfectoMidas = () => {
     const navigate = useNavigate();
@@ -89,9 +90,10 @@ const EfectoMidas = () => {
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
     // Freemium limiter
-    const { isFree, checkStakeLimit, isLimitReached, currentProfit, daysLeft } = useFreemiumLimiter();
+    const { isFree, checkStakeLimit, isLimitReached, currentProfit, daysLeft, isOnSessionCooldown } = useFreemiumLimiter();
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [showOfferModal, setShowOfferModal] = useState(false);
+    const [showLossAversionModal, setShowLossAversionModal] = useState(false);
 
     // Check if trial expired
     const isExpired = daysLeft !== null && daysLeft <= 0;
@@ -100,10 +102,17 @@ const EfectoMidas = () => {
     useEffect(() => {
         if (isLimitReached && isRunning) {
             stopBot();
-            setShowLimitModal(true);
-            toast.warning('¡Meta diaria alcanzada! Bot detenido.');
+            setShowLossAversionModal(true);
+            toast.warning('¡Límite de prueba alcanzado! Bot detenido.');
         }
     }, [isLimitReached, isRunning, stopBot]);
+
+    // Show loss aversion modal when cooldown starts
+    useEffect(() => {
+        if (isOnSessionCooldown && isFree && !isRunning) {
+            setShowLossAversionModal(true);
+        }
+    }, [isOnSessionCooldown, isFree, isRunning]);
 
     // Persist config
     useEffect(() => {
@@ -930,6 +939,13 @@ const EfectoMidas = () => {
                 isExpired={isExpired}
                 showDiscount={true}
             />
+
+            {/* Loss Aversion Modal - Shows when cooldown is active */}
+            <LossAversionModal
+                isOpen={showLossAversionModal}
+                onClose={() => setShowLossAversionModal(false)}
+            />
+
         </div >
     );
 };

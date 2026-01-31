@@ -6,8 +6,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, ShieldCheck, Zap, TrendingUp, Award, Users } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, User, ArrowRight, ShieldCheck, Zap, TrendingUp, Award, Users, Phone, ChevronDown, MessageCircle } from "lucide-react";
 import useReferral from "@/hooks/useReferral";
+import { supabase } from "@/lib/supabaseClient";
+import { toast } from "sonner";
+
+// Country codes for WhatsApp
+const COUNTRY_CODES = [
+    { code: '+54', country: 'AR', flag: '🇦🇷', name: 'Argentina' },
+    { code: '+591', country: 'BO', flag: '🇧🇴', name: 'Bolivia' },
+    { code: '+55', country: 'BR', flag: '🇧🇷', name: 'Brasil' },
+    { code: '+56', country: 'CL', flag: '🇨🇱', name: 'Chile' },
+    { code: '+57', country: 'CO', flag: '🇨🇴', name: 'Colombia' },
+    { code: '+506', country: 'CR', flag: '🇨🇷', name: 'Costa Rica' },
+    { code: '+53', country: 'CU', flag: '🇨🇺', name: 'Cuba' },
+    { code: '+593', country: 'EC', flag: '🇪🇨', name: 'Ecuador' },
+    { code: '+503', country: 'SV', flag: '🇸🇻', name: 'El Salvador' },
+    { code: '+34', country: 'ES', flag: '🇪🇸', name: 'España' },
+    { code: '+1', country: 'US', flag: '🇺🇸', name: 'Estados Unidos' },
+    { code: '+502', country: 'GT', flag: '🇬🇹', name: 'Guatemala' },
+    { code: '+504', country: 'HN', flag: '🇭🇳', name: 'Honduras' },
+    { code: '+52', country: 'MX', flag: '🇲🇽', name: 'México' },
+    { code: '+505', country: 'NI', flag: '🇳🇮', name: 'Nicaragua' },
+    { code: '+507', country: 'PA', flag: '🇵🇦', name: 'Panamá' },
+    { code: '+595', country: 'PY', flag: '🇵🇾', name: 'Paraguay' },
+    { code: '+51', country: 'PE', flag: '🇵🇪', name: 'Perú' },
+    { code: '+351', country: 'PT', flag: '🇵🇹', name: 'Portugal' },
+    { code: '+1', country: 'PR', flag: '🇵🇷', name: 'Puerto Rico' },
+    { code: '+1', country: 'DO', flag: '🇩🇴', name: 'Rep. Dominicana' },
+    { code: '+598', country: 'UY', flag: '🇺🇾', name: 'Uruguay' },
+    { code: '+58', country: 'VE', flag: '🇻🇪', name: 'Venezuela' },
+];
 
 const Auth = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +46,12 @@ const Auth = () => {
     const [name, setName] = useState("");
     const [mode, setMode] = useState<"login" | "register">("login");
 
+    // WhatsApp capture now in step 1
+    const [whatsappNumber, setWhatsappNumber] = useState("");
+    const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
+    const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+
+
     const { signIn, signUp, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const prefersReducedMotion = useReducedMotion();
@@ -25,21 +60,49 @@ const Auth = () => {
     useReferral();
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && mode === 'login') {
             navigate("/");
         }
-    }, [isAuthenticated, navigate]);
+    }, [isAuthenticated, navigate, mode]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    // Handle Register submission
+    const handleStep1Submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
         try {
-            if (mode === "login") {
-                await signIn(email, password);
-            } else {
-                await signUp(email, password, name);
+            // Validate WhatsApp number
+            if (!whatsappNumber || whatsappNumber.length < 8) {
+                toast.error('Por favor, ingresa un número de WhatsApp válido.');
+                setIsLoading(false);
+                return;
             }
+
+            const fullWhatsappNumber = `${selectedCountry.code}${whatsappNumber.replace(/\D/g, '')}`;
+
+            // Call signUp with all details including WhatsApp
+            const result = await signUp(email, password, name, fullWhatsappNumber);
+
+            if (result.success) {
+                toast.success('¡Cuenta creada! WhatsApp vinculado correctamente.');
+
+                // Navigate to Deriv connection page directly
+                navigate('/conectar-deriv');
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handle login submission
+    const handleLoginSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        try {
+            await signIn(email, password);
         } catch (error) {
             console.error(error);
         } finally {
@@ -49,7 +112,10 @@ const Auth = () => {
 
     const handleFreeTrial = () => {
         setMode("register");
+        // No longer using steps, just mode
     };
+
+
 
     // Motion variants
     const containerVariants = {
@@ -70,6 +136,23 @@ const Auth = () => {
             y: 0,
             transition: { duration: prefersReducedMotion ? 0 : 0.4, ease: "easeOut" }
         }
+    };
+
+    const slideVariants = {
+        enter: (direction: number) => ({
+            x: direction > 0 ? 300 : -300,
+            opacity: 0
+        }),
+        center: {
+            zIndex: 1,
+            x: 0,
+            opacity: 1
+        },
+        exit: (direction: number) => ({
+            zIndex: 0,
+            x: direction < 0 ? 300 : -300,
+            opacity: 0
+        })
     };
 
     return (
@@ -140,7 +223,8 @@ const Auth = () => {
                         </div>
                     </motion.div>
 
-                    {/* Free Trial Banner */}
+                    {/* Free Trial Banner - Only show on step 1 */}
+
                     <motion.div variants={itemVariants} className="mb-4">
                         <button
                             onClick={handleFreeTrial}
@@ -161,6 +245,7 @@ const Auth = () => {
                             </div>
                         </button>
                     </motion.div>
+
 
                     {/* Auth Card */}
                     <motion.div variants={itemVariants} className="relative">
@@ -204,36 +289,22 @@ const Auth = () => {
                                 </button>
                             </div>
 
-                            {/* Form */}
-                            <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-5">
-                                <AnimatePresence mode="wait">
-                                    <motion.div
-                                        key={mode}
-                                        initial={{ opacity: 0, x: mode === "login" ? -20 : 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: mode === "login" ? 20 : -20 }}
-                                        transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
-                                        className="space-y-5"
-                                    >
-                                        {mode === "register" && (
-                                            <div className="space-y-2">
-                                                <Label htmlFor="name" className="text-slate-300 text-xs font-bold uppercase tracking-widest">
-                                                    Nombre Completo
-                                                </Label>
-                                                <div className="relative group">
-                                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
-                                                    <Input
-                                                        id="name"
-                                                        placeholder="Tu nombre"
-                                                        value={name}
-                                                        onChange={(e) => setName(e.target.value)}
-                                                        className="pl-10 h-12 bg-slate-900/50 border-slate-700/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-white placeholder:text-slate-500 transition-all font-medium"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
 
+
+
+                            {/* Form */}
+                            <AnimatePresence mode="wait" custom={mode}>
+                                {/* LOGIN FORM */}
+                                {mode === "login" && (
+                                    <motion.form
+                                        key="login"
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 20 }}
+                                        transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
+                                        onSubmit={handleLoginSubmit}
+                                        className="p-6 md:p-8 space-y-5"
+                                    >
                                         <div className="space-y-2">
                                             <Label htmlFor="email" className="text-slate-300 text-xs font-bold uppercase tracking-widest">
                                                 Correo Electrónico
@@ -257,14 +328,12 @@ const Auth = () => {
                                                 <Label htmlFor="password" className="text-slate-300 text-xs font-bold uppercase tracking-widest">
                                                     Contraseña
                                                 </Label>
-                                                {mode === "login" && (
-                                                    <Link
-                                                        to="/forgot-password"
-                                                        className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider font-bold"
-                                                    >
-                                                        ¿Olvidaste?
-                                                    </Link>
-                                                )}
+                                                <Link
+                                                    to="/forgot-password"
+                                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider font-bold"
+                                                >
+                                                    ¿Olvidaste?
+                                                </Link>
                                             </div>
                                             <div className="relative group">
                                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
@@ -286,33 +355,180 @@ const Auth = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                    </motion.div>
-                                </AnimatePresence>
 
-                                <Button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full h-13 mt-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-500 text-white font-bold uppercase tracking-widest text-sm shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:shadow-[0_0_35px_rgba(16,185,129,0.7)] transition-all duration-300 border-0 relative overflow-hidden group"
-                                >
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        {isLoading ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <>
-                                                {mode === "login" ? "Acceder al Sistema" : "Crear Cuenta Pro"}
-                                                <ArrowRight className="w-4 h-4 motion-safe:group-hover:translate-x-1 transition-transform" />
-                                            </>
-                                        )}
-                                    </span>
-                                    <div className="absolute inset-0 -translate-x-full motion-safe:group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
-                                </Button>
-
-                                {mode === "register" && (
-                                    <p className="text-center text-xs text-slate-500 pt-2">
-                                        Al crear cuenta, obtienes <span className="text-emerald-400 font-bold">3 días gratis</span> de acceso completo
-                                    </p>
+                                        <Button
+                                            type="submit"
+                                            disabled={isLoading}
+                                            className="w-full h-13 mt-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-500 text-white font-bold uppercase tracking-widest text-sm shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:shadow-[0_0_35px_rgba(16,185,129,0.7)] transition-all duration-300 border-0 relative overflow-hidden group"
+                                        >
+                                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                                {isLoading ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        Acceder al Sistema
+                                                        <ArrowRight className="w-4 h-4 motion-safe:group-hover:translate-x-1 transition-transform" />
+                                                    </>
+                                                )}
+                                            </span>
+                                            <div className="absolute inset-0 -translate-x-full motion-safe:group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
+                                        </Button>
+                                    </motion.form>
                                 )}
-                            </form>
+
+                                {/* REGISTER FORM */}
+                                {mode === "register" && (
+                                    <motion.form
+                                        key="register-step1"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -300 }}
+                                        transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
+                                        onSubmit={handleStep1Submit}
+                                        className="p-6 md:p-8 space-y-5"
+                                    >
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name" className="text-slate-300 text-xs font-bold uppercase tracking-widest">
+                                                Nombre Completo
+                                            </Label>
+                                            <div className="relative group">
+                                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                                <Input
+                                                    id="name"
+                                                    placeholder="Tu nombre"
+                                                    value={name}
+                                                    onChange={(e) => setName(e.target.value)}
+                                                    className="pl-10 h-12 bg-slate-900/50 border-slate-700/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-white placeholder:text-slate-500 transition-all font-medium"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="whatsapp" className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                                                <MessageCircle className="w-4 h-4 text-emerald-400" />
+                                                WhatsApp
+                                            </Label>
+                                            <div className="flex gap-2">
+                                                {/* Country Selector */}
+                                                <div className="relative">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                                                        className="h-12 px-3 bg-slate-900/50 border border-slate-700/50 rounded-lg flex items-center gap-2 text-white hover:border-emerald-500/50 transition-colors"
+                                                    >
+                                                        <span className="text-lg">{selectedCountry.flag}</span>
+                                                        <span className="text-sm font-mono">{selectedCountry.code}</span>
+                                                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                                                    </button>
+
+                                                    {showCountryDropdown && (
+                                                        <div className="absolute top-full left-0 mt-1 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto">
+                                                            {COUNTRY_CODES.map((country) => (
+                                                                <button
+                                                                    key={country.code}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedCountry(country);
+                                                                        setShowCountryDropdown(false);
+                                                                    }}
+                                                                    className="w-full px-3 py-2 flex items-center gap-3 hover:bg-emerald-500/10 transition-colors text-left"
+                                                                >
+                                                                    <span className="text-lg">{country.flag}</span>
+                                                                    <span className="text-sm text-white">{country.name}</span>
+                                                                    <span className="text-xs text-slate-400 ml-auto font-mono">{country.code}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Phone Input */}
+                                                <div className="relative group flex-1">
+                                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                                    <Input
+                                                        id="whatsapp"
+                                                        type="tel"
+                                                        placeholder="11 99999-9999"
+                                                        value={whatsappNumber}
+                                                        onChange={(e) => setWhatsappNumber(e.target.value)}
+                                                        className="pl-10 h-12 bg-slate-900/50 border-slate-700/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-white placeholder:text-slate-500 transition-all font-medium"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-emerald-400/80 leading-tight">
+                                                Vincule su WhatsApp para recibir alertas de seguridad, soporte técnico inmediato y avisos de meta batida
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email" className="text-slate-300 text-xs font-bold uppercase tracking-widest">
+                                                Correo Electrónico
+                                            </Label>
+                                            <div className="relative group">
+                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                                <Input
+                                                    id="email"
+                                                    type="email"
+                                                    placeholder="su@correo.com"
+                                                    value={email}
+                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    className="pl-10 h-12 bg-slate-900/50 border-slate-700/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-white placeholder:text-slate-500 transition-all font-medium"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="password" className="text-slate-300 text-xs font-bold uppercase tracking-widest">
+                                                Contraseña
+                                            </Label>
+                                            <div className="relative group">
+                                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
+                                                <Input
+                                                    id="password"
+                                                    type={showPassword ? "text" : "password"}
+                                                    placeholder="••••••••"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    className="pl-10 pr-10 h-12 bg-slate-900/50 border-slate-700/50 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 text-white placeholder:text-slate-500 transition-all font-medium"
+                                                    required
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400 transition-colors"
+                                                >
+                                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            disabled={isLoading}
+                                            className="w-full h-13 mt-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-500 text-white font-bold uppercase tracking-widest text-sm shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:shadow-[0_0_35px_rgba(16,185,129,0.7)] transition-all duration-300 border-0 relative overflow-hidden group"
+                                        >
+                                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                                {isLoading ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        Crear Cuenta
+                                                        <ArrowRight className="w-4 h-4 motion-safe:group-hover:translate-x-1 transition-transform" />
+                                                    </>
+                                                )}
+                                            </span>
+                                            <div className="absolute inset-0 -translate-x-full motion-safe:group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
+                                        </Button>
+
+                                        <p className="text-center text-xs text-slate-500 pt-2">
+                                            Al crear cuenta, obtienes <span className="text-emerald-400 font-bold">3 días gratis</span> de acceso completo
+                                        </p>
+                                    </motion.form>
+                                )}
+                            </AnimatePresence>
 
                         </div>
                     </motion.div>

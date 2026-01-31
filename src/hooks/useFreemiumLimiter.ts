@@ -5,16 +5,16 @@ import { useTradingSession } from '../contexts/TradingSessionContext';
 
 // Constantes de límites para el plan gratuito
 export const FREEMIUM_LIMITS = {
-    MAX_STAKE: Infinity,  // Límite de apuesta: Ilimitado (antes $1.00)
-    MAX_PROFIT: 14.00,    // Tope de ganancia de sesión: $14.00 USD (antes $10.00)
+    MAX_STAKE: Infinity,  // Límite de apuesta: Ilimitado
+    MAX_PROFIT: 5.00,     // Tope de ganancia de sesión: $5.00 USD (antes $14.00)
 };
 
 // Marketing accounts - always PRO
 const MARKETING_EMAILS = ['brendacostatmktcp@outlook.com'];
 
-// Cooldown configuration
+// Cooldown configuration - 3 HOURS
 export const COOLDOWN_CONFIG = {
-    DURATION_MS: 60 * 60 * 1000, // 1 hora en milisegundos
+    DURATION_MS: 3 * 60 * 60 * 1000, // 3 horas en milisegundos (antes 1 hora)
     STORAGE_KEY: 'freemium_cooldown_ends_at',
 };
 
@@ -31,16 +31,20 @@ interface FreemiumLimiterState {
     daysLeft: number | null;
     daysActive: number;
     expirationDate: string | null;
-    // New cooldown state
+    // Cooldown state
     isOnSessionCooldown: boolean;
     cooldownEndsAt: number | null;
     cooldownRemainingMs: number;
+    // Lost opportunity tracking
+    missedSignals: number;
+    estimatedLostProfit: number;
 }
 
 export const useFreemiumLimiter = () => {
     const { user } = useAuth();
     const { sessionProfit } = useTradingSession();
     const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const missedSignalIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const [state, setState] = useState<FreemiumLimiterState>({
         planType: 'free',
@@ -53,10 +57,13 @@ export const useFreemiumLimiter = () => {
         daysLeft: null,
         daysActive: 0,
         expirationDate: null,
-        // New cooldown state
+        // Cooldown state
         isOnSessionCooldown: false,
         cooldownEndsAt: null,
         cooldownRemainingMs: 0,
+        // Lost opportunity tracking
+        missedSignals: 0,
+        estimatedLostProfit: 0,
     });
 
     // Load cooldown state from localStorage on mount
@@ -66,11 +73,18 @@ export const useFreemiumLimiter = () => {
             const endsAt = parseInt(storedCooldownEnd, 10);
             const now = Date.now();
             if (endsAt > now) {
+                // Calculate missed signals based on time elapsed
+                const elapsedMs = now - (endsAt - COOLDOWN_CONFIG.DURATION_MS);
+                const missedSignals = Math.floor(elapsedMs / (10 * 60 * 1000)); // 1 signal per 10 min
+                const estimatedLostProfit = missedSignals * (2.5 + Math.random() * 2); // $2.50-$4.50 per signal
+
                 setState(prev => ({
                     ...prev,
                     isOnSessionCooldown: true,
                     cooldownEndsAt: endsAt,
                     cooldownRemainingMs: endsAt - now,
+                    missedSignals,
+                    estimatedLostProfit: Number(estimatedLostProfit.toFixed(2)),
                 }));
             } else {
                 // Cooldown expired, clear it
@@ -78,6 +92,29 @@ export const useFreemiumLimiter = () => {
             }
         }
     }, []);
+
+    // Simulate missed signals during cooldown (psychological pressure)
+    useEffect(() => {
+        if (state.isOnSessionCooldown && state.isFree) {
+            missedSignalIntervalRef.current = setInterval(() => {
+                setState(prev => {
+                    const newMissed = prev.missedSignals + 1;
+                    const newProfit = prev.estimatedLostProfit + (2.5 + Math.random() * 2);
+                    return {
+                        ...prev,
+                        missedSignals: newMissed,
+                        estimatedLostProfit: Number(newProfit.toFixed(2)),
+                    };
+                });
+            }, 10 * 60 * 1000); // Every 10 minutes add a "missed signal"
+
+            return () => {
+                if (missedSignalIntervalRef.current) {
+                    clearInterval(missedSignalIntervalRef.current);
+                }
+            };
+        }
+    }, [state.isOnSessionCooldown, state.isFree]);
 
     // Cooldown countdown interval
     useEffect(() => {
@@ -98,6 +135,8 @@ export const useFreemiumLimiter = () => {
                         cooldownEndsAt: null,
                         cooldownRemainingMs: 0,
                         isLimitReached: false,
+                        missedSignals: 0,
+                        estimatedLostProfit: 0,
                     }));
                 } else {
                     setState(prev => ({
@@ -144,7 +183,6 @@ export const useFreemiumLimiter = () => {
                 const isMarketingAccount = MARKETING_EMAILS.includes(user.email?.toLowerCase() || '');
 
                 // Check for all paid plans (including legacy names) OR marketing accounts
-                // Paid plans include: pro, premium, elite, whale, vitalicio, iniciado, mensual, anual
                 const PAID_PLANS = ['pro', 'premium', 'elite', 'whale', 'vitalicio', 'iniciado', 'mensual', 'anual'];
                 const isPro = isMarketingAccount || PAID_PLANS.includes(planType.toLowerCase());
 
@@ -157,20 +195,16 @@ export const useFreemiumLimiter = () => {
                 let daysLeft = null;
 
                 if (isPro) {
-                    // Pro users: use expiration_date
                     expirationDate = data?.expiration_date;
                 } else {
-                    // Free users: use trial_ends_at (3-day trial from signup)
                     expirationDate = data?.trial_ends_at;
                 }
 
                 if (expirationDate) {
                     const expDate = new Date(expirationDate);
-                    // Set time to end of day for accurate calculation
                     expDate.setHours(23, 59, 59, 999);
                     const diffTime = expDate.getTime() - now.getTime();
                     daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    // If expired, set to 0
                     if (daysLeft < 0) daysLeft = 0;
                 }
 
@@ -195,26 +229,54 @@ export const useFreemiumLimiter = () => {
         fetchPlanType();
     }, [user?.id]);
 
+    // Sync profit to Supabase for persistence
+    const syncProfitToSupabase = useCallback(async (profit: number) => {
+        if (!user?.id || state.isPro) return;
+
+        try {
+            await supabase
+                .from('profiles')
+                .update({ daily_trial_profit: profit })
+                .eq('id', user.id);
+        } catch (err) {
+            console.error('Error syncing profit:', err);
+        }
+    }, [user?.id, state.isPro]);
+
     // Start cooldown when limit is reached
     const startCooldown = useCallback(() => {
         const endsAt = Date.now() + COOLDOWN_CONFIG.DURATION_MS;
         localStorage.setItem(COOLDOWN_CONFIG.STORAGE_KEY, endsAt.toString());
+
+        // Sync cooldown start to Supabase
+        if (user?.id) {
+            supabase
+                .from('profiles')
+                .update({ last_cooldown_start: new Date().toISOString() })
+                .eq('id', user.id)
+                .then(() => console.log('Cooldown synced to Supabase'));
+        }
+
         setState(prev => ({
             ...prev,
             isOnSessionCooldown: true,
             cooldownEndsAt: endsAt,
             cooldownRemainingMs: COOLDOWN_CONFIG.DURATION_MS,
             isLimitReached: true,
+            missedSignals: 0,
+            estimatedLostProfit: 0,
         }));
-    }, []);
+    }, [user?.id]);
 
     // Monitorear si se alcanzó el límite de ganancia
     useEffect(() => {
         if (state.isFree && !state.isOnSessionCooldown && sessionProfit >= FREEMIUM_LIMITS.MAX_PROFIT) {
+            // Sync profit before cooldown
+            syncProfitToSupabase(sessionProfit);
             // Trigger cooldown
             startCooldown();
         }
-    }, [sessionProfit, state.isFree, state.isOnSessionCooldown, startCooldown]);
+    }, [sessionProfit, state.isFree, state.isOnSessionCooldown, startCooldown, syncProfitToSupabase]);
 
     // Request browser notification permission
     const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
@@ -240,7 +302,6 @@ export const useFreemiumLimiter = () => {
         const hasPermission = await requestNotificationPermission();
         if (!hasPermission || !state.cooldownRemainingMs) return false;
 
-        // Set a timeout to show notification when cooldown ends
         setTimeout(() => {
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('⚡ Million Bots - ¡Sistema Listo!', {
@@ -263,7 +324,7 @@ export const useFreemiumLimiter = () => {
         if (state.isOnSessionCooldown) {
             return {
                 allowed: false,
-                message: '⏳ Sistema en recarga. Espera a que termine el cooldown.',
+                message: '⏳ Sistema en recarga. Espera a que termine el cooldown (3 horas).',
             };
         }
 
@@ -286,7 +347,7 @@ export const useFreemiumLimiter = () => {
         if (state.isOnSessionCooldown) {
             return {
                 allowed: false,
-                message: '⚡ Sistema en recarga. Espera 1 hora o actualiza a PRO.',
+                message: '⚡ Sistema en recarga. Espera 3 horas o actualiza a PRO.',
             };
         }
 
@@ -312,15 +373,16 @@ export const useFreemiumLimiter = () => {
         };
     }, [sessionProfit, state.isPro]);
 
-    // Format remaining time for display
+    // Format remaining time for display (HH:MM:SS for 3 hours)
     const getFormattedCooldownTime = useCallback(() => {
-        if (!state.cooldownRemainingMs) return '00:00';
+        if (!state.cooldownRemainingMs) return '00:00:00';
 
         const totalSeconds = Math.floor(state.cooldownRemainingMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
 
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }, [state.cooldownRemainingMs]);
 
     return {
@@ -329,11 +391,12 @@ export const useFreemiumLimiter = () => {
         canTrade,
         getProfitProgress,
         currentProfit: sessionProfit,
-        // New cooldown functions
+        // Cooldown functions
         startCooldown,
         getFormattedCooldownTime,
         requestNotificationPermission,
         scheduleNotification,
+        syncProfitToSupabase,
     };
 };
 

@@ -18,6 +18,8 @@ import {
 import { toast } from 'sonner';
 import { useBotAstron, LogEntry } from '../../hooks/useBotAstron';
 import { useDeriv } from '../../contexts/DerivContext';
+import { useFreemiumLimiter, FREEMIUM_LIMITS } from '../../hooks/useFreemiumLimiter';
+import { LossAversionModal } from '../LossAversionModal';
 
 // Enhanced Progress Bar with Glow
 const ProgressBar = ({ value, color, glowColor, height = "h-1.5" }: { value: number, color: string, glowColor: string, height?: string }) => (
@@ -46,6 +48,11 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const { isRunning, stats, logs, recentTicks, startBot, stopBot } = useBotAstron();
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
+    // Freemium limiter
+    const { isFree, checkStakeLimit, isLimitReached, currentProfit, daysLeft, isOnSessionCooldown } = useFreemiumLimiter();
+    const [showLossAversionModal, setShowLossAversionModal] = useState(false);
+    const isExpired = daysLeft !== null && daysLeft <= 0;
+
     // Config States
     const [stake, setStake] = useState<string>('0.35');
     const [stopLoss, setStopLoss] = useState<string>('50.00');
@@ -60,6 +67,22 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         }
     }, [logs]);
 
+    // Check if profit limit reached and show modal
+    useEffect(() => {
+        if (isLimitReached && isRunning) {
+            stopBot();
+            setShowLossAversionModal(true);
+            toast.warning('¡Límite de prueba alcanzado! Bot detenido.');
+        }
+    }, [isLimitReached, isRunning, stopBot]);
+
+    // Show loss aversion modal when cooldown starts
+    useEffect(() => {
+        if (isOnSessionCooldown && isFree && !isRunning) {
+            setShowLossAversionModal(true);
+        }
+    }, [isOnSessionCooldown, isFree, isRunning]);
+
     const handleToggleBot = () => {
         if (isRunning) {
             stopBot();
@@ -67,6 +90,20 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         } else {
             if (!isConnected) {
                 toast.error('Primero debe conectar su cuenta Deriv');
+                return;
+            }
+
+            // Check if trial expired
+            if (isFree && isExpired) {
+                setShowLossAversionModal(true);
+                toast.warning('Tu período de prueba ha expirado.');
+                return;
+            }
+
+            // Check if on cooldown
+            if (isFree && isOnSessionCooldown) {
+                setShowLossAversionModal(true);
+                toast.warning('Sistema en recarga. Espera o actualiza a PRO.');
                 return;
             }
 
@@ -79,6 +116,14 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 toast.error('Stake inválido');
                 return;
             }
+
+            // Freemium stake validation
+            const stakeCheck = checkStakeLimit(stakeVal);
+            if (!stakeCheck.allowed) {
+                toast.error(stakeCheck.message);
+                return;
+            }
+
             if (isNaN(maxGaleVal) || maxGaleVal < 0) {
                 toast.error('Nivel de Martingala inválido');
                 return;
@@ -313,7 +358,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                         {/* Top Row: Tick & Bots */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Tick Analysis Card */}
-                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-0 overflow-hidden flex flex-col relative group border border-white/5 shadow-2xl h-[380px]">
+                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-0 overflow-hidden flex flex-col relative group border border-white/5 shadow-2xl h-[380px] order-2 md:order-1">
                                 <div className="p-5 pb-3 flex justify-between items-center bg-[#111625] border-b border-white/5 z-20 relative">
                                     <div className="flex items-center gap-2">
                                         <List size={16} className="text-[#00E5FF]" />
@@ -370,7 +415,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                             </div>
 
                             {/* Active Bots Card */}
-                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-6 flex flex-col relative overflow-hidden shadow-2xl h-[380px] border border-white/5">
+                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-6 flex flex-col relative overflow-hidden shadow-2xl h-[380px] border border-white/5 order-1 md:order-2">
                                 {/* Background Effect - Moving Gradient */}
                                 <div className="absolute top-0 right-0 w-48 h-48 bg-[#00E5FF]/10 rounded-full blur-[60px] -mr-10 -mt-10 animate-pulse-glow"></div>
 
@@ -391,7 +436,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                                     <Bug className="text-[#00E5FF]" size={22} />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-black text-white text-base tracking-tight font-mono">ASTRON BOT v3</h4>
+                                                    <h4 className="font-black text-white text-base tracking-tight font-mono">BUG DERIV</h4>
                                                     <p className="text-[10px] text-gray-400 font-medium mt-0.5 font-mono">ESTRATEGIA: MEAN REVERSION</p>
                                                 </div>
                                             </div>
@@ -499,6 +544,13 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                     </div>
                 </div>
             </div>
+
+            {/* Loss Aversion Modal */}
+            <LossAversionModal
+                isOpen={showLossAversionModal}
+                onClose={() => setShowLossAversionModal(false)}
+            />
+
         </div>
     );
 };
