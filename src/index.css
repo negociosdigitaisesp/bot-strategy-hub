@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
+    --background: 240 10% 2%;
     --foreground: 0 0% 98%;
 
     --card: 240 10% 3.9%;
@@ -37,7 +37,7 @@
     --radius: 0.75rem;
 
     /* Sidebar Colors */
-    --sidebar-background: 240 6% 10%;
+    --sidebar-background: 240 10% 3%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 174 94% 56%;
     --sidebar-primary-foreground: 0 0% 0%;
@@ -372,6 +372,29 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--sidebar-accent) / 0.8);
   }
+
+  /* Custom scrollbar for Astron Bot */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 229, 255, 0.3) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 229, 255, 0.2);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 229, 255, 0.4);
+  }
 }
 
 @layer utilities {
@@ -389,6 +412,19 @@
 
   .animate-float {
     animation: float 3s ease-in-out infinite;
+  }
+
+  /* Astron Bot Animations */
+  .animate-enter-row {
+    animation: enter-row 0.3s ease-out;
+  }
+
+  .animate-enter-log {
+    animation: enter-log 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
   }
 
   /* ========== PREMIUM MOTION EFFECTS ========== */
@@ -804,6 +840,42 @@
   100% {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes enter-row {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enter-log {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 

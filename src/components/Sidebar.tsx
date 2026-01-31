@@ -27,7 +27,9 @@ import {
     Gem,
     Hourglass,
     AlertTriangle,
-    Rocket
+    Rocket,
+    LayoutDashboard,
+    Bot
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -182,16 +184,27 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             description: 'Protección inteligente'
         },
         {
-            name: 'Ranking del Asertividad',
-            icon: <BookOpen size={20} />,
+            name: 'Dashboard',
+            icon: <LayoutDashboard size={20} />,
             path: '/',
             isImportant: false,
             requiresUpgrade: false,
-            description: 'Robots disponibles'
+            description: 'Panel de Control'
         },
+
         {
-            name: 'Panel de Bots',
-            icon: <Zap size={20} />,
+            name: 'BUG DERIV',
+            icon: <Bug size={20} />,
+            path: '/astron-bot',
+            isImportant: true,
+            requiresUpgrade: true,
+            description: 'Mean Reversion Strategy',
+            badge: 'NEW'
+        },
+
+        {
+            name: 'Bots',
+            icon: <Bot size={20} />,
             path: '/bots',
             isImportant: false,
             requiresUpgrade: true,
@@ -389,9 +402,16 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                                             </div>
 
                                             {/* Important indicator (subtle) */}
-                                            {item.isImportant && (
+                                            {item.isImportant && !item.badge && (
                                                 <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-wider bg-primary/20 text-primary border border-primary/30">
                                                     !
+                                                </span>
+                                            )}
+
+                                            {/* NEW Badge */}
+                                            {item.badge && (
+                                                <span className="ml-2 px-2 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider bg-gradient-to-r from-[#00E5FF] to-[#00D1FF] text-black border border-[#00E5FF]/50 shadow-[0_0_10px_rgba(0,229,255,0.3)] animate-pulse">
+                                                    {item.badge}
                                                 </span>
                                             )}
 

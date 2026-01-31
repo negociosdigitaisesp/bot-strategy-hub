@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
-import { Shield, Key, CheckCircle2, AlertCircle, ExternalLink, RefreshCw, LogOut, Zap, Lock, Link2 } from 'lucide-react';
+import { Shield, Key, CheckCircle2, AlertCircle, ExternalLink, RefreshCw, LogOut, Zap, Lock, Link2, Gamepad2, DollarSign } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AffiliateModal } from './AffiliateModal';
 import { SmartHelpTrigger } from './SmartHelpTrigger';

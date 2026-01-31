@@ -2,7 +2,7 @@ import React from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { useMarketingMode } from '../hooks/useMarketingMode';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
-import { Wifi, WifiOff, Loader2, User, DollarSign, Gem } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, User, DollarSign, Gem, Bug } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 import { Link } from 'react-router-dom';
@@ -90,58 +90,40 @@ export const DerivStatus = () => {
 
     return (
         <div className={cn(
-            "w-full p-4 rounded-2xl bg-gradient-to-br transition-all duration-300",
-            isDiamante
-                ? "from-purple-500/10 via-purple-500/5 to-transparent border border-purple-500/20"
-                : "from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20"
+            "w-full p-4 rounded-2xl bg-[#0B0E14]/80 backdrop-blur-xl border border-[#00E5FF]/20 transition-all duration-300 relative group overflow-hidden shadow-[0_0_15px_rgba(0,0,0,0.4)]",
         )}>
+            {/* Background Glow Effect */}
+            <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#00E5FF]/5 rounded-full blur-2xl group-hover:bg-[#00E5FF]/10 transition-all duration-500"></div>
+
             {/* Header with connection status */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-4 relative z-10">
                 <div className={cn(
-                    "relative flex items-center justify-center w-10 h-10 rounded-xl border",
-                    isDiamante
-                        ? "bg-purple-500/10 border-purple-500/20"
-                        : "bg-emerald-500/20 border-emerald-500/30"
+                    "relative flex items-center justify-center w-10 h-10 rounded-xl border bg-[#00E5FF]/10 border-[#00E5FF]/20 shadow-[0_0_10px_rgba(0,229,255,0.1)]",
                 )}>
-                    <Wifi size={20} className={isDiamante ? "text-purple-400" : "text-emerald-400"} />
+                    <Wifi size={20} className="text-[#00E5FF]" />
                     <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                         <span className={cn(
-                            "animate-ping absolute inline-flex h-full w-full rounded-full opacity-50",
-                            isDiamante ? "bg-purple-400" : "bg-emerald-400"
+                            "animate-ping absolute inline-flex h-full w-full rounded-full opacity-50 bg-[#00E5FF]",
                         )}></span>
                         <span className={cn(
-                            "relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-background",
-                            isDiamante ? "bg-purple-500" : "bg-emerald-500"
+                            "relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-[#0B0E14] bg-[#00E5FF]",
                         )}></span>
                     </span>
                 </div>
                 <div className="flex-1">
-                    <span className={cn(
-                        "block text-sm font-bold",
-                        isDiamante ? "text-purple-400" : "text-emerald-400"
-                    )}>Deriv Conectado</span>
-                    <span className={cn(
-                        "block text-[10px] uppercase tracking-wider",
-                        isDiamante ? "text-purple-400/50" : "text-emerald-400/50"
-                    )}>En línea</span>
+                    <span className="block text-sm font-bold text-white tracking-tight">Deriv Conectado</span>
+                    <span className="block text-[10px] uppercase tracking-[0.2em] font-mono text-[#00E5FF]/70">EN LÍNEA</span>
                 </div>
             </div>
 
             {/* Account info */}
-            <div className="flex flex-col gap-1 mb-3 px-3 py-2 rounded-lg bg-white/5">
+            <div className="flex flex-col gap-1 mb-3 px-3 py-2.5 rounded-xl bg-[#05050F] border border-white/5 relative z-10">
                 <div className="flex items-center gap-2">
-                    {/* Use Gem icon for Diamante users, User icon for others */}
-                    {isDiamante ? (
-                        <Gem size={12} className="text-purple-400" />
-                    ) : (
-                        <User size={12} className="text-white/40" />
-                    )}
+                    {/* Use Gem icon for special users, Bug/User icon for others to match Cyber theme */}
+                    <Bug size={12} className="text-[#00E5FF]/60" />
                     <span
                         className={cn(
-                            "text-xs font-bold uppercase tracking-wider",
-                            // Purple for Diamante, emerald for real, cyan for demo
-                            isDiamante ? "text-purple-400" :
-                                forceRealColors || isRealAccount ? "text-emerald-400" : "text-cyan-400"
+                            "text-[10px] font-black uppercase tracking-[0.1em] font-mono text-[#00E5FF]",
                         )}
                     >
                         {accountTypeDisplay}
@@ -150,7 +132,7 @@ export const DerivStatus = () => {
                 <div className="ml-5">
                     <AccountNumberDisplay
                         accountNumber={displayLoginId}
-                        className="text-[10px] text-white/50 font-mono tracking-wider"
+                        className="text-[11px] text-white/50 font-mono tracking-wider font-medium"
                         iconSize={12}
                     />
                 </div>
@@ -158,31 +140,27 @@ export const DerivStatus = () => {
 
             {/* Balance display */}
             <div className={cn(
-                "px-3 py-3 rounded-xl bg-gradient-to-r border",
-                isDiamante
-                    ? "from-purple-500/5 to-transparent border-purple-500/10"
-                    : "from-emerald-500/5 to-transparent border-emerald-500/10"
+                "px-3 py-3 rounded-xl bg-gradient-to-r from-[#00E5FF]/5 to-transparent border border-[#00E5FF]/10 relative z-10 hover:border-[#00E5FF]/30 transition-colors duration-300",
             )}>
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                         <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center",
-                            isDiamante ? "bg-purple-500/10" : "bg-emerald-500/10"
+                            "w-8 h-8 rounded-lg flex items-center justify-center bg-[#00E5FF]/10 border border-[#00E5FF]/20",
                         )}>
-                            <DollarSign size={16} className={isDiamante ? "text-purple-400" : "text-emerald-400"} />
+                            <DollarSign size={16} className="text-[#00E5FF]" />
                         </div>
                         <div>
-                            <span className="block text-[10px] text-white/40 font-medium uppercase tracking-wider leading-none mb-1">
-                                Saldo Disponible
+                            <span className="block text-[9px] text-gray-500 font-bold uppercase tracking-[0.15em] leading-none mb-1.5 font-mono">
+                                SALDO DISPONIBLE
                             </span>
-                            <span className="block text-xl font-black font-mono text-white leading-none">
+                            <span className="block text-xl font-black font-mono text-white leading-none tracking-tight">
                                 {account ? (
                                     <>
-                                        <span className={isDiamante ? "text-purple-400" : "text-emerald-400"}>{currencySymbol}</span>
+                                        <span className="text-[#00E5FF] mr-1">$</span>
                                         <span>{displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </>
                                 ) : (
-                                    <span className="text-white/30">---</span>
+                                    <span className="text-white/20">---</span>
                                 )}
                             </span>
                         </div>

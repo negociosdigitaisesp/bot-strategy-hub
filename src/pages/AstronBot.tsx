@@ -11,7 +11,7 @@ const AstronBot = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background flex">
+        <div className="min-h-screen bg-[#05050F] flex overflow-hidden">
             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
             <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                 <AstronPanel
