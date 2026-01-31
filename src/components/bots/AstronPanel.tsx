@@ -128,10 +128,10 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
 
                     <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
                         <div className="text-left sm:text-right flex-1 sm:flex-none">
-                            <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-wider block font-bold font-mono">Cuenta Deriv</span>
+                            <span className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-wider block font-bold font-mono">Estado</span>
                             <div className="flex items-center gap-1.5 sm:gap-2">
                                 <Wifi size={12} className={isConnected ? "text-green-500" : "text-red-500"} />
-                                <span className="text-xs font-bold text-white">{account?.loginid || 'Desconectado'}</span>
+                                <span className="text-xs font-bold text-white">{isConnected ? 'Conectado' : 'Desconectado'}</span>
                             </div>
                         </div>
                         <div className={`px-4 py-2 rounded-lg border ${isRunning ? 'bg-[#00E5FF]/10 border-[#00E5FF] text-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.3)]' : 'bg-gray-800 border-gray-700 text-gray-400'} flex items-center gap-2 text-xs font-bold font-mono transition-all duration-300`}>
@@ -407,8 +407,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                             <button
                                                 onClick={handleToggleBot}
                                                 className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 flex-shrink-0 ${isRunning
-                                                        ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/50'
-                                                        : 'bg-gradient-to-r from-[#00E5FF] to-[#00D1FF] hover:from-[#00D1FF] hover:to-[#00E5FF] text-black shadow-lg shadow-[#00E5FF]/30 hover:shadow-[#00E5FF]/50'
+                                                    ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/50'
+                                                    : 'bg-gradient-to-r from-[#00E5FF] to-[#00D1FF] hover:from-[#00D1FF] hover:to-[#00E5FF] text-black shadow-lg shadow-[#00E5FF]/30 hover:shadow-[#00E5FF]/50'
                                                     }`}
                                             >
                                                 {isRunning ? (
