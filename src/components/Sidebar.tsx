@@ -26,7 +26,8 @@ import {
     Handshake,
     Gem,
     Hourglass,
-    AlertTriangle
+    AlertTriangle,
+    Rocket
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -205,6 +206,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             requiresUpgrade: true,
             description: 'Shadow Mode - Digit Differs'
         },
+
 
 
         {

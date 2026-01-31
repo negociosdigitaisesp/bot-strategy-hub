@@ -62,11 +62,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const getSession = async () => {
       setLoading(true);
       try {
-        console.log('Retrieving Supabase session...');
+        // console.log('Retrieving Supabase session...');
         const { data, error } = await supabase.auth.getSession();
 
         if (!error && data?.session) {
-          console.log('Session retrieved successfully');
+          // console.log('Session retrieved successfully');
           setSession(data.session);
           setUser(data.session.user);
           setIsOfflineMode(false);
@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If no valid session, check if we have a refresh token to try
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           if (!refreshError && refreshData?.session) {
-            console.log('Session refreshed successfully');
+            // console.log('Session refreshed successfully');
             setSession(refreshData.session);
             setUser(refreshData.session.user);
             setIsOfflineMode(false);
@@ -102,23 +102,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up listener for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log('Auth state change event:', event);
+        // console.log('Auth state change event:', event);
 
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          console.log('User signed in or token refreshed');
+          // console.log('User signed in or token refreshed');
           if (newSession) {
             setSession(newSession);
             setUser(newSession.user);
             setIsOfflineMode(false);
           }
         } else if (event === 'SIGNED_OUT') {
-          console.log('User signed out');
+          // console.log('User signed out');
           setSession(null);
           setUser(null);
           localStorage.removeItem(DEMO_STORAGE_KEY); // Clean up any demo tokens
           setIsOfflineMode(false);
         } else if (event === 'USER_UPDATED') {
-          console.log('User updated');
+          // console.log('User updated');
           if (newSession) {
             setSession(newSession);
             setUser(newSession.user);

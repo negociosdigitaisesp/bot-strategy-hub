@@ -54,6 +54,7 @@ import BotApalancamiento from "./pages/BotApalancamiento";
 import BotQuantum from "./pages/BotQuantum";
 import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
+import AstronBot from "./pages/AstronBot";
 
 import ReferralLanding from "./pages/ReferralLanding";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
@@ -394,6 +395,15 @@ const App = () => {
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                               <EfectoMidas />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/astron-bot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <AstronBot />
                             </main>
                           </>
                         } />

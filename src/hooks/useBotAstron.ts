@@ -8,9 +8,8 @@ interface BotConfig {
     stake: number;
     stopLoss: number;
     takeProfit: number;
-    overPrediction: number;
-    underPrediction: number;
     symbol?: string;
+    useMartingale?: boolean;
 }
 
 interface BotStats {
@@ -46,8 +45,12 @@ export const useBotAstron = () => {
     const initialStakeRef = useRef<number>(0);
     const currentStakeRef = useRef<number>(0);
     const isWaitingForContractRef = useRef<boolean>(false);
-    const nextTradeRef = useRef<'OVER' | 'UNDER'>('OVER');
     const totalProfitRef = useRef<number>(0);
+
+    // NEW: Smart Strategy Refs
+    const historyRef = useRef<number[]>([]); // Rolling window of last 100 ticks
+    const consecutiveLossesRef = useRef<number>(0);
+    const MAX_GALE = 3;
 
     // Helper to add log
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -64,57 +67,78 @@ export const useBotAstron = () => {
     const handleMessage = useCallback((event: MessageEvent) => {
         const data = JSON.parse(event.data);
 
-        // Handle tick updates - check for entry condition
+        // Handle tick updates
         if (data.msg_type === 'tick' && data.tick) {
-            const quote = Number(data.tick.quote).toFixed(2); // R_100 has 2 decimal places
-            const lastDigit = parseInt(quote.charAt(quote.length - 1));
+            const quote = Number(data.tick.quote).toFixed(2);
+            const currentDigit = parseInt(quote.charAt(quote.length - 1));
 
-            // Log ticks occasionally
-            if (Math.random() < 0.15) {
-                addLog(`📊 Último dígito: ${lastDigit} | Próximo: ${nextTradeRef.current}`, 'info');
+            // Update History (Rolling Window 100)
+            if (historyRef.current.length >= 100) {
+                historyRef.current.shift();
+            }
+            historyRef.current.push(currentDigit);
+
+            // WARM-UP PHASE
+            if (historyRef.current.length < 100) {
+                if (historyRef.current.length % 25 === 0) {
+                    addLog(`⏳ Calentamiento: ${historyRef.current.length}/100 ticks recolectados`, 'info');
+                }
+                return; // Do not trade yet
             }
 
-            // Entry condition based on last digit and next trade direction
+            // STRATEGY: Statistical Mean Reversion
             if (!isWaitingForContractRef.current && socket && configRef.current) {
-                let shouldTrade = false;
-                let contractType: string | null = null;
-                let prediction: number | null = null;
 
-                if (nextTradeRef.current === 'OVER' && lastDigit === 0) {
-                    shouldTrade = true;
-                    contractType = 'DIGITOVER';
-                    prediction = configRef.current.overPrediction;
-                    addLog(`🎯 Dígito 0 detectado! Comprando DIGITOVER > ${prediction}`, 'success');
-                } else if (nextTradeRef.current === 'UNDER' && lastDigit === 9) {
-                    shouldTrade = true;
-                    contractType = 'DIGITUNDER';
-                    prediction = configRef.current.underPrediction;
-                    addLog(`🎯 Dígito 9 detectado! Comprando DIGITUNDER < ${prediction}`, 'success');
+                // 1. Calculate Frequencies
+                const counts = new Array(10).fill(0);
+                historyRef.current.forEach(d => counts[d]++);
+
+                // 2. Find "Coldest" Digit (Lowest Frequency)
+                let minFreq = 1.0;
+                let coldDigit = -1;
+
+                for (let i = 0; i < 10; i++) {
+                    const freq = counts[i] / 100;
+                    if (freq < minFreq) {
+                        minFreq = freq;
+                        coldDigit = i;
+                    }
                 }
 
-                if (shouldTrade && contractType && prediction !== null) {
+                // 3. Calculate Deviation & Confidence
+                const expectedFreq = 0.10; // 10%
+                const deviation = expectedFreq - minFreq;
+                // Confidence: scaled so that 4% deviation = 50% confidence. Max 100%.
+                const confidence = Math.min(1.0, deviation / 0.08);
+
+                // 4. Entry Condition
+                // Deviation >= 0.04 (4%) -> which implies Confidence >= 0.5 (50%)
+                if (deviation >= 0.04) {
                     isWaitingForContractRef.current = true;
                     const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
+                    const percentageConfidence = (confidence * 100).toFixed(1);
 
-                    // Send buy request
+                    addLog(`🎯 Señal: Dígito ${coldDigit} frío (${(minFreq * 100).toFixed(0)}%). Desviación: ${(deviation * 100).toFixed(1)}%. Confianza: ${percentageConfidence}%`, 'success');
+
+                    // 5. Place Trade: DIGITDIFF (Betting that the cold digit will NOT appear next)
                     const buyRequest = {
                         buy: 1,
                         subscribe: 1,
                         price: 100,
                         parameters: {
-                            contract_type: contractType,
+                            contract_type: 'DIGITDIFF',
                             symbol: configRef.current.symbol || 'R_100',
                             currency: 'USD',
                             amount: stakeAmount,
                             basis: 'stake',
                             duration: 1,
                             duration_unit: 't',
-                            barrier: prediction.toString(),
+                            barrier: coldDigit.toString(),
                         }
                     };
 
                     socket.send(JSON.stringify(buyRequest));
-                    addLog(`🛒 Orden: ${contractType} | Barrera: ${prediction} | Stake: $${stakeAmount.toFixed(2)}`, 'info');
+                    addLog(`🛒 Orden: DIFF ${coldDigit} | Confianza: ${percentageConfidence}% | Stake: $${stakeAmount.toFixed(2)}`, 'info');
                 }
             }
         }
@@ -137,9 +161,9 @@ export const useBotAstron = () => {
                 updateStats(profit, isWin);
 
                 if (isWin) {
-                    // WIN - Reset stake
+                    // WIN
                     addLog(`🎉 ¡GANAMOS! +$${profit.toFixed(2)}`, 'success');
-                    currentStakeRef.current = initialStakeRef.current;
+                    currentStakeRef.current = initialStakeRef.current; // Reset stake
 
                     setStats(prev => ({
                         ...prev,
@@ -148,42 +172,51 @@ export const useBotAstron = () => {
                         currentStake: initialStakeRef.current,
                     }));
 
-                    totalProfitRef.current = prev.totalProfit + profit;
+                    consecutiveLossesRef.current = 0;
+                    totalProfitRef.current = stats.totalProfit + profit;
                 } else {
-                    // LOSS - Apply Martingale (x2)
+                    // LOSS
                     const lossAmount = Math.abs(profit);
                     addLog(`💥 Perdimos: -$${lossAmount.toFixed(2)}`, 'error');
 
-                    // Martingale: current stake + (current stake * 2)
-                    const newStake = parseFloat((currentStakeRef.current + (currentStakeRef.current * 2)).toFixed(2));
-                    currentStakeRef.current = newStake;
-                    addLog(`📈 Martingale: Próximo stake $${newStake.toFixed(2)}`, 'warning');
+                    const martingaleEnabled = configRef.current?.useMartingale !== false;
+
+                    if (!martingaleEnabled) {
+                        addLog(`🔄 Martingale DESHABILITADO: Stake fijo`, 'info');
+                    } else {
+                        // MARTINGALE
+                        consecutiveLossesRef.current += 1;
+
+                        if (consecutiveLossesRef.current >= MAX_GALE) {
+                            addLog(`🚨 MÁXIMO GALE (${MAX_GALE}) ALCANZADO! Reseteando stake...`, 'error');
+                            currentStakeRef.current = initialStakeRef.current;
+                            consecutiveLossesRef.current = 0;
+                        } else {
+                            // Martingale for DIGITDIFF (recovery requires high multiplier ~11x due to low payout)
+                            const newStake = parseFloat((currentStakeRef.current * 11).toFixed(2));
+                            currentStakeRef.current = newStake;
+                            addLog(`📈 Martingale (DIGITDIFF): $${newStake.toFixed(2)}`, 'warning');
+                        }
+                    }
 
                     setStats(prev => ({
                         ...prev,
                         losses: prev.losses + 1,
                         totalProfit: prev.totalProfit + profit,
-                        currentStake: newStake,
+                        currentStake: currentStakeRef.current,
                     }));
 
-                    totalProfitRef.current = prev.totalProfit + profit;
+                    totalProfitRef.current = stats.totalProfit + profit;
                 }
-
-                // Alternate next trade direction
-                nextTradeRef.current = nextTradeRef.current === 'OVER' ? 'UNDER' : 'OVER';
-                addLog(`🔄 Próximo trade: ${nextTradeRef.current}`, 'info');
-
 
                 // Check Stop Loss / Take Profit
                 if (configRef.current) {
                     if (totalProfitRef.current >= configRef.current.takeProfit) {
-                        addLog(`🏆 ¡META ALCANZADA! +$${totalProfitRef.current.toFixed(2)}`, 'success');
                         toast.success('¡Take Profit alcanzado!');
                         stopBot();
                         return;
                     }
                     if (totalProfitRef.current <= -configRef.current.stopLoss) {
-                        addLog(`🛑 STOP LOSS activado. -$${Math.abs(totalProfitRef.current).toFixed(2)}`, 'error');
                         toast.error('Stop Loss activado');
                         stopBot();
                         return;
@@ -212,7 +245,8 @@ export const useBotAstron = () => {
         initialStakeRef.current = config.stake;
         currentStakeRef.current = config.stake;
         isWaitingForContractRef.current = false;
-        nextTradeRef.current = 'OVER'; // Start with OVER
+        historyRef.current = []; // Clear history
+        consecutiveLossesRef.current = 0;
 
         setStats({
             wins: 0,
@@ -222,10 +256,9 @@ export const useBotAstron = () => {
         });
         setLogs([]);
 
-        // Notify Global Session
         setActiveBot('Astron Bot');
-
-        addLog(`⏳ Esperando dígito 0 para OVER...`, 'info');
+        addLog(`🧠 Iniciando Estrategia Mean Reversion...`, 'info');
+        addLog(`⏳ Recolectando 100 ticks de historial...`, 'info');
 
         setIsRunning(true);
         return true;

@@ -19,10 +19,11 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const [stake, setStake] = useState<string>('0.35');
     const [stopLoss, setStopLoss] = useState<string>('100.00');
     const [takeProfit, setTakeProfit] = useState<string>('100.00');
+    const [useMartingale, setUseMartingale] = useState<boolean>(true);
+
 
     // Fixed strategy values (hidden from user)
-    const overPrediction = 2;
-    const underPrediction = 8;
+
 
 
 
@@ -49,10 +50,10 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 stake: stakeVal,
                 stopLoss: stopLossVal,
                 takeProfit: takeProfitVal,
-                overPrediction: overPrediction,
-                underPrediction: underPrediction,
-                symbol: 'R_100',
+                symbol: 'R_10',
+                useMartingale: useMartingale,
             });
+
 
             if (success) {
                 toast.success('Astron Bot iniciado');
@@ -168,6 +169,35 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                             className="w-full px-3 py-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-emerald-400 font-mono focus:border-emerald-500/50 transition-all outline-none disabled:opacity-50"
                                         />
                                     </div>
+                                </div>
+
+                                {/* Martingale Toggle */}
+                                <div className="pt-3 border-t border-white/10">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs text-white/60 uppercase tracking-wider font-medium">
+                                            Martingale
+                                        </label>
+                                        <button
+                                            onClick={() => setUseMartingale(!useMartingale)}
+                                            disabled={isRunning}
+                                            className={cn(
+                                                "relative w-12 h-6 rounded-full transition-all duration-300 disabled:opacity-50",
+                                                useMartingale
+                                                    ? "bg-cyan-500"
+                                                    : "bg-white/10"
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300",
+                                                    useMartingale ? "left-7" : "left-1"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-white/30 mt-1">
+                                        {useMartingale ? 'Dobra stake após loss' : 'Stake fixo'}
+                                    </p>
                                 </div>
                             </div>
                         </div>

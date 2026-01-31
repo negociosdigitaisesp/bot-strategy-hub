@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { Shield, Key, CheckCircle2, AlertCircle, ExternalLink, RefreshCw, LogOut, Zap, Lock, Link2 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -98,15 +98,64 @@ const StepCard = ({
     );
 };
 
+interface LastConnectedAccount {
+    loginid: string;
+    token: string;
+    timestamp: number;
+}
+
 export const DerivConnectionForm = () => {
     const { isConnected, isConnecting, connect, disconnect, lastError, account } = useDeriv();
     const [inputToken, setInputToken] = useState('');
     const [showAffiliateModal, setShowAffiliateModal] = useState(false);
+    const [lastConnected, setLastConnected] = useState<LastConnectedAccount | null>(null);
+
+    // Load last connected account from localStorage
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('deriv_last_connected');
+            if (stored) {
+                setLastConnected(JSON.parse(stored));
+            }
+        } catch (error) {
+            console.error('Error loading last connected account:', error);
+        }
+    }, []);
+
+    // Save last connected account when successfully connected
+    useEffect(() => {
+        if (isConnected && account) {
+            const savedAccountsStr = localStorage.getItem('deriv_saved_accounts');
+            if (savedAccountsStr) {
+                try {
+                    const savedAccounts = JSON.parse(savedAccountsStr);
+                    const currentAccount = savedAccounts.find((acc: any) => acc.loginid === account.loginid);
+                    if (currentAccount) {
+                        const lastConnectedData: LastConnectedAccount = {
+                            loginid: account.loginid,
+                            token: currentAccount.token,
+                            timestamp: Date.now()
+                        };
+                        localStorage.setItem('deriv_last_connected', JSON.stringify(lastConnectedData));
+                        setLastConnected(lastConnectedData);
+                    }
+                } catch (error) {
+                    console.error('Error saving last connected account:', error);
+                }
+            }
+        }
+    }, [isConnected, account]);
 
     const handleConnect = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inputToken.trim()) return;
         await connect(inputToken.trim());
+    };
+
+    const handleQuickReconnect = async () => {
+        if (lastConnected?.token) {
+            await connect(lastConnected.token);
+        }
     };
 
     const handleConfigClick = (e: React.MouseEvent) => {
@@ -186,6 +235,70 @@ export const DerivConnectionForm = () => {
             </div>
 
             <div className="p-6 space-y-6">
+                {/* Last Connected Account - Quick Reconnect */}
+                {lastConnected && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 shadow-lg"
+                    >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                                    {lastConnected.loginid.startsWith('CR') ? (
+                                        <DollarSign size={20} className="text-emerald-400" />
+                                    ) : (
+                                        <Gamepad2 size={20} className="text-cyan-400" />
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-0.5">
+                                        Última Cuenta Conectada
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <AccountNumberDisplay
+                                            accountNumber={lastConnected.loginid}
+                                            className="font-mono font-bold text-white text-sm"
+                                            iconSize={14}
+                                            showToggle={false}
+                                        />
+                                        <span className={cn(
+                                            "text-[10px] px-2 py-0.5 rounded-full font-bold",
+                                            lastConnected.loginid.startsWith('CR')
+                                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                                : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                                        )}>
+                                            {lastConnected.loginid.startsWith('CR') ? 'REAL' : 'DEMO'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleQuickReconnect}
+                                disabled={isConnecting}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap",
+                                    isConnecting
+                                        ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                                        : "bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40"
+                                )}
+                            >
+                                {isConnecting ? (
+                                    <>
+                                        <RefreshCw size={16} className="animate-spin" />
+                                        Conectando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap size={16} />
+                                        Reconectar Rápido
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+
                 {/* ===== 3-STEP WIZARD GUIDE ===== */}
                 <AnimatePresence>
                     <motion.div

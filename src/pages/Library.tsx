@@ -260,7 +260,9 @@ const Library = () => {
       'cuentas': '/double-cuentas',
       'doublecuentas1.0': '/double-cuentas',
       'aurabot': '/aura-bot',
-      'aura': '/aura-bot'
+      'aura': '/aura-bot',
+      'astronbot': '/astron-bot',
+      'astron': '/astron-bot'
     };
 
     return botRoutes[normalizedName] || '/';
