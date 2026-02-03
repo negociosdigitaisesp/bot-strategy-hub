@@ -33,6 +33,7 @@ export interface BotConfig {
     autoSwitchEnabled?: boolean; // NEW: Smart Asset Selection
     minScore?: number; // NEW: Minimum score threshold for trading
     useSoros?: boolean; // NEW: Turbo-Scalp Mode
+    maxSorosLevels?: number; // NEW: Configurable Soros Levels
 }
 
 export interface BotStats {

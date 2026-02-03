@@ -284,6 +284,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const [autoSwitch, setAutoSwitch] = useState<boolean>(true); // NEW Auto-Switch State
     const [assertivityLevel, setAssertivityLevel] = useState<'conservative' | 'balanced' | 'aggressive'>('aggressive'); // Default to aggressive for more signals
     const [vaultTarget, setVaultTarget] = useState<string>('3.00');
+    const [useSoros, setUseSoros] = useState<boolean>(false); // NEW: Soros strategy toggle
+    const [sorosLevels, setSorosLevels] = useState<number>(1); // NEW: Soros Levels (1-5)
 
     // Auto-scroll logs
     useEffect(() => {
@@ -420,7 +422,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                     vaultTarget: 5.00, // Quick target
                     stopLoss: 50.00,
                     takeProfit: 50.00,
-                    useSoros: true // MINI-SOROS ENABLED
+                    useSoros: isFree ? true : useSoros, // Force ON for free users, configurable for pro
+                    maxSorosLevels: isFree ? 1 : sorosLevels // Free: Level 2 (1 step), Pro: Configurable
                 };
 
                 toast.success('⚡ MODO TURBO-SCALP ACTIVADO: Alta Velocidad.');
@@ -749,6 +752,97 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <p className="text-[10px] text-amber-400/60 mt-2 font-mono">
                                         Acumula ganancias de todos los activos.
                                     </p>
+                                </div>
+
+                                {/* Soros Strategy with Motion UI */}
+                                <div className={`rounded-xl border transition-all duration-500 ease-out overflow-hidden ${useSoros
+                                        ? 'bg-purple-500/10 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)]'
+                                        : 'bg-gray-900/40 border-gray-800'
+                                    }`}>
+                                    <div className="p-5">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg transition-colors duration-300 ${useSoros ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-800 text-gray-500'}`}>
+                                                    <Zap size={18} />
+                                                </div>
+                                                <div>
+                                                    <span className={`text-sm font-bold font-mono block ${useSoros ? 'text-white' : 'text-gray-400'}`}>
+                                                        Estrategia Soros
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-mono">
+                                                        {useSoros ? `Nivel ${sorosLevels} Activo` : 'Desactivado'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                onClick={() => !isRunning && setUseSoros(!useSoros)}
+                                                className={`w-12 h-7 rounded-full relative cursor-pointer transition-all duration-300 ${useSoros
+                                                        ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]'
+                                                        : 'bg-gray-700'
+                                                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-md ${useSoros ? 'left-6' : 'left-1'
+                                                    }`}></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Expandable Configuration Area */}
+                                        <div className={`transition-all duration-500 ease-in-out ${useSoros ? 'max-h-48 opacity-100 mt-4' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+
+                                            {/* Level Slider */}
+                                            <div className="pt-2 pb-4">
+                                                <div className="flex justify-between text-[10px] text-purple-400/80 font-mono mb-2 uppercase font-bold">
+                                                    <span>Conservador (1)</span>
+                                                    <span>Agresivo (5)</span>
+                                                </div>
+                                                <div className="relative h-2 bg-gray-800 rounded-full cursor-pointer group">
+                                                    <div
+                                                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-300"
+                                                        style={{ width: `${(sorosLevels / 5) * 100}%` }}
+                                                    ></div>
+                                                    <input
+                                                        type="range"
+                                                        min="1"
+                                                        max="5"
+                                                        step="1"
+                                                        disabled={isRunning}
+                                                        value={sorosLevels}
+                                                        onChange={(e) => setSorosLevels(parseInt(e.target.value))}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    />
+                                                    <div
+                                                        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg border-2 border-purple-500 transition-all duration-300 pointer-events-none group-hover:scale-125"
+                                                        style={{ left: `calc(${(sorosLevels / 5) * 100}% - 8px)` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+
+                                            {/* Visual Cycle Feedback */}
+                                            <div className="bg-black/40 rounded-lg p-3 border border-purple-500/10 flex items-center justify-between text-[11px] font-mono">
+                                                <div className="text-center">
+                                                    <span className="block text-gray-500 text-[9px] uppercase mb-1">Base</span>
+                                                    <span className="text-white font-bold">${stake}</span>
+                                                </div>
+                                                <div className="w-full mx-2 relative h-px bg-gray-800">
+                                                    <div className="absolute inset-0 bg-purple-500/50 animate-pulse"></div>
+                                                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-purple-500/20 px-2 rounded-full text-[9px] text-purple-400 font-bold whitespace-nowrap border border-purple-500/30">
+                                                        {sorosLevels} {sorosLevels === 1 ? 'Nivel' : 'Niveles'}
+                                                    </div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <span className="block text-gray-500 text-[9px] uppercase mb-1">Meta</span>
+                                                    <span className="text-purple-400 font-bold drop-shadow-lg">
+                                                        Max Power
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-[10px] text-gray-500 mt-3 text-center leading-relaxed">
+                                                Reinicia a la base después de <strong className="text-purple-400">{sorosLevels}</strong> victorias consecutivas.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="mt-auto pt-6 border-t border-gray-800/50">

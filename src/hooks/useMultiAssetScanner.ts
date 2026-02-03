@@ -49,6 +49,7 @@ export interface ScannerConfig {
     autoSwitch?: boolean;       // NEW: Smart Asset Selection
     minScore?: number;          // NEW: Min score to trade (default 75)
     useSoros?: boolean;         // NEW: Turbo-Scalp Mode (Mini-Soros L2)
+    maxSorosLevels?: number;    // NEW: Configurable Soros Levels
 }
 
 // Scanner statistics
@@ -576,20 +577,22 @@ export const useMultiAssetScanner = () => {
 
                     consecutiveLossesRef.current = 0;
 
-                    // SOROS LOGIC (Mini-Soros L2)
+                    // SOROS LOGIC (Dynamic Levels)
                     const useSoros = configRef.current?.useSoros;
+                    const maxSoros = configRef.current?.maxSorosLevels || 1;
+
                     if (useSoros) {
-                        if (sorosLevelRef.current === 0) {
-                            // Level 1 Win -> Go to Level 2 (Stake + Profit)
-                            sorosLevelRef.current = 1;
-                            const nextStake = parseFloat((initialStakeRef.current + profit).toFixed(2));
+                        if (sorosLevelRef.current < maxSoros) {
+                            // Level UP (Compounding)
+                            sorosLevelRef.current += 1;
+                            const nextStake = parseFloat((currentStakeRef.current + profit).toFixed(2));
                             currentStakeRef.current = nextStake;
-                            addLog(`🚀 SOROS NIVEL 2: Apostando Ganancia ($${nextStake})`, 'gold');
+                            addLog(`🚀 SOROS NIVEL ${sorosLevelRef.current}: Apostando Ganancia ($${nextStake})`, 'gold');
                         } else {
-                            // Level 2 Win -> Reset to Base (Cycle Complete)
+                            // Max Level Reached -> Reset to Base (Cycle Complete)
                             sorosLevelRef.current = 0;
                             currentStakeRef.current = initialStakeRef.current;
-                            addLog(`🏆 CICLO SOROS COMPLETADO: Retorno a base ($${currentStakeRef.current})`, 'success');
+                            addLog(`🏆 CICLO SOROS COMPLETADO (${maxSoros} Niveles): Retorno a base ($${currentStakeRef.current})`, 'success');
                         }
                     } else {
                         // Standard Reset
