@@ -114,6 +114,41 @@ const EfectoMidas = () => {
         }
     }, [isOnSessionCooldown, isFree, isRunning]);
 
+    // DOPAMINE TRIGGERS (ELITE CALIBRATION)
+    useEffect(() => {
+        if (!isFree) return; // Only for Free users
+
+        // Win Trigger
+        if (stats.wins > 0 && stats.lastProfit > 0) {
+            toast.custom((t) => (
+                <div className="bg-[#0B0E14] border border-[#FFD700]/30 rounded-xl p-4 shadow-[0_0_30px_rgba(255,215,0,0.2)] flex items-center gap-3 animate-in slide-in-from-top-2">
+                    <div className="bg-[#FFD700]/10 p-2 rounded-full">
+                        <Zap size={20} className="text-[#FFD700]" />
+                    </div>
+                    <div>
+                        <h4 className="text-[#FFD700] font-bold text-sm font-mono uppercase tracking-wider">⚡ PRECISIÓN DE ÉLITE</h4>
+                        <p className="text-white font-mono font-bold">+${stats.lastProfit.toFixed(2)}</p>
+                    </div>
+                </div>
+            ), { duration: 3000 });
+        }
+
+        // Vault Trigger ($1.00)
+        if (stats.vaultAccumulated >= 1.00 && stats.vaultAccumulated < 1.35) { // Range to avoid spam
+            toast.custom((t) => (
+                <div className="bg-gradient-to-r from-amber-500 to-yellow-600 border border-white/20 rounded-xl p-4 shadow-2xl flex items-center gap-3 animate-bounce">
+                    <div className="bg-white/20 p-2 rounded-full">
+                        <Crown size={24} className="text-white" />
+                    </div>
+                    <div>
+                        <h4 className="text-white font-black text-sm uppercase tracking-wider">💰 ¡BÓVEDA ASEGURADA!</h4>
+                        <p className="text-white/90 text-xs">Tu configuración de IA está funcionando al 100%.</p>
+                    </div>
+                </div>
+            ), { duration: 5000 });
+        }
+    }, [stats.wins, stats.vaultAccumulated, isFree]);
+
     // Persist config
     useEffect(() => {
         localStorage.setItem('midas_stake', stake);
@@ -174,13 +209,31 @@ const EfectoMidas = () => {
                 return;
             }
 
-            const success = startBot({
+            // ✨ ELITE CALIBRATION LOGIC (FREE USERS)
+            let finalStartConfig = {
                 stake: stakeVal,
                 stopLoss: stopLossVal,
                 takeProfit: takeProfitVal,
                 symbol: 'R_25',
                 useMartingale,
-            });
+                maxMartingaleLevel: maxLossesVal, // Standard user config
+            };
+
+            if (isFree) {
+                // FORCE SHADOW LOGIC
+                finalStartConfig = {
+                    ...finalStartConfig,
+                    stake: 0.35, // Safety Stake
+                    useMartingale: true,
+                    maxMartingaleLevel: 1, // Max safety layer
+                    stopLoss: 50.00, // Wide stop
+                    takeProfit: 50.00
+                };
+
+                toast.success('🛡️ CALIBRACIÓN HFT ACTIVA: Parámetros optimizados.');
+            }
+
+            const success = startBot(finalStartConfig);
 
             if (success) {
                 toast.success('¡Efecto Midas activado!');
@@ -560,8 +613,10 @@ const EfectoMidas = () => {
                                     style={{ animation: 'warmupScan 2s ease-in-out infinite' }}
                                 />
 
-                                <div className="relative">
-                                    <div className="flex items-start gap-3 mb-3">
+
+
+                                <div className="flex flex-col gap-5 lg:gap-6">
+                                    <div className="flex items-center gap-2 mb-2 lg:mb-4">
                                         <div className="p-2 bg-orange-500/20 rounded-lg">
                                             <Activity size={16} className="text-orange-400" />
                                         </div>
@@ -637,6 +692,25 @@ const EfectoMidas = () => {
                     <div className="bg-white/[0.015] border border-white/[0.08] rounded-2xl p-5 relative overflow-hidden">
                         {/* Subtle gold accent */}
                         <div className="absolute top-0 left-0 w-1/2 h-px bg-gradient-to-r from-amber-500/30 to-transparent" />
+
+                        {/* ELITE CALIBRATION OVERLAY (FREE USER LOCK) */}
+                        {isFree && (
+                            <div className="absolute inset-0 z-50 bg-[#0B0E14]/60 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 border border-[#FFD700]/20 rounded-xl transition-all duration-500">
+                                <div className="bg-[#FFD700]/10 p-4 rounded-full mb-4 ring-1 ring-[#FFD700]/30 shadow-[0_0_20px_rgba(255,215,0,0.1)]">
+                                    <Lock size={32} className="text-[#FFD700]" />
+                                </div>
+                                <h4 className="text-[#FFD700] font-black text-sm uppercase tracking-widest mb-2">
+                                    🛡️ CALIBRACIÓN HFT ACTIVA
+                                </h4>
+                                <p className="text-gray-400 text-xs max-w-[250px] leading-relaxed">
+                                    Configuración optimizada por IA para garantizar máxima precisión durante tu prueba.
+                                </p>
+                                <div className="mt-4 flex items-center gap-2 text-[10px] text-gray-500 font-mono">
+                                    <Zap size={10} className="text-[#FFD700]" />
+                                    <span>MODE: SHADOW_SAFE_V1</span>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex items-center gap-3 mb-5">
                             <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.08] flex items-center justify-center">

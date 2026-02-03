@@ -20,7 +20,9 @@ import {
     Target,
     Sparkles,
     BrainCircuit,
-    Trophy
+    Trophy,
+    Lock,
+    Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBotAstron, LogEntry, ScannerSymbol, AssetState } from '../../hooks/useBotAstron';
@@ -254,6 +256,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         recentTicks,
         startBot,
         stopBot,
+
         // Multi-asset specific
         assetStates,
         activeAsset,
@@ -304,6 +307,41 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             setShowLossAversionModal(true);
         }
     }, [isOnSessionCooldown, isFree, isRunning]);
+
+    // DOPAMINE TRIGGERS (ELITE CALIBRATION)
+    useEffect(() => {
+        if (!isFree) return; // Only for Free users
+
+        // Win Trigger
+        if (stats.wins > 0 && stats.lastProfit > 0) {
+            toast.custom((t) => (
+                <div className="bg-[#0B0E14] border border-[#FFD700]/30 rounded-xl p-4 shadow-[0_0_30px_rgba(255,215,0,0.2)] flex items-center gap-3 animate-in slide-in-from-top-2">
+                    <div className="bg-[#FFD700]/10 p-2 rounded-full">
+                        <Zap size={20} className="text-[#FFD700]" />
+                    </div>
+                    <div>
+                        <h4 className="text-[#FFD700] font-bold text-sm font-mono uppercase tracking-wider">⚡ PRECISIÓN DE ÉLITE</h4>
+                        <p className="text-white font-mono font-bold">+${stats.lastProfit.toFixed(2)}</p>
+                    </div>
+                </div>
+            ), { duration: 3000 });
+        }
+
+        // Vault Trigger ($1.00)
+        if (stats.vaultAccumulated >= 1.00 && stats.vaultAccumulated < 1.35) { // Range to avoid spam
+            toast.custom((t) => (
+                <div className="bg-gradient-to-r from-amber-500 to-yellow-600 border border-white/20 rounded-xl p-4 shadow-2xl flex items-center gap-3 animate-bounce">
+                    <div className="bg-white/20 p-2 rounded-full">
+                        <Crown size={24} className="text-white" />
+                    </div>
+                    <div>
+                        <h4 className="text-white font-black text-sm uppercase tracking-wider">💰 ¡BÓVEDA ASEGURADA!</h4>
+                        <p className="text-white/90 text-xs">Tu configuración de IA está funcionando al 100%.</p>
+                    </div>
+                </div>
+            ), { duration: 5000 });
+        }
+    }, [stats.wins, stats.vaultAccumulated, isFree]);
 
     const handleToggleBot = () => {
         if (isRunning) {
@@ -357,7 +395,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             const minScore = minScoreMap[assertivityLevel];
             const martingaleFactorVal = parseFloat(martingaleFactor) || 2.5;
 
-            const success = startBot({
+            // ✨ ELITE CALIBRATION LOGIC (FREE USERS)
+            let finalStartConfig = {
                 stake: stakeVal,
                 stopLoss: stopLossVal,
                 takeProfit: takeProfitVal,
@@ -368,7 +407,26 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 vaultTarget: vaultTargetVal,
                 autoSwitchEnabled: autoSwitch,
                 minScore: minScore
-            });
+            };
+
+            if (isFree) {
+                // FORCE TURBO-SCALP LOGIC (AGGRESSIVE)
+                finalStartConfig = {
+                    ...finalStartConfig,
+                    stake: 1.00, // HIGH STAKE for fast profit
+                    minScore: 40, // HIGH FREQUENCY (Mini opportunity)
+                    maxMartingaleLevel: 2, // Limit risk but allow recovery
+                    martingaleFactor: 2.5,
+                    vaultTarget: 5.00, // Quick target
+                    stopLoss: 50.00,
+                    takeProfit: 50.00,
+                    useSoros: true // MINI-SOROS ENABLED
+                };
+
+                toast.success('⚡ MODO TURBO-SCALP ACTIVADO: Alta Velocidad.');
+            }
+
+            const success = startBot(finalStartConfig);
 
             if (success) {
                 toast.success('🚀 Bug Deriv Scanner iniciado - Escaneando 5 activos');
@@ -570,6 +628,25 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                 <Code size={16} className="text-[#00E5FF]" />
                                 <h3 className="text-white font-bold text-xs lg:text-sm tracking-wide font-mono">CONFIGURACIÓN</h3>
                             </div>
+
+                            {/* ELITE CALIBRATION OVERLAY (FREE USER LOCK) */}
+                            {isFree && (
+                                <div className="absolute inset-0 z-50 bg-[#0B0E14]/60 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 border border-[#FFD700]/20 rounded-xl lg:rounded-2xl transition-all duration-500">
+                                    <div className="bg-[#FFD700]/10 p-4 rounded-full mb-4 ring-1 ring-[#FFD700]/30 shadow-[0_0_20px_rgba(255,215,0,0.1)]">
+                                        <Lock size={32} className="text-[#FFD700]" />
+                                    </div>
+                                    <h4 className="text-[#FFD700] font-black text-sm uppercase tracking-widest mb-2">
+                                        ⚡ MODO TURBO-SCALP
+                                    </h4>
+                                    <p className="text-gray-400 text-xs max-w-[250px] leading-relaxed">
+                                        Configuración de alta velocidad para crecimiento rápido y máxima adrenalina.
+                                    </p>
+                                    <div className="mt-4 flex items-center gap-2 text-[10px] text-gray-500 font-mono">
+                                        <Zap size={10} className="text-[#FFD700]" />
+                                        <span>MODE: AGGRESSIVE_GROWTH_V2</span>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="flex-1 space-y-4 lg:space-y-6">
                                 <div>

@@ -2,6 +2,7 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { MandatoryWACapture } from './MandatoryWACapture';
 
 interface ProtectedRouteProps {
   children?: React.ReactNode;
@@ -22,7 +23,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children || <Outlet />}</>;
+  return (
+    <>
+      <MandatoryWACapture />
+      {children || <Outlet />}
+    </>
+  );
 };
 
 export default ProtectedRoute;

@@ -32,6 +32,7 @@ export interface BotConfig {
     vaultTarget?: number;
     autoSwitchEnabled?: boolean; // NEW: Smart Asset Selection
     minScore?: number; // NEW: Minimum score threshold for trading
+    useSoros?: boolean; // NEW: Turbo-Scalp Mode
 }
 
 export interface BotStats {
@@ -159,7 +160,8 @@ export const useBotAstron = () => {
             vaultEnabled: config.vaultEnabled,
             vaultTarget: config.vaultTarget,
             autoSwitch: config.autoSwitchEnabled, // Pass to hook
-            minScore: config.minScore // Pass minScore threshold
+            minScore: config.minScore, // Pass minScore threshold
+            useSoros: config.useSoros // Pass Soros config
         });
     }, [scanner]);
 

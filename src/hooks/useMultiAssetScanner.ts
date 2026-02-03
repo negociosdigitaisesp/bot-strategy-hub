@@ -48,6 +48,7 @@ export interface ScannerConfig {
     vaultTarget?: number;
     autoSwitch?: boolean;       // NEW: Smart Asset Selection
     minScore?: number;          // NEW: Min score to trade (default 75)
+    useSoros?: boolean;         // NEW: Turbo-Scalp Mode (Mini-Soros L2)
 }
 
 // Scanner statistics
@@ -218,6 +219,7 @@ export const useMultiAssetScanner = () => {
     const assetStatesRef = useRef<Record<ScannerSymbol, AssetState>>(assetStates);
     const vaultAccumulatedRef = useRef<number>(0);
     const leaderAssetRef = useRef<ScannerSymbol | null>(null);
+    const sorosLevelRef = useRef<number>(0); // 0=Base, 1=Level 2 (Stake+Profit)
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -239,6 +241,38 @@ export const useMultiAssetScanner = () => {
         };
         setLogs(prev => [...prev.slice(-100), newLog]);
     }, []);
+
+    // Scanning Feedback Loop (Dopamine for waiting)
+    useEffect(() => {
+        if (!isRunning) return;
+
+        const interval = setInterval(() => {
+            if (activeAsset) return; // Silent if trading
+
+            // Pick a random asset to "scan" in logs
+            const randomSym = SCANNER_SYMBOLS[Math.floor(Math.random() * SCANNER_SYMBOLS.length)];
+            const state = assetStatesRef.current[randomSym];
+            const currentScore = state.score.total;
+            const targetScore = configRef.current?.minScore || 75;
+
+            // Only log if it's somewhat interesting (e.g. > 30)
+            if (currentScore > 30) {
+                // Varying messages
+                const msgs = [
+                    `🔎 Escaneando ${state.displayName}... Score ${currentScore}% (Buscando >${targetScore}%)`,
+                    `📊 Análisis V${state.displayName.split('V')[1]}: ${currentScore}% - Calculando entrada...`,
+                    `⚡ ${state.displayName}: Volatilidad detectada. Score ${currentScore}%`,
+                    `🔄 Sincronizando ${state.displayName}...`
+                ];
+                // 30% chance to log to avoid spamming too much
+                if (Math.random() > 0.7) {
+                    addLog(msgs[Math.floor(Math.random() * msgs.length)], 'info');
+                }
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [isRunning, activeAsset, addLog]);
 
     // Check warmup status across all assets
     const checkWarmupStatus = useCallback(() => {
@@ -539,8 +573,28 @@ export const useMultiAssetScanner = () => {
 
                 if (isWin) {
                     addLog(`💰 WIN +$${profit.toFixed(2)} en ${tradedSymbol ? SYMBOL_NAMES[tradedSymbol] : 'UNKNOWN'}`, 'gold', tradedSymbol || undefined);
-                    currentStakeRef.current = initialStakeRef.current;
+
                     consecutiveLossesRef.current = 0;
+
+                    // SOROS LOGIC (Mini-Soros L2)
+                    const useSoros = configRef.current?.useSoros;
+                    if (useSoros) {
+                        if (sorosLevelRef.current === 0) {
+                            // Level 1 Win -> Go to Level 2 (Stake + Profit)
+                            sorosLevelRef.current = 1;
+                            const nextStake = parseFloat((initialStakeRef.current + profit).toFixed(2));
+                            currentStakeRef.current = nextStake;
+                            addLog(`🚀 SOROS NIVEL 2: Apostando Ganancia ($${nextStake})`, 'gold');
+                        } else {
+                            // Level 2 Win -> Reset to Base (Cycle Complete)
+                            sorosLevelRef.current = 0;
+                            currentStakeRef.current = initialStakeRef.current;
+                            addLog(`🏆 CICLO SOROS COMPLETADO: Retorno a base ($${currentStakeRef.current})`, 'success');
+                        }
+                    } else {
+                        // Standard Reset
+                        currentStakeRef.current = initialStakeRef.current;
+                    }
 
                     // Update vault
                     vaultAccumulatedRef.current += profit;
@@ -578,9 +632,13 @@ export const useMultiAssetScanner = () => {
 
                         if (consecutiveLossesRef.current >= maxGale) {
                             addLog(`🛑 Max Gale (${maxGale}) alcanzado. Reseteando.`, 'warning');
+                            addLog(`🛑 Max Gale (${maxGale}) alcanzado. Reseteando.`, 'warning');
                             currentStakeRef.current = initialStakeRef.current;
                             consecutiveLossesRef.current = 0;
+                            sorosLevelRef.current = 0; // Reset Soros on Max Gale Loss
                         } else {
+                            // Reset Soros on any Loss (Martingale takes over)
+                            sorosLevelRef.current = 0;
                             // Configurable Martingale Factor (default 2.5)
                             const factor = configRef.current?.martingaleFactor || 2.5;
                             const newStake = parseFloat((currentStakeRef.current * factor).toFixed(2));
@@ -662,7 +720,10 @@ export const useMultiAssetScanner = () => {
         isWaitingForContractRef.current = false;
         consecutiveLossesRef.current = 0;
         totalProfitRef.current = 0;
+        consecutiveLossesRef.current = 0;
+        totalProfitRef.current = 0;
         vaultAccumulatedRef.current = 0;
+        sorosLevelRef.current = 0;
 
         // Reset all asset states
         const resetStates: Record<string, AssetState> = {};
