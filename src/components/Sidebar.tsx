@@ -29,7 +29,8 @@ import {
     AlertTriangle,
     Rocket,
     LayoutDashboard,
-    Bot
+    Bot,
+    Crosshair
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -201,6 +202,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             description: 'Mean Reversion Strategy',
             badge: 'NEW'
         },
+
 
         {
             name: 'Bots',

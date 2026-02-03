@@ -56,6 +56,9 @@ import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
 import AstronBot from "./pages/AstronBot";
 
+
+
+
 import ReferralLanding from "./pages/ReferralLanding";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import Academy from "./pages/Academy";
@@ -408,6 +411,10 @@ const App = () => {
                           </>
                         } />
 
+
+
+
+
                         <Route path="/programa-socios" element={
                           <>
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
@@ -430,6 +437,8 @@ const App = () => {
 
                       {/* Hidden route for email funnel - not in menu - PUBLIC */}
                       <Route path="/quieroserpro" element={<QuieroSerPro />} />
+
+
 
                       <Route path="/pagina-de-teste" element={<PaginaDeTeste />} />
                       <Route path="/PaginaBloqueada" element={<PaginaBloqueada />} />

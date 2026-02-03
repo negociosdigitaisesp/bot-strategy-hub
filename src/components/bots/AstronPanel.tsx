@@ -13,13 +13,215 @@ import {
     ShieldAlert,
     Wifi,
     Code,
-    Bug
+    Bug,
+    Radio,
+    Radar,
+    Zap,
+    Target,
+    Sparkles,
+    BrainCircuit,
+    Trophy
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBotAstron, LogEntry } from '../../hooks/useBotAstron';
+import { useBotAstron, LogEntry, ScannerSymbol, AssetState } from '../../hooks/useBotAstron';
 import { useDeriv } from '../../contexts/DerivContext';
 import { useFreemiumLimiter, FREEMIUM_LIMITS } from '../../hooks/useFreemiumLimiter';
 import { LossAversionModal } from '../LossAversionModal';
+
+// ============================================
+// FLEET MONITOR WIDGET (REPLACES RADAR PANEL)
+// ============================================
+interface FleetMonitorProps {
+    assetStates: Record<ScannerSymbol, AssetState>;
+    activeAsset: ScannerSymbol | null;
+    leaderAsset: ScannerSymbol | null;
+    isRunning: boolean;
+    isWarmingUp: boolean;
+    warmUpProgress: number;
+    opportunityMessage: string | null;
+    autoSwitchEnabled: boolean;
+}
+
+const FleetMonitor: React.FC<FleetMonitorProps> = ({
+    assetStates,
+    activeAsset,
+    leaderAsset,
+    isRunning,
+    isWarmingUp,
+    warmUpProgress,
+    opportunityMessage,
+    autoSwitchEnabled
+}) => {
+    const symbols: ScannerSymbol[] = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'];
+
+    return (
+        <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-4 border border-white/5 relative overflow-hidden flex flex-col gap-4">
+            {/* Ambient glow */}
+            <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[60px] pointer-events-none transition-colors duration-500
+                ${autoSwitchEnabled ? 'bg-amber-500/10' : 'bg-[#00E5FF]/5'}
+            `} />
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className={`p-2 rounded-lg border transition-colors duration-300 ${autoSwitchEnabled ? 'bg-amber-500/10 border-amber-500/20' : 'bg-[#00E5FF]/10 border-[#00E5FF]/20'}`}>
+                        {autoSwitchEnabled ? (
+                            <BrainCircuit size={16} className="text-amber-400" />
+                        ) : (
+                            <Radar size={16} className="text-[#00E5FF]" />
+                        )}
+                    </div>
+                    <div>
+                        <h3 className={`text-sm font-bold font-mono transition-colors ${autoSwitchEnabled ? 'text-amber-400' : 'text-white'}`}>
+                            {autoSwitchEnabled ? 'SMART FLEET MONITOR' : 'RADAR MONITOR'}
+                        </h3>
+                        <p className="text-[9px] text-gray-500 uppercase tracking-wider">
+                            {autoSwitchEnabled ? 'Auto-Selection Active' : 'Passive Scanning Mode'}
+                        </p>
+                    </div>
+                </div>
+
+                {isRunning && (
+                    <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2">
+                            <span className={`animate-ping absolute inline-flex h-2 w-2 rounded-full opacity-75 ${autoSwitchEnabled ? 'bg-amber-500' : 'bg-[#00E5FF]'}`}></span>
+                            <span className={`relative inline-flex rounded-full h-2 w-2 ${autoSwitchEnabled ? 'bg-amber-500' : 'bg-[#00E5FF]'}`}></span>
+                        </span>
+                        <span className={`text-[10px] font-mono font-bold ${autoSwitchEnabled ? 'text-amber-400' : 'text-[#00E5FF]'}`}>
+                            {autoSwitchEnabled ? 'OPTIMIZING' : 'SCANNING'}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Warmup Progress */}
+            {isWarmingUp && isRunning && (
+                <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-orange-400 font-medium">⏳ Calibrando Motor Quant...</span>
+                        <span className="text-xs text-orange-300 font-mono">{warmUpProgress.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-1.5 bg-black/40 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-500"
+                            style={{ width: `${warmUpProgress}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Opportunity Alert */}
+            {opportunityMessage && (
+                <div className="p-3 bg-gradient-to-r from-emerald-500/15 to-emerald-600/10 border border-emerald-500/30 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-emerald-400" />
+                        <span className="text-sm text-emerald-300 font-medium">{opportunityMessage}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Log Status Auto-Switch */}
+            {autoSwitchEnabled && isRunning && !isWarmingUp && (
+                <div className="px-3 py-2 bg-[#1A1D26] rounded-lg border border-white/5 flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400 font-mono">LÍDER ACTUAL:</span>
+                    {leaderAsset ? (
+                        <span className="text-xs font-bold text-amber-400 font-mono flex items-center gap-1">
+                            <Trophy size={10} /> {assetStates[leaderAsset].displayName} ({assetStates[leaderAsset].score.total} pts)
+                        </span>
+                    ) : (
+                        <span className="text-xs font-bold text-gray-500 font-mono">Buscando...</span>
+                    )}
+                </div>
+            )}
+
+            {/* ASSET GRID - MOBILE OPTIMIZED */}
+            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2">
+                {symbols.map(symbol => {
+                    const asset = assetStates[symbol];
+                    if (!asset) return null; // Safety check
+                    const isLeader = leaderAsset === symbol && autoSwitchEnabled;
+                    const isActive = activeAsset === symbol;
+                    const score = asset.score.total;
+
+                    // Colors based on score
+                    let scoreColor = 'text-gray-400';
+                    let barColor = 'bg-gray-600';
+
+                    if (score >= 75) {
+                        scoreColor = 'text-[#00FF88]';
+                        barColor = 'bg-[#00FF88]';
+                    } else if (score >= 50) {
+                        scoreColor = 'text-yellow-400';
+                        barColor = 'bg-yellow-400';
+                    } else {
+                        scoreColor = 'text-red-400';
+                        barColor = 'bg-red-400';
+                    }
+
+                    if (isLeader) {
+                        scoreColor = 'text-amber-400';
+                        barColor = 'bg-amber-400';
+                    }
+
+                    return (
+                        <div key={symbol} className={`
+                            relative flex flex-col p-2.5 rounded-xl border transition-all duration-300
+                            ${isLeader
+                                ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] transform scale-[1.02] z-10'
+                                : isActive
+                                    ? 'bg-[#00FF88]/10 border-[#00FF88]/30'
+                                    : 'bg-[#111625] border-white/5 hover:border-white/10'
+                            }
+                        `}>
+                            {/* Header */}
+                            <div className="flex justify-between items-start mb-2">
+                                <span className={`text-xs font-bold font-mono ${isLeader ? 'text-amber-400' : 'text-gray-300'}`}>
+                                    {asset.displayName}
+                                </span>
+                                {isLeader && <Trophy size={10} className="text-amber-400" />}
+                            </div>
+
+                            {/* Score Big Display */}
+                            <div className="flex items-end gap-1 mb-2">
+                                <span className={`text-2xl font-black ${scoreColor} leading-none`}>
+                                    {score}
+                                </span>
+                                <span className="text-[9px] text-gray-500 font-mono mb-0.5">%</span>
+                            </div>
+
+                            {/* Mini Bars */}
+                            <div className="flex items-center gap-0.5 h-1 w-full bg-black/40 rounded-full overflow-hidden mb-2">
+                                <div className={`h-full transition-all duration-500 rounded-full ${barColor}`} style={{ width: `${score}%` }} />
+                            </div>
+
+                            {/* Metrics Mini */}
+                            <div className="grid grid-cols-3 gap-0.5 text-[8px] text-gray-500 font-mono opacity-80">
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Entropía">
+                                    E:{asset.score.entropy}
+                                </div>
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Volatilidad">
+                                    V:{asset.score.volatility}
+                                </div>
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Clusters">
+                                    C:{asset.score.clusters}
+                                </div>
+                            </div>
+
+                            {/* Status Overlay for Firing */}
+                            {asset.status === 'firing' && (
+                                <div className="absolute inset-0 bg-amber-500/20 backdrop-blur-[1px] rounded-xl flex items-center justify-center border-2 border-amber-500 animate-pulse">
+                                    <span className="text-xs font-black text-amber-300 uppercase tracking-widest">FIRE</span>
+                                </div>
+                            )}
+
+
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 // Enhanced Progress Bar with Glow
 const ProgressBar = ({ value, color, glowColor, height = "h-1.5" }: { value: number, color: string, glowColor: string, height?: string }) => (
@@ -45,7 +247,23 @@ interface AstronPanelProps {
 
 export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, onBack }) => {
     const { isConnected, account } = useDeriv();
-    const { isRunning, stats, logs, recentTicks, startBot, stopBot } = useBotAstron();
+    const {
+        isRunning,
+        stats,
+        logs,
+        recentTicks,
+        startBot,
+        stopBot,
+        // Multi-asset specific
+        assetStates,
+        activeAsset,
+        leaderAsset, // NEW leaderAsset from hook
+        opportunityMessage,
+        isWarmingUp,
+        warmUpProgress,
+        SCANNER_SYMBOLS,
+        SYMBOL_NAMES
+    } = useBotAstron();
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
     // Freemium limiter
@@ -58,7 +276,11 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const [stopLoss, setStopLoss] = useState<string>('50.00');
     const [takeProfit, setTakeProfit] = useState<string>('50.00');
     const [useMartingale, setUseMartingale] = useState<boolean>(true);
-    const [maxGale, setMaxGale] = useState<string>('3'); // Default Max Gale 3
+    const [maxGale, setMaxGale] = useState<string>('3');
+    const [martingaleFactor, setMartingaleFactor] = useState<string>('2.5'); // NEW: Configurable factor
+    const [autoSwitch, setAutoSwitch] = useState<boolean>(true); // NEW Auto-Switch State
+    const [assertivityLevel, setAssertivityLevel] = useState<'conservative' | 'balanced' | 'aggressive'>('aggressive'); // Default to aggressive for more signals
+    const [vaultTarget, setVaultTarget] = useState<string>('3.00');
 
     // Auto-scroll logs
     useEffect(() => {
@@ -86,7 +308,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const handleToggleBot = () => {
         if (isRunning) {
             stopBot();
-            toast.info('Astron Bot detenido');
+            toast.info('Bug Deriv Scanner detenido');
         } else {
             if (!isConnected) {
                 toast.error('Primero debe conectar su cuenta Deriv');
@@ -111,6 +333,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             const stopLossVal = parseFloat(stopLoss);
             const takeProfitVal = parseFloat(takeProfit);
             const maxGaleVal = parseInt(maxGale);
+            const vaultTargetVal = parseFloat(vaultTarget);
 
             if (isNaN(stakeVal) || stakeVal <= 0) {
                 toast.error('Stake inválido');
@@ -129,17 +352,26 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 return;
             }
 
+            // Map assertivity level to minScore (lowered for more signals)
+            const minScoreMap = { conservative: 70, balanced: 55, aggressive: 40 };
+            const minScore = minScoreMap[assertivityLevel];
+            const martingaleFactorVal = parseFloat(martingaleFactor) || 2.5;
+
             const success = startBot({
                 stake: stakeVal,
                 stopLoss: stopLossVal,
                 takeProfit: takeProfitVal,
-                symbol: 'R_10',
                 useMartingale: useMartingale,
                 maxMartingaleLevel: maxGaleVal,
+                martingaleFactor: martingaleFactorVal,
+                vaultEnabled: true,
+                vaultTarget: vaultTargetVal,
+                autoSwitchEnabled: autoSwitch,
+                minScore: minScore
             });
 
             if (success) {
-                toast.success('Astron Bot iniciado');
+                toast.success('🚀 Bug Deriv Scanner iniciado - Escaneando 5 activos');
             }
         }
     };
@@ -151,8 +383,9 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const totalOps = stats.wins + stats.losses;
 
     return (
-        <div className="min-h-screen bg-transparent text-white p-3 sm:p-6 font-sans">
+        <div className="min-h-screen bg-transparent text-white p-3 pt-20 sm:p-6 font-sans">
             <div className="max-w-[1600px] mx-auto px-2 sm:px-4">
+                {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 bg-[#0B0E14]/50 p-3 sm:p-4 rounded-2xl border border-white/5 backdrop-blur-md gap-3 sm:gap-0">
                     <div className="flex items-center gap-3 sm:gap-4">
                         <div className="relative group">
@@ -163,10 +396,10 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                         </div>
                         <div>
                             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase">
-                                BUG DERIV
+                                BUG DERIV SCANNER
                             </h1>
                             <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-[0.15em] sm:tracking-[0.2em] font-mono font-bold">
-                                Sistema de Control v3.0
+                                Multi-Asset Opportunity Scanner v4.0
                             </p>
                         </div>
                     </div>
@@ -181,39 +414,106 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                         </div>
                         <div className={`px-4 py-2 rounded-lg border ${isRunning ? 'bg-[#00E5FF]/10 border-[#00E5FF] text-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.3)]' : 'bg-gray-800 border-gray-700 text-gray-400'} flex items-center gap-2 text-xs font-bold font-mono transition-all duration-300`}>
                             <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-[#00E5FF] animate-ping' : 'bg-gray-500'}`}></div>
-                            {isRunning ? 'SISTEMA ACTIVO' : 'SISTEMA EN REPOSO'}
+                            {isRunning ? 'ESCANEANDO 5 ACTIVOS' : 'SISTEMA EN REPOSO'}
                         </div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
 
-                    {/* LEFT COLUMN: Controls & Key Stats */}
-                    <div className="lg:col-span-4 flex flex-col gap-6">
+                    {/* LEFT COLUMN: Controls & Key Stats - FIRST ON MOBILE */}
+                    <div className="lg:col-span-4 flex flex-col gap-3 lg:gap-4 order-1">
+
+                        {/* SCANNING MODE & ASSERTIVITY CONTROLS */}
+                        <div className="bg-[#0B0E14] rounded-xl p-4 border border-white/5">
+                            {/* Auto-Switch Toggle */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <BrainCircuit size={16} className="text-amber-400" />
+                                    <span className="text-sm font-bold text-white font-mono">Selección Inteligente</span>
+                                </div>
+                                <div
+                                    onClick={() => !isRunning && setAutoSwitch(!autoSwitch)}
+                                    className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${autoSwitch ? 'bg-amber-500' : 'bg-gray-700'} ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${autoSwitch ? 'left-5' : 'left-0.5'}`} />
+                                </div>
+                            </div>
+
+                            {/* Assertivity Level Selector */}
+                            <div className="flex flex-col gap-2">
+                                <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Nivel de Assertividad</span>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    {(['conservative', 'balanced', 'aggressive'] as const).map(level => (
+                                        <button
+                                            key={level}
+                                            onClick={() => !isRunning && setAssertivityLevel(level)}
+                                            disabled={isRunning}
+                                            className={`px-2 py-1.5 rounded-lg text-[10px] font-bold font-mono uppercase transition-all border
+                                                ${assertivityLevel === level
+                                                    ? level === 'conservative'
+                                                        ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                                        : level === 'balanced'
+                                                            ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                                            : 'bg-red-500/20 border-red-500 text-red-400'
+                                                    : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:border-gray-600'
+                                                }
+                                                ${isRunning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                                            `}
+                                        >
+                                            {level === 'conservative' ? '🛡️ Seguro' : level === 'balanced' ? '⚖️ Medio' : '🎯 Agresivo'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="text-[9px] text-gray-600 font-mono">
+                                    {assertivityLevel === 'conservative' ? 'Score mínimo: 70% (Mayor precisión)' :
+                                        assertivityLevel === 'balanced' ? 'Score mínimo: 55% (Equilibrado)' :
+                                            'Score mínimo: 40% (Máximas señales)'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* FLEET MONITOR - REPLACES RADAR PANEL */}
+                        <FleetMonitor
+                            assetStates={assetStates}
+                            activeAsset={activeAsset}
+                            leaderAsset={leaderAsset}
+                            isRunning={isRunning}
+                            isWarmingUp={isWarmingUp}
+                            warmUpProgress={warmUpProgress}
+                            opportunityMessage={opportunityMessage}
+                            autoSwitchEnabled={autoSwitch}
+                        />
 
                         {/* Market Result (Overview) */}
                         <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-6 relative flex flex-col justify-between group overflow-hidden transition-all duration-500 border border-white/5 hover:border-[#00E5FF]/30">
                             {/* Ambient Background Glow */}
-                            <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#00E5FF]/10 blur-[80px] rounded-full pointer-events-none"></div>
+
+
 
                             <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div className="flex items-center gap-2">
                                     <Terminal size={18} className="text-[#00E5FF]" />
-                                    <h3 className="text-white font-bold text-sm tracking-wide font-mono">RESULTADO</h3>
+                                    <h3 className="text-white font-bold text-sm tracking-wide font-mono">RESULTADO GLOBAL</h3>
                                 </div>
                                 <ShieldAlert size={14} className="text-gray-500 cursor-pointer hover:text-white transition-colors" />
                             </div>
 
                             <div className="text-center mb-6 relative z-10">
                                 <p className="text-[11px] font-bold text-gray-400 tracking-widest uppercase mb-1">Beneficio Total</p>
-                                <div className={`text-4xl font-black flex items-center justify-center gap-2 ${stats.totalProfit >= 0 ? 'text-[#00E5FF] drop-shadow-[0_0_15px_rgba(0,229,255,0.6)]' : 'text-[#FF3D00] drop-shadow-[0_0_15px_rgba(255,61,0,0.6)]'} transition-all duration-300 scale-100`}>
+                                <div className={`text-4xl font-black flex items-center justify-center gap-2 ${stats.totalProfit >= 0 ? 'text-[#00FF88]' : 'text-[#FF3D00]'} transition-all duration-300 scale-100`}>
                                     {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)} <span className="text-lg opacity-50">$</span>
                                 </div>
-                                <div className="flex justify-center mt-2">
-                                    <span className="text-[10px] bg-white/5 px-3 py-0.5 rounded-full text-gray-400 font-mono border border-white/5">
-                                        RENDIMIENTO: {totalOps > 0 ? ((stats.totalProfit / (totalOps * parseFloat(stake || '1'))) * 100).toFixed(2) : '0.00'}%
-                                    </span>
-                                </div>
+                                {/* Vault Progress */}
+                                {stats.vaultAccumulated !== undefined && stats.vaultAccumulated > 0 && (
+                                    <div className="mt-2 flex items-center justify-center gap-2">
+                                        <span className="text-[9px] text-amber-400 font-mono">🏦 BÓVEDA:</span>
+                                        <span className="text-xs text-amber-300 font-bold">${stats.vaultAccumulated.toFixed(2)}</span>
+                                        {stats.vaultCycles !== undefined && stats.vaultCycles > 0 && (
+                                            <span className="text-[9px] text-amber-400/60">({stats.vaultCycles} ciclos)</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-3 gap-3 mb-2 relative z-10">
@@ -221,12 +521,12 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                 <div className="flex flex-col items-center group/item">
                                     <div className="bg-[#111625]/80 backdrop-blur-sm rounded-xl p-3 w-full border border-gray-800 relative overflow-hidden group-hover/item:border-[#00E5FF]/30 transition-all duration-300 shadow-lg">
                                         <div className="text-center mb-1">
-                                            <span className="text-xl font-bold text-[#00E5FF]">{stats.wins}</span>
+                                            <span className="text-xl font-bold text-[#00FF88]">{stats.wins}</span>
                                         </div>
                                         <ProgressBar
                                             value={totalOps > 0 ? (stats.wins / totalOps) * 100 : 0}
-                                            color="#00E5FF"
-                                            glowColor="rgba(0, 229, 255, 0.5)"
+                                            color="#00FF88"
+                                            glowColor="rgba(0, 255, 136, 0.5)"
                                         />
                                     </div>
                                     <span className="text-[10px] text-gray-400 mt-2 font-bold tracking-wider uppercase font-mono">Ganadas</span>
@@ -264,14 +564,14 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                             </div>
                         </div>
 
-                        {/* Strategy Configuration */}
-                        <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-6 flex flex-col shadow-2xl transition-transform hover:scale-[1.005] duration-300 border-t border-t-[#00E5FF]/10 border border-white/5">
-                            <div className="flex items-center gap-2 mb-6">
-                                <Code size={18} className="text-[#00E5FF]" />
-                                <h3 className="text-white font-bold text-sm tracking-wide font-mono">CONFIGURACIÓN</h3>
+                        {/* Strategy Configuration - MOBILE OPTIMIZED */}
+                        <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-xl lg:rounded-2xl p-4 lg:p-6 flex flex-col shadow-2xl transition-transform hover:scale-[1.005] duration-300 border-t border-t-[#00E5FF]/10 border border-white/5">
+                            <div className="flex items-center gap-2 mb-4 lg:mb-6">
+                                <Code size={16} className="text-[#00E5FF]" />
+                                <h3 className="text-white font-bold text-xs lg:text-sm tracking-wide font-mono">CONFIGURACIÓN</h3>
                             </div>
 
-                            <div className="flex-1 space-y-6">
+                            <div className="flex-1 space-y-4 lg:space-y-6">
                                 <div>
                                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block pl-1 font-mono">Apuesta Inicial ($)</label>
                                     <div className="relative group">
@@ -282,11 +582,11 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                             value={stake}
                                             onChange={(e) => setStake(e.target.value)}
                                             disabled={isRunning}
-                                            className="w-full bg-[#05050F] border border-gray-800 rounded-xl py-4 pl-8 pr-4 text-white font-mono text-lg font-bold focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF]/50 focus:outline-none transition-all disabled:opacity-50 shadow-inner"
+                                            className="w-full bg-[#05050F] border border-gray-800 rounded-xl py-3 lg:py-4 pl-8 pr-4 text-white font-mono text-base lg:text-lg font-bold focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF]/50 focus:outline-none transition-all disabled:opacity-50 shadow-inner"
                                         />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                                <div className="grid grid-cols-2 gap-3 lg:gap-6">
                                     <div>
                                         <label className="text-[10px] text-[#FF782C] font-bold uppercase tracking-wider mb-2 block pl-1 font-mono">Límite de Pérdida ($)</label>
                                         <div className="relative">
@@ -313,6 +613,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     </div>
                                 </div>
 
+
+
                                 <div className="bg-[#0B0E14] rounded-xl p-5 border border-gray-800 hover:border-gray-700 transition-colors shadow-inner">
                                     <div className="flex items-center justify-between mb-3">
                                         <span className="text-sm font-bold text-white font-mono">Protocolo Martingala</span>
@@ -324,19 +626,51 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                         </div>
                                     </div>
                                     {useMartingale && (
-                                        <div className="mt-3 pt-3 border-t border-gray-800">
-                                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block font-mono">Max Gale (Niveles)</label>
-                                            <input
-                                                type="number"
-                                                value={maxGale}
-                                                onChange={(e) => setMaxGale(e.target.value)}
-                                                disabled={isRunning}
-                                                className="w-full bg-[#05050F] border border-gray-800 rounded-lg py-2 px-3 text-white font-mono text-sm focus:border-[#00E5FF] focus:outline-none transition-all disabled:opacity-50"
-                                            />
+                                        <div className="mt-3 pt-3 border-t border-gray-800 space-y-3">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block font-mono">Max Gale (Niveles)</label>
+                                                <input
+                                                    type="number"
+                                                    value={maxGale}
+                                                    onChange={(e) => setMaxGale(e.target.value)}
+                                                    disabled={isRunning}
+                                                    className="w-full bg-[#05050F] border border-gray-800 rounded-lg py-2 px-3 text-white font-mono text-sm focus:border-[#00E5FF] focus:outline-none transition-all disabled:opacity-50"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 block font-mono">Factor Multiplicador</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    min="1.5"
+                                                    max="15"
+                                                    value={martingaleFactor}
+                                                    onChange={(e) => setMartingaleFactor(e.target.value)}
+                                                    disabled={isRunning}
+                                                    className="w-full bg-[#05050F] border border-gray-800 rounded-lg py-2 px-3 text-white font-mono text-sm focus:border-[#00E5FF] focus:outline-none transition-all disabled:opacity-50"
+                                                />
+                                                <p className="text-[9px] text-gray-500 mt-1 font-mono">Ej: 2.5 = dobla + 50%. 11 = payout DIFF</p>
+                                            </div>
                                         </div>
                                     )}
                                     <p className="text-[11px] text-gray-500 leading-relaxed opacity-80 font-mono mt-3">
-                                        Auto-recuperación: Doblar apuesta tras pérdida para forzar recuperación.
+                                        Factor configurable. Stake inicial: ${stake}
+                                    </p>
+                                </div>
+
+                                {/* Vault Target */}
+                                <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20">
+                                    <label className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-2 block font-mono">🏦 Meta Bóveda ($)</label>
+                                    <input
+                                        type="number"
+                                        step="0.50"
+                                        value={vaultTarget}
+                                        onChange={(e) => setVaultTarget(e.target.value)}
+                                        disabled={isRunning}
+                                        className="w-full bg-[#05050F] border border-amber-500/20 rounded-lg py-2 px-3 text-amber-300 font-mono text-sm focus:border-amber-400 focus:outline-none transition-all disabled:opacity-50"
+                                    />
+                                    <p className="text-[10px] text-amber-400/60 mt-2 font-mono">
+                                        Acumula ganancias de todos los activos.
                                     </p>
                                 </div>
 
@@ -344,38 +678,61 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <div className="flex justify-between items-center">
                                         <span className="text-xs text-gray-400 font-medium font-mono">Estrategia</span>
                                         <button className="text-[10px] font-bold text-[#00E5FF] bg-[#00E5FF]/10 px-3 py-1.5 rounded-lg border border-[#00E5FF]/20 hover:bg-[#00E5FF]/20 transition-colors font-mono tracking-wide">
-                                            MEAN REVERSION
+                                            SHADOW + INERTIA
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Start/Stop Button - MOBILE OPTIMIZED */}
+                        <button
+                            onClick={handleToggleBot}
+                            disabled={!isConnected}
+                            className={`w-full py-3 lg:py-4 rounded-xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${isRunning
+                                ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30'
+                                : 'bg-gradient-to-r from-[#00E5FF] to-[#00D1FF] text-black hover:shadow-[0_0_30px_rgba(0,229,255,0.4)]'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                            {isRunning ? (
+                                <>
+                                    <Square fill="currentColor" size={16} />
+                                    DETENER SCANNER
+                                </>
+                            ) : (
+                                <>
+                                    <Radar size={18} />
+                                    INICIAR BUG DERIV SCANNER
+                                </>
+                            )}
+                        </button>
                     </div>
 
-                    {/* RIGHT COLUMN: Data & Logs */}
-                    <div className="lg:col-span-8 flex flex-col gap-6">
+                    {/* RIGHT COLUMN: Data & Logs - SECOND ON MOBILE */}
+                    <div className="lg:col-span-8 flex flex-col gap-4 lg:gap-6 order-2">
 
-                        {/* Top Row: Tick & Bots */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Top Row: Tick & Bots - MOBILE OPTIMIZED */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
                             {/* Tick Analysis Card */}
-                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-0 overflow-hidden flex flex-col relative group border border-white/5 shadow-2xl h-[380px] order-2 md:order-1">
-                                <div className="p-5 pb-3 flex justify-between items-center bg-[#111625] border-b border-white/5 z-20 relative">
+                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-xl lg:rounded-2xl p-0 overflow-hidden flex flex-col relative group border border-white/5 shadow-2xl h-[280px] lg:h-[380px] order-2 md:order-1">
+                                <div className="p-3 lg:p-5 pb-2 lg:pb-3 flex justify-between items-center bg-[#111625] border-b border-white/5 z-20 relative">
                                     <div className="flex items-center gap-2">
                                         <List size={16} className="text-[#00E5FF]" />
-                                        <h3 className="text-white font-bold text-sm tracking-wide font-mono">FLUJO DE DATOS</h3>
+                                        <h3 className="text-white font-bold text-sm tracking-wide font-mono">FLUJO MULTI-ACTIVO</h3>
                                     </div>
                                     <div className="flex gap-2">
                                         <div className="flex items-center gap-1.5 bg-[#00E5FF]/10 px-2 py-1 rounded-md border border-[#00E5FF]/20">
                                             <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse"></span>
-                                            <span className="text-[10px] text-[#00E5FF] font-bold tracking-wider font-mono">EN VIVO</span>
+                                            <span className="text-[10px] text-[#00E5FF] font-bold tracking-wider font-mono">5 FEEDS</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Table Header */}
-                                <div className="grid grid-cols-3 px-6 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-[#0B0E14] z-10 font-mono">
+                                <div className="grid grid-cols-4 px-6 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-[#0B0E14] z-10 font-mono">
+                                    <div>Activo</div>
                                     <div>Precio / Dígito</div>
-                                    <div className="text-center">Señal</div>
+                                    <div className="text-center">Estado</div>
                                     <div className="text-right">Cambio</div>
                                 </div>
 
@@ -390,19 +747,29 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <div className="flex flex-col">
                                         {recentTicks.map((tick, index) => (
                                             <div key={tick.id} className={`
-                                            grid grid-cols-3 px-6 py-2.5 border-b border-white/[0.03] items-center 
+                                            grid grid-cols-4 px-6 py-2.5 border-b border-white/[0.03] items-center 
                                             transition-all duration-500 font-mono
                                             ${index === 0 ? 'bg-[#00E5FF]/5 animate-enter-row border-l-2 border-l-[#00E5FF]' : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'}
                                         `}>
+                                                {/* Symbol */}
+                                                <div className="text-xs font-bold text-white/60">
+                                                    {tick.symbol ? SYMBOL_NAMES[tick.symbol] : '---'}
+                                                </div>
+                                                {/* Price */}
                                                 <div className={`text-sm font-medium ${tick.isUp ? 'text-[#2F80ED]' : 'text-red-500'} flex items-baseline gap-1`}>
                                                     <span className="opacity-60 text-xs tracking-tighter">{tick.price.slice(0, -1)}</span>
                                                     <span className={`text-base font-bold ${tick.isUp ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-red-400'}`}>{tick.price.slice(-1)}</span>
                                                 </div>
+                                                {/* Signal/Status */}
                                                 <div className="text-center">
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${index === 0 ? 'bg-white/10 text-white' : 'text-gray-500 opacity-60'}`}>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${tick.signal?.includes('FIRING') ? 'bg-amber-500/20 text-amber-300' :
+                                                        tick.signal?.includes('FORMING') ? 'bg-yellow-500/20 text-yellow-300' :
+                                                            index === 0 ? 'bg-white/10 text-white' : 'text-gray-500 opacity-60'
+                                                        }`}>
                                                         {tick.signal}
                                                     </span>
                                                 </div>
+                                                {/* Change */}
                                                 <div className={`text-right text-xs font-bold ${tick.change.startsWith('+') ? 'text-[#00E5FF]' : 'text-[#FF3D00]'}`}>
                                                     {tick.change}
                                                 </div>
@@ -414,13 +781,13 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                 </div>
                             </div>
 
-                            {/* Active Bots Card */}
-                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-6 flex flex-col relative overflow-hidden shadow-2xl h-[380px] border border-white/5 order-1 md:order-2">
+                            {/* Active Bot Status Card - MOBILE OPTIMIZED */}
+                            <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-xl lg:rounded-2xl p-4 lg:p-6 flex flex-col relative overflow-hidden shadow-2xl h-[280px] lg:h-[380px] border border-white/5 order-1 md:order-2">
                                 {/* Background Effect - Moving Gradient */}
-                                <div className="absolute top-0 right-0 w-48 h-48 bg-[#00E5FF]/10 rounded-full blur-[60px] -mr-10 -mt-10 animate-pulse-glow"></div>
+                                <div className="absolute top-0 right-0 w-32 lg:w-48 h-32 lg:h-48 bg-[#00E5FF]/10 rounded-full blur-[60px] -mr-10 -mt-10 animate-pulse-glow"></div>
 
-                                <div className="flex justify-between items-center mb-6 relative z-10">
-                                    <h3 className="text-gray-400 font-bold text-sm tracking-wide font-mono">BOT ACTIVO</h3>
+                                <div className="flex justify-between items-center mb-4 lg:mb-6 relative z-10">
+                                    <h3 className="text-gray-400 font-bold text-xs lg:text-sm tracking-wide font-mono">SCANNER ACTIVO</h3>
                                     <span className="flex h-3 w-3 relative">
                                         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isRunning ? 'bg-green-400 opacity-75' : 'bg-gray-500 opacity-20'}`}></span>
                                         <span className={`relative inline-flex rounded-full h-3 w-3 ${isRunning ? 'bg-green-500' : 'bg-gray-600'}`}></span>
@@ -433,18 +800,28 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                         <div className="flex justify-between items-start mb-2 pl-2">
                                             <div className="flex items-center gap-3">
                                                 <div className="p-2.5 bg-[#00E5FF]/10 rounded-xl border border-[#00E5FF]/20">
-                                                    <Bug className="text-[#00E5FF]" size={22} />
+                                                    <Radar className="text-[#00E5FF]" size={22} />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-black text-white text-base tracking-tight font-mono">BUG DERIV</h4>
-                                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5 font-mono">ESTRATEGIA: MEAN REVERSION</p>
+                                                    <h4 className="font-black text-white text-base tracking-tight font-mono">BUG DERIV SCANNER</h4>
+                                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5 font-mono">
+                                                        {isRunning ? (
+                                                            activeAsset ?
+                                                                `ACTIVO: ${SYMBOL_NAMES[activeAsset]}` :
+                                                                leaderAsset && autoSwitch ?
+                                                                    `LÍDER: ${SYMBOL_NAMES[leaderAsset]} (Optimizando)` :
+                                                                    'ESCANEANDO 5 ACTIVOS'
+                                                        ) : (
+                                                            autoSwitch ? 'SHADOW + INERTIA + QUANT SCORE' : 'SHADOW MODE + INERTIA FILTER'
+                                                        )}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="flex items-center justify-between mt-5 pl-2">
                                             <div className="flex flex-col">
-                                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5 font-mono">Ganancia Sesión</span>
+                                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5 font-mono">Ganancia Global</span>
                                                 <span className={`text-base font-black ${stats.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'} font-mono`}>
                                                     {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)}
                                                 </span>
@@ -476,20 +853,38 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <div className="bg-[#0B0E14]/30 rounded-xl p-3 border border-gray-800/50 flex items-center justify-between opacity-50 hover:opacity-100 transition-opacity cursor-not-allowed grayscale">
                                         <div className="flex items-center gap-3">
                                             <Layers className="text-gray-400" size={18} />
-                                            <span className="text-sm text-gray-400 font-medium font-mono">Protección de Balance</span>
+                                            <span className="text-sm text-gray-400 font-medium font-mono">Bóveda Global</span>
                                         </div>
-                                        <span className="text-[9px] border border-gray-700 rounded px-1.5 py-0.5 text-gray-500 font-bold uppercase font-mono">Activado</span>
+                                        <span className="text-[9px] border border-gray-700 rounded px-1.5 py-0.5 text-gray-500 font-bold uppercase font-mono">Activo</span>
+                                    </div>
+
+                                    {/* Asset Quick Status */}
+                                    <div className="grid grid-cols-5 gap-1 mt-2">
+                                        {SCANNER_SYMBOLS.map(symbol => {
+                                            const asset = assetStates[symbol];
+                                            return (
+                                                <div
+                                                    key={symbol}
+                                                    className={`text-center py-1.5 rounded-lg text-[9px] font-mono font-bold transition-all ${asset.status === 'firing' ? 'bg-amber-500/20 text-amber-300 animate-pulse' :
+                                                        asset.status === 'forming' ? 'bg-yellow-500/10 text-yellow-400' :
+                                                            'bg-white/5 text-gray-500'
+                                                        }`}
+                                                >
+                                                    {SYMBOL_NAMES[symbol]}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Bottom Row: Live Activity */}
-                        <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-6 flex flex-col h-[400px] shadow-2xl border border-white/5">
-                            <div className="flex justify-between items-center mb-6">
+                        {/* Bottom Row: Live Activity - MOBILE OPTIMIZED */}
+                        <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-xl lg:rounded-2xl p-4 lg:p-6 flex flex-col h-[280px] lg:h-[400px] shadow-2xl border border-white/5">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 lg:mb-6">
                                 <div className="flex items-center gap-2">
-                                    <Terminal size={18} className="text-[#00E5FF]" />
-                                    <h3 className="text-white font-bold text-sm tracking-wide font-mono">REGISTRO DEL SISTEMA</h3>
+                                    <Terminal size={16} className="text-[#00E5FF]" />
+                                    <h3 className="text-white font-bold text-xs lg:text-sm tracking-wide font-mono">REGISTRO</h3>
                                 </div>
                                 <div className="flex gap-8 text-[10px] font-bold text-gray-400 tracking-wider bg-[#0B0E14] px-4 py-1.5 rounded-lg border border-white/5 font-mono">
                                     <span className="hidden sm:block w-20 text-gray-500">HORA</span>
@@ -511,29 +906,31 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     return (
                                         <div key={log.id} className={`animate-enter-log group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-300 hover:scale-[1.01] ${log.type === 'success' ? 'bg-[#00E5FF]/5 border-[#00E5FF]/20 shadow-[0_0_10px_rgba(0,229,255,0.05)]' :
                                             log.type === 'error' ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_10px_rgba(255,61,0,0.05)]' :
-                                                'bg-[#0B0E14]/50 border-gray-800 hover:bg-[#0B0E14]'
+                                                log.type === 'gold' ? 'bg-amber-500/5 border-amber-500/20 shadow-[0_0_10px_rgba(251,191,36,0.05)]' :
+                                                    'bg-[#0B0E14]/50 border-gray-800 hover:bg-[#0B0E14]'
                                             }`}>
                                             <div className="flex items-center gap-4 flex-1">
                                                 <div className={`p-2 rounded-lg shrink-0 ${log.type === 'success' ? 'bg-[#00E5FF]/10 text-[#00E5FF]' :
                                                     log.type === 'error' ? 'bg-red-500/10 text-red-500' :
-                                                        'bg-blue-500/10 text-blue-400'
+                                                        log.type === 'gold' ? 'bg-amber-500/10 text-amber-400' :
+                                                            'bg-blue-500/10 text-blue-400'
                                                     }`}>
                                                     {log.type === 'success' ? <ArrowUpRight size={18} strokeWidth={3} /> :
                                                         log.type === 'error' ? <ArrowDownRight size={18} strokeWidth={3} /> :
-                                                            <Code size={18} />}
+                                                            log.type === 'gold' ? <Sparkles size={18} /> :
+                                                                <Code size={18} />}
                                                 </div>
                                                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-6 flex-1">
                                                     <span className="text-[10px] font-mono text-gray-400 w-20 shrink-0 opacity-70">{log.time}</span>
                                                     <div className="flex-1">
-                                                        <h4 className={`text-xs font-bold tracking-wide font-mono ${log.type === 'success' ? 'text-white' : log.type === 'error' ? 'text-white' : 'text-gray-300'}`}>{log.message}</h4>
+                                                        <h4 className={`text-xs font-bold tracking-wide font-mono ${log.type === 'success' ? 'text-white' : log.type === 'error' ? 'text-white' : log.type === 'gold' ? 'text-amber-200' : 'text-gray-300'}`}>{log.message}</h4>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="text-right w-24 shrink-0">
-                                                {/* Check if message contains profit info to display here, or leave as status */}
-                                                <span className={`font-mono font-black text-sm ${log.type === 'success' ? 'text-[#00E5FF]' : log.type === 'error' ? 'text-[#FF3D00]' : 'text-gray-500'}`}>
-                                                    {log.type === 'success' ? 'WIN' : log.type === 'error' ? 'LOSS' : 'INFO'}
+                                                <span className={`font-mono font-black text-sm ${log.type === 'success' ? 'text-[#00E5FF]' : log.type === 'error' ? 'text-[#FF3D00]' : log.type === 'gold' ? 'text-amber-400' : 'text-gray-500'}`}>
+                                                    {log.type === 'success' ? 'WIN' : log.type === 'error' ? 'LOSS' : log.type === 'gold' ? '⭐' : 'INFO'}
                                                 </span>
                                             </div>
                                         </div>
