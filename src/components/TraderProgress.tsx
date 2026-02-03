@@ -43,31 +43,42 @@ const TraderProgress: React.FC<TraderProgressProps> = ({ className }) => {
             if (user) {
                 setUserId(user.id);
 
-                // Try to load from Supabase
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('onboarding_progress')
-                    .eq('id', user.id)
-                    .single();
+                // Try to load from Supabase (wrapped in try-catch to handle missing column)
+                try {
+                    const { data: profile, error } = await supabase
+                        .from('profiles')
+                        .select('onboarding_progress')
+                        .eq('id', user.id)
+                        .single();
 
-                if (profile?.onboarding_progress) {
-                    const supabaseProgress = profile.onboarding_progress as number[];
-                    // Merge local and supabase progress (use the one with more items)
-                    const localParsed = localProgress ? JSON.parse(localProgress) : [];
-                    const mergedProgress = supabaseProgress.length >= localParsed.length
-                        ? supabaseProgress
-                        : localParsed;
-
-                    setWatchedLessons(mergedProgress);
-                    localStorage.setItem('academy_watched', JSON.stringify(mergedProgress));
-
-                    // If local has more, sync to supabase
-                    if (localParsed.length > supabaseProgress.length) {
-                        await supabase
-                            .from('profiles')
-                            .update({ onboarding_progress: localParsed })
-                            .eq('id', user.id);
+                    // If column doesn't exist, silently fail and use localStorage only
+                    if (error && error.message.includes('column')) {
+                        console.warn('onboarding_progress column not found, using localStorage only');
+                        return;
                     }
+
+                    if (profile?.onboarding_progress) {
+                        const supabaseProgress = profile.onboarding_progress as number[];
+                        // Merge local and supabase progress (use the one with more items)
+                        const localParsed = localProgress ? JSON.parse(localProgress) : [];
+                        const mergedProgress = supabaseProgress.length >= localParsed.length
+                            ? supabaseProgress
+                            : localParsed;
+
+                        setWatchedLessons(mergedProgress);
+                        localStorage.setItem('academy_watched', JSON.stringify(mergedProgress));
+
+                        // If local has more, sync to supabase
+                        if (localParsed.length > supabaseProgress.length) {
+                            await supabase
+                                .from('profiles')
+                                .update({ onboarding_progress: localParsed })
+                                .eq('id', user.id);
+                        }
+                    }
+                } catch (syncError) {
+                    console.warn('Could not sync onboarding progress with Supabase:', syncError);
+                    // Continue with localStorage data
                 }
             }
         } catch (error) {

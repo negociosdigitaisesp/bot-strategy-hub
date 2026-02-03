@@ -89,7 +89,7 @@ export const MandatoryWACapture = () => {
                 .from('profiles')
                 .update({
                     whatsapp_number: fullNumber,
-                    wa_status: 'pending_welcome'
+                    wa_status: 'pending_token'  // Changed from 'pending_welcome' to match constraint
                 })
                 .eq('id', user?.id);
 
