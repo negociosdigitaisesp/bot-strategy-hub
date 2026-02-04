@@ -23,7 +23,8 @@ import {
     Trophy,
     Lock,
     Crown,
-    Snowflake
+    Snowflake,
+    AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBotAstron, LogEntry, ScannerSymbol, AssetState } from '../../hooks/useBotAstron';
