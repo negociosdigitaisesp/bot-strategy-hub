@@ -35,6 +35,8 @@ export interface BotConfig {
     // Cooldown Config
     profitTarget?: number;
     maxConsecutiveLosses?: number;
+    // Anomaly Detection v3.0
+    anomalyOnlyMode?: boolean; // Only trade when anomaly is confirmed
 }
 
 export interface BotStats {
@@ -175,7 +177,8 @@ export const useBotAstron = () => {
             minScore: config.minScore,
             useSoros: config.useSoros,
             profitTarget: config.profitTarget,
-            maxConsecutiveLosses: config.maxConsecutiveLosses
+            maxConsecutiveLosses: config.maxConsecutiveLosses,
+            anomalyOnlyMode: config.anomalyOnlyMode
         });
     }, [scanner]);
 
@@ -203,6 +206,11 @@ export const useBotAstron = () => {
         isCoolingDown: scanner.isCoolingDown,
         cooldownTime: scanner.cooldownTime,
         cooldownReason: scanner.cooldownReason,
+
+        // Anomaly Detection States v3.0
+        isAnomalyDetected: scanner.isAnomalyDetected,
+        currentAutocorr: scanner.currentAutocorr,
+        ANOMALY_CONFIG: scanner.ANOMALY_CONFIG,
 
         // Actions
         startBot,

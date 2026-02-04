@@ -46,6 +46,9 @@ interface FleetMonitorProps {
     isCoolingDown: boolean;
     cooldownTime: number;
     cooldownReason: 'profit' | 'loss' | null;
+    // Anomaly Detection v3.0
+    isAnomalyDetected?: boolean;
+    currentAutocorr?: number;
 }
 
 const FleetMonitor: React.FC<FleetMonitorProps> = ({
@@ -59,7 +62,9 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
     autoSwitchEnabled,
     isCoolingDown,
     cooldownTime,
-    cooldownReason
+    cooldownReason,
+    isAnomalyDetected,
+    currentAutocorr
 }) => {
     const symbols: ScannerSymbol[] = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'];
 
@@ -142,6 +147,50 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
                             className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-500"
                             style={{ width: `${warmUpProgress}%` }}
                         />
+                    </div>
+                </div>
+            )}
+
+
+            {/* ANOMALY DETECTION INDICATOR v3.0 */}
+            {isRunning && !isWarmingUp && !isCoolingDown && currentAutocorr !== undefined && (
+                <div className={`p-3 rounded-xl border transition-all duration-500 ${isAnomalyDetected
+                    ? currentAutocorr < 0
+                        ? 'bg-gradient-to-r from-purple-500/20 to-violet-600/15 border-purple-500/40 animate-pulse'
+                        : 'bg-gradient-to-r from-red-500/15 to-orange-600/10 border-red-500/30'
+                    : 'bg-[#1A1D26] border-white/5'
+                    }`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className={`p-1.5 rounded-md ${isAnomalyDetected ? 'bg-purple-500/20' : 'bg-gray-700/30'
+                                }`}>
+                                <Activity size={14} className={
+                                    isAnomalyDetected
+                                        ? currentAutocorr < 0 ? 'text-purple-400' : 'text-orange-400'
+                                        : 'text-gray-500'
+                                } />
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 font-mono uppercase">AUTOCORR</span>
+                                <div className={`text-sm font-bold font-mono ${isAnomalyDetected
+                                    ? currentAutocorr < 0 ? 'text-purple-400' : 'text-orange-400'
+                                    : 'text-gray-500'
+                                    }`}>
+                                    {currentAutocorr >= 0 ? '+' : ''}{currentAutocorr.toFixed(3)}
+                                </div>
+                            </div>
+                        </div>
+
+                        {isAnomalyDetected ? (
+                            <div className={`px-2 py-1 rounded-full text-[9px] font-bold font-mono uppercase tracking-wide ${currentAutocorr < 0
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                                }`}>
+                                {currentAutocorr < 0 ? '📉 EDGE DETECTADO' : '⚠️ EVITAR'}
+                            </div>
+                        ) : (
+                            <span className="text-[9px] text-gray-500 font-mono">NEUTRAL</span>
+                        )}
                     </div>
                 </div>
             )}
@@ -303,7 +352,10 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         // Cooldown states
         isCoolingDown,
         cooldownTime,
-        cooldownReason
+        cooldownReason,
+        // Anomaly Detection v3.0
+        isAnomalyDetected,
+        currentAutocorr
     } = useBotAstron();
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -326,6 +378,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     // Cooldown Config States
     const [profitTarget, setProfitTarget] = useState<string>('3.00');
     const [maxLosses, setMaxLosses] = useState<string>('2');
+    // Anomaly Detection v3.0
+    const [anomalyOnlyMode, setAnomalyOnlyMode] = useState<boolean>(false);
 
     // Auto-scroll logs
     useEffect(() => {
@@ -433,7 +487,9 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 minScore: minScore,
                 // Cooldown Config
                 profitTarget: parseFloat(profitTarget) || 3.0,
-                maxConsecutiveLosses: parseInt(maxLosses) || 2
+                maxConsecutiveLosses: parseInt(maxLosses) || 2,
+                // Anomaly Detection v3.0
+                anomalyOnlyMode: anomalyOnlyMode
             };
 
             if (isFree) {
@@ -525,6 +581,23 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                 </div>
                             </div>
 
+                            {/* SOLO ANOMALÍA MODE TOGGLE v3.0 */}
+                            <div className="flex items-center justify-between mb-4 p-2 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                                <div className="flex items-center gap-2">
+                                    <Activity size={16} className={anomalyOnlyMode ? "text-purple-400" : "text-gray-500"} />
+                                    <div className="flex flex-col">
+                                        <span className={`text-xs font-bold font-mono ${anomalyOnlyMode ? 'text-purple-300' : 'text-gray-400'}`}>Solo Anomalía</span>
+                                        <span className="text-[8px] text-gray-500 font-mono">Solo opera con edge confirmado</span>
+                                    </div>
+                                </div>
+                                <div
+                                    onClick={() => !isRunning && setAnomalyOnlyMode(!anomalyOnlyMode)}
+                                    className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${anomalyOnlyMode ? 'bg-purple-500' : 'bg-gray-700'} ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${anomalyOnlyMode ? 'left-5' : 'left-0.5'}`} />
+                                </div>
+                            </div>
+
                             {/* Assertivity Level Selector */}
                             <div className="flex flex-col gap-2">
                                 <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Nivel de Assertividad</span>
@@ -571,6 +644,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                             isCoolingDown={isCoolingDown}
                             cooldownTime={cooldownTime}
                             cooldownReason={cooldownReason}
+                            isAnomalyDetected={isAnomalyDetected}
+                            currentAutocorr={currentAutocorr}
                         />
 
                         {/* Market Result (Overview) */}

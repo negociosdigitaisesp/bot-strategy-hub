@@ -11,6 +11,18 @@ import { toast } from 'sonner';
 export const SCANNER_SYMBOLS = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'] as const;
 export type ScannerSymbol = typeof SCANNER_SYMBOLS[number];
 
+// ============================================
+// ANOMALY DETECTION SYSTEM v3.0
+// ============================================
+// Statistically valid parameters (no gambler's fallacy)
+const ANOMALY_CONFIG = {
+    BUFFER_SIZE: 50,                    // Increased from 25 for robust statistics
+    AUTOCORR_ANOMALY_THRESHOLD: 0.10,   // |autocorr| > 0.10 = anomaly
+    ANOMALY_CONFIRMATION_TICKS: 3,      // Require 3 consecutive anomaly signals
+    ANTI_CLUSTERING_COOLDOWN_MS: 3000,  // 3 seconds between trades
+    MIN_TICKS_FOR_TRADE: 30,            // Minimum ticks before allowing trades
+};
+
 // Asset Score Component
 export interface AssetScore {
     entropy: number;        // 0-50 pts (Randomness)
@@ -52,6 +64,8 @@ export interface ScannerConfig {
     profitTarget?: number;      // Cycle profit target to trigger cooldown (default $3)
     maxConsecutiveLosses?: number; // Max losses before cooldown (default 2)
     cooldownDuration?: number;  // Base cooldown duration in seconds (default 60)
+    // Anomaly Detection v3.0
+    anomalyOnlyMode?: boolean;  // Only trade when anomaly is confirmed (default false)
 }
 
 // Scanner statistics
@@ -270,6 +284,15 @@ export const useMultiAssetScanner = () => {
     const isCoolingDownRef = useRef<boolean>(false);
     // Watchdog Ref
     const lastTickTimeRef = useRef<number>(Date.now());
+
+    // ============================================
+    // ANOMALY DETECTION REFS v3.0
+    // ============================================
+    const anomalyConfirmationCountRef = useRef<number>(0);  // Counter for consecutive anomaly signals
+    const lastTradeTimestampRef = useRef<number>(0);        // For anti-clustering cooldown
+    const [isAnomalyDetected, setIsAnomalyDetected] = useState(false);
+    const [currentAutocorr, setCurrentAutocorr] = useState<number>(0);
+    const anomalyTypeRef = useRef<'negative' | 'positive' | null>(null);
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -522,47 +545,77 @@ export const useMultiAssetScanner = () => {
 
                 setAssetStates(prev => {
                     const asset = prev[tickSymbol];
-                    const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
-                    const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
+                    // v3.0: Increased buffer to 50 for robust statistics
+                    const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-ANOMALY_CONFIG.BUFFER_SIZE);
+                    const newPriceBuffer = [...asset.priceBuffer, price].slice(-ANOMALY_CONFIG.BUFFER_SIZE);
 
-                    // --- QUANT SCORING v2.0 (LEAN) ---
+                    // --- QUANT SCORING v3.0 (ANOMALY DETECTION) ---
                     const zScore = calculateZScore(newPriceBuffer);
                     const entropyScore = calculateEntropyScore(newDigitBuffer);
                     const autocorrScore = calculateAutocorrScore(newDigitBuffer);
-                    const volatilityBonus = calculateVolatilityScore(zScore);
+                    const rawAutocorr = calculateAutocorrelation(newDigitBuffer);
+
+                    // Update current autocorr for UI display
+                    setCurrentAutocorr(rawAutocorr);
 
                     // NEW FORMULA: Entropy (60) + Autocorrelation (40) = 100
-                    // Cluster Score REMOVED (irrelevant for PRNG)
                     const totalScore = entropyScore + autocorrScore;
 
                     const scoreObj: AssetScore = {
                         entropy: entropyScore,
-                        volatility: autocorrScore, // Repurposed: now shows autocorr score
-                        clusters: 0, // DEPRECATED: always 0
+                        volatility: autocorrScore,
+                        clusters: 0,
                         total: totalScore
                     };
+
+                    // ============================================
+                    // ANOMALY DETECTION v3.0
+                    // ============================================
+                    const isAutocorrAnomaly = Math.abs(rawAutocorr) > ANOMALY_CONFIG.AUTOCORR_ANOMALY_THRESHOLD;
+                    const anomalyType: 'negative' | 'positive' | null =
+                        rawAutocorr < -ANOMALY_CONFIG.AUTOCORR_ANOMALY_THRESHOLD ? 'negative' :
+                            rawAutocorr > ANOMALY_CONFIG.AUTOCORR_ANOMALY_THRESHOLD ? 'positive' : null;
+
+                    // Track anomaly confirmation
+                    if (isAutocorrAnomaly) {
+                        anomalyConfirmationCountRef.current++;
+                        anomalyTypeRef.current = anomalyType;
+                    } else {
+                        anomalyConfirmationCountRef.current = 0;
+                        anomalyTypeRef.current = null;
+                    }
+
+                    // Confirmed anomaly = 3+ consecutive signals
+                    const isConfirmedAnomaly = anomalyConfirmationCountRef.current >= ANOMALY_CONFIG.ANOMALY_CONFIRMATION_TICKS;
+                    setIsAnomalyDetected(isConfirmedAnomaly);
+
+                    // Log anomaly detection (throttled)
+                    if (isConfirmedAnomaly && anomalyConfirmationCountRef.current === ANOMALY_CONFIG.ANOMALY_CONFIRMATION_TICKS) {
+                        const typeEmoji = anomalyType === 'negative' ? '📉' : '📈';
+                        addLog(`${typeEmoji} ANOMALÍA CONFIRMADA: Autocorr ${rawAutocorr.toFixed(3)} (${anomalyType}) en ${SYMBOL_NAMES[tickSymbol]}`, 'gold', tickSymbol);
+                    }
 
                     const lastTwo = newDigitBuffer.length >= 2
                         ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
                         : null;
                     const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
 
-                    // Streak analysis for anomaly detection
-                    const { currentStreak, isAnomalous } = analyzeStreak(newDigitBuffer);
+                    // Streak analysis
+                    const { currentStreak, isAnomalous: isStreakAnomalous } = analyzeStreak(newDigitBuffer);
 
-                    // Simplified inertia check
-                    const inertiaOK = zScore < 1.5 || isAnomalous; // Allow if streak anomaly detected
+                    // Inertia check
+                    const inertiaOK = zScore < 1.5;
 
                     let status: AssetState['status'] = 'scanning';
 
                     const isAutoSwitchOn = configRef.current?.autoSwitch;
-                    const minScore = configRef.current?.minScore || 55; // Lowered default (new scale)
+                    const minScore = configRef.current?.minScore || 55;
                     const isLeader = leaderAssetRef.current === tickSymbol;
                     const scorePass = totalScore >= minScore;
 
                     if (isAutoSwitchOn && (!isLeader || !scorePass)) {
                         status = 'vetoed';
-                    } else if (shadowPattern || isAnomalous) {
+                    } else if (isConfirmedAnomaly || shadowPattern || isStreakAnomalous) {
                         status = 'forming';
                     }
 
@@ -572,9 +625,9 @@ export const useMultiAssetScanner = () => {
                             ...asset,
                             digitBuffer: newDigitBuffer,
                             priceBuffer: newPriceBuffer,
-                            healthScore: Math.round(totalScore), // Now reflects total score
+                            healthScore: Math.round(totalScore),
                             score: scoreObj,
-                            shadowPattern: shadowPattern || isAnomalous, // Include anomaly
+                            shadowPattern: shadowPattern || isStreakAnomalous || isConfirmedAnomaly,
                             lastTwoDigits: lastTwo,
                             inertiaOK,
                             zScore,
@@ -591,36 +644,50 @@ export const useMultiAssetScanner = () => {
 
                     if (!checkWarmupStatus()) return;
 
-                    const asset = currentStates[tickSymbol];
-                    const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
-                    const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
+                    // ============================================
+                    // ANTI-CLUSTERING TEMPORAL COOLDOWN v3.0
+                    // ============================================
+                    const timeSinceLastTrade = Date.now() - lastTradeTimestampRef.current;
+                    if (timeSinceLastTrade < ANOMALY_CONFIG.ANTI_CLUSTERING_COOLDOWN_MS) {
+                        return; // Skip - too soon after last trade
+                    }
 
-                    // --- QUANT SCORING v2.0 (LEAN) for trade decision ---
+                    const asset = currentStates[tickSymbol];
+                    // v3.0: Use 50-tick buffer
+                    const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-ANOMALY_CONFIG.BUFFER_SIZE);
+                    const newPriceBuffer = [...asset.priceBuffer, price].slice(-ANOMALY_CONFIG.BUFFER_SIZE);
+
+                    // --- QUANT SCORING v3.0 for trade decision ---
                     const zScore = calculateZScore(newPriceBuffer);
                     const entropyScore = calculateEntropyScore(newDigitBuffer);
                     const autocorrScore = calculateAutocorrScore(newDigitBuffer);
+                    const rawAutocorr = calculateAutocorrelation(newDigitBuffer);
                     const totalScore = entropyScore + autocorrScore;
 
                     // Streak analysis
-                    const { currentStreak, isAnomalous } = analyzeStreak(newDigitBuffer);
+                    const { currentStreak, isAnomalous: isStreakAnomalous } = analyzeStreak(newDigitBuffer);
 
                     const lastTwo = newDigitBuffer.length >= 2
                         ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
                         : null;
                     const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
 
-                    // SIMPLIFIED TRIGGER: Either shadow pattern OR anomalous streak
-                    const shouldTrigger = (shadowPattern || isAnomalous) && newDigitBuffer.length >= 15;
+                    // v3.0: Check for confirmed anomaly OR legacy triggers
+                    const isConfirmedAnomaly = anomalyConfirmationCountRef.current >= ANOMALY_CONFIG.ANOMALY_CONFIRMATION_TICKS;
+                    const hasEnoughTicks = newDigitBuffer.length >= ANOMALY_CONFIG.MIN_TICKS_FOR_TRADE;
+
+                    // TRIGGER: Either confirmed anomaly, shadow pattern, OR streak anomaly
+                    const shouldTrigger = hasEnoughTicks && (isConfirmedAnomaly || shadowPattern || isStreakAnomalous);
                     const inertiaOK = zScore < 1.5;
 
-                    // Fire Logic - LEAN v2.0
+                    // Fire Logic - v3.0
                     if (shouldTrigger && inertiaOK) {
 
-                        console.log(`🛠️ [v2.0] Trigger en ${SYMBOL_NAMES[tickSymbol]}. Score: ${totalScore}. Autocorr: ${autocorrScore}. Streak: ${currentStreak}`);
+                        console.log(`🛠️ [v3.0] Trigger en ${SYMBOL_NAMES[tickSymbol]}. Score: ${totalScore}. Autocorr: ${rawAutocorr.toFixed(3)}. Anomaly: ${isConfirmedAnomaly}`);
 
                         // AUTO-SWITCH GUARD
                         if (configRef.current.autoSwitch) {
-                            const minScore = configRef.current.minScore || 55; // Lowered for new scale
+                            const minScore = configRef.current.minScore || 55;
 
                             if (totalScore < minScore) {
                                 setAssetStates(prev => ({
@@ -639,8 +706,31 @@ export const useMultiAssetScanner = () => {
                             }
                         }
 
+                        // ============================================
+                        // ANOMALY ONLY MODE GUARD v3.0
+                        // ============================================
+                        // When enabled, only trade when anomaly is CONFIRMED
+                        if (configRef.current.anomalyOnlyMode) {
+                            if (!isConfirmedAnomaly) {
+                                // Log skip (throttled to avoid spam)
+                                if (Math.random() > 0.95) {
+                                    addLog(`⏸️ Modo SOLO ANOMALÍA: Esperando anomalía confirmada...`, 'info', tickSymbol);
+                                }
+                                return;
+                            }
+                            // Additional check: only trade on NEGATIVE autocorr (edge for DIGITDIFF)
+                            if (rawAutocorr > 0) {
+                                addLog(`⚠️ Anomalía positiva detectada - EVITANDO trade`, 'warning', tickSymbol);
+                                return;
+                            }
+                            addLog(`📉 MODO ANOMALÍA: Edge confirmado (r=${rawAutocorr.toFixed(3)})`, 'gold', tickSymbol);
+                        }
+
                         // EXECUTION
                         const triggerDigit = lastTwo ? lastTwo[0] : newDigitBuffer[newDigitBuffer.length - 1];
+
+                        // Set anti-clustering timestamp
+                        lastTradeTimestampRef.current = Date.now();
 
                         isWaitingForContractRef.current = true;
                         setActiveAsset(tickSymbol);
@@ -656,8 +746,12 @@ export const useMultiAssetScanner = () => {
 
                         const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
 
-                        // Enhanced logging with v2.0 metrics
-                        const triggerReason = isAnomalous ? `Streak x${currentStreak}` : `Patrón ${triggerDigit}-${triggerDigit}`;
+                        // Enhanced logging with v3.0 metrics
+                        const triggerReason = isConfirmedAnomaly
+                            ? `ANOMALÍA (r=${rawAutocorr.toFixed(3)})`
+                            : isStreakAnomalous
+                                ? `Streak x${currentStreak}`
+                                : `Patrón ${triggerDigit}-${triggerDigit}`;
                         addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${entropyScore} A:${autocorrScore} = ${totalScore}%`, 'gold', tickSymbol);
 
                         const buyRequest = {
@@ -680,7 +774,7 @@ export const useMultiAssetScanner = () => {
                         addLog(`⚡ Orden enviada: DIFF ${triggerDigit} en ${SYMBOL_NAMES[tickSymbol]} | Stake: $${stakeAmount}`, 'info', tickSymbol);
                     } else if (shouldTrigger && !inertiaOK) {
                         // Log rejection (throttled)
-                        if (Math.random() > 0.85) {
+                        if (Math.random() > 0.9) {
                             addLog(`⚠️ Señal ${SYMBOL_NAMES[tickSymbol]} ignorada: Volatilidad alta (Z:${zScore.toFixed(2)})`, 'warning');
                         }
                     }
@@ -985,6 +1079,10 @@ export const useMultiAssetScanner = () => {
         cooldownTime,
         cooldownReason,
 
+        // Anomaly Detection States v3.0
+        isAnomalyDetected,
+        currentAutocorr,
+
         // Actions
         startScanner,
         stopScanner,
@@ -993,5 +1091,6 @@ export const useMultiAssetScanner = () => {
         // Constants
         SCANNER_SYMBOLS,
         SYMBOL_NAMES,
+        ANOMALY_CONFIG, // Export for UI display
     };
 };
