@@ -94,6 +94,8 @@ const EfectoMidas = () => {
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [showOfferModal, setShowOfferModal] = useState(false);
     const [showLossAversionModal, setShowLossAversionModal] = useState(false);
+    // SOFT LOCK: Traffic Management
+    const [showTrafficLock, setShowTrafficLock] = useState(false);
 
     // Check if trial expired
     const isExpired = daysLeft !== null && daysLeft <= 0;
@@ -180,6 +182,12 @@ const EfectoMidas = () => {
             if (!isConnected) {
                 toast.error('Primero debe conectar su cuenta Deriv');
                 return;
+            }
+
+            // 🚦 TRAFFIC MANAGEMENT (SOFT LOCK)
+            if (isFree) {
+                setShowTrafficLock(true);
+                return; // BLOCK EXECUTION
             }
 
             // 🚀 TRIAL EXPIRED: Block users whose free trial has ended
@@ -802,6 +810,37 @@ const EfectoMidas = () => {
 
                         </div>
                     </div>
+
+                    {/* 🚦 TRAFFIC LOCK BANNER */}
+                    {showTrafficLock && (
+                        <div className="mb-4 p-3 bg-red-950/20 border border-red-500/30 rounded-lg animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-start gap-2 mb-2">
+                                <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <h4 className="text-red-500 font-bold text-xs uppercase tracking-wider mb-1">
+                                        ACESSO RESTRINGIDO APENAS PARA USUARIOS PRO
+                                    </h4>
+                                    <p className="text-[10px] text-red-200/70 leading-relaxed font-mono">
+                                        Debido a la alta efectividad del sistema, priorizamos el ancho de banda para usuarios Pro.
+                                        <br /><br />
+                                        <span className="text-red-400 font-bold">La Solución:</span> Activa tu <span className="text-white font-bold">Ruta Dedicada PRO</span> para operar sin filas.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <a
+                                href="https://pay.hotmart.com/Q103866199O?off=itafpp2z"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg transition-all shadow-lg shadow-red-900/40 group"
+                            >
+                                <Zap size={14} className="group-hover:text-yellow-300 transition-colors" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">
+                                    ⚡ Desbloquear Cuenta Pro por SOLO $24/año
+                                </span>
+                            </a>
+                        </div>
+                    )}
 
                     {/* Control Button */}
                     <button

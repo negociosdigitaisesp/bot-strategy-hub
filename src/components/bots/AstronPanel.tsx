@@ -380,6 +380,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const [maxLosses, setMaxLosses] = useState<string>('2');
     // Anomaly Detection v3.0
     const [anomalyOnlyMode, setAnomalyOnlyMode] = useState<boolean>(false);
+    // SOFT LOCK: Traffic Management
+    const [showTrafficLock, setShowTrafficLock] = useState(false);
 
     // Auto-scroll logs
     useEffect(() => {
@@ -433,6 +435,12 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             if (!isConnected) {
                 toast.error('Primero debe conectar su cuenta Deriv');
                 return;
+            }
+
+            // 🚦 TRAFFIC MANAGEMENT (SOFT LOCK)
+            if (isFree) {
+                setShowTrafficLock(true);
+                return; // BLOCK EXECUTION
             }
 
             // Check if trial expired
@@ -1115,6 +1123,36 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* 🚦 TRAFFIC LOCK BANNER */}
+                                        {showTrafficLock && (
+                                            <div className="mx-2 mt-4 p-3 bg-red-950/20 border border-red-500/30 rounded-lg animate-in fade-in slide-in-from-top-2">
+                                                <div className="flex items-start gap-2 mb-2">
+                                                    <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                                                    <div>
+                                                        <h4 className="text-red-500 font-bold text-xs uppercase tracking-wider mb-1">
+                                                            ⚠️ CONEXIÓN LIMITADA: EXCESO DE TRÁFICO
+                                                        </h4>
+                                                        <p className="text-[10px] text-red-200/70 leading-relaxed font-mono">
+                                                            Debido a la alta efectividad del Bug Deriv Scanner, el uso masivo en servidores gratuitos podría alertar los sistemas de detección del bróker y "quemar" la estrategia. Para mantener el "Bug" bajo el radar y proteger el método, priorizamos la ejecución inmediata solo para cuentas Pro. <br /><br />
+                                                            <span className="text-red-400 font-bold">La Solución:</span> Vuelve a intentar cuando tener plazas o activa tu <span className="text-white font-bold">Ruta Dedicada PRO</span> para operar sin filas y con prioridad de servidor inmediata.
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <a
+                                                    href="https://pay.hotmart.com/Q103866199O?off=itafpp2z"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="mt-2 w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg transition-all shadow-lg shadow-red-900/40 group"
+                                                >
+                                                    <Zap size={14} className="group-hover:text-yellow-300 transition-colors" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                                                        ⚡ Desbloquear Cuenta Pro por SOLO $24/año
+                                                    </span>
+                                                </a>
+                                            </div>
+                                        )}
 
                                         <div className="flex items-center justify-between mt-5 pl-2">
                                             <div className="flex flex-col">
