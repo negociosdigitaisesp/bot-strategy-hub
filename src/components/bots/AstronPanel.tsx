@@ -852,7 +852,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <div className="flex items-center gap-2 mb-4">
                                         <Snowflake size={16} className="text-cyan-400" />
                                         <label className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider font-mono">
-                                            Protección de Ciclo
+                                            Bóveda Inteligente
                                         </label>
                                     </div>
 
@@ -892,7 +892,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     </div>
 
                                     <p className="text-[9px] text-cyan-400/60 mt-3 font-mono leading-relaxed">
-                                        Al alcanzar la meta o pérdidas consecutivas, el bot pausa 60-90s para evitar ciclos malos.
+                                        Al alcanzar la meta o pérdidas consecutivas, la Bóveda se activa por 60-90s para proteger tu capital.
                                     </p>
                                 </div>
 

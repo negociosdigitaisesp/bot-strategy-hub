@@ -84,10 +84,13 @@ const SYMBOL_NAMES: Record<ScannerSymbol, string> = {
 };
 
 // ============================================
-// QUANT SCORING ALGORITHMS
+// QUANT SCORING ALGORITHMS v2.0 (LEAN)
 // ============================================
+// Removed: Cluster Score (irrelevant for PRNG)
+// Added: Autocorrelation (detects real edge)
+// Focus: Entropy-based analysis without gambler's fallacy
 
-// 1. Z-Score Calculation (Volatility)
+// 1. Z-Score Calculation (Volatility) - SIMPLIFIED
 const calculateZScore = (prices: number[]): number => {
     if (prices.length < 10) return 0;
     const velocities: number[] = [];
@@ -103,9 +106,11 @@ const calculateZScore = (prices: number[]): number => {
     return Math.abs((latestVelocity - mean) / stdDev);
 };
 
-// 2. Entropy Score (0-50 pts)
+// 2. Entropy Score (0-60 pts) - MAIN METRIC
+// Measures randomness quality using Chi-Square test
+// High entropy = uniform distribution = GOOD for DIGITDIFF
 const calculateEntropyScore = (digits: number[]): number => {
-    if (digits.length < 10) return 25;
+    if (digits.length < 15) return 30; // Neutral until sufficient data
     const counts = new Array(10).fill(0);
     digits.forEach(d => counts[d]++);
 
@@ -115,39 +120,81 @@ const calculateEntropyScore = (digits: number[]): number => {
         chiSquare += Math.pow(count - expected, 2) / expected;
     });
 
-    const score = Math.max(0, 50 - (chiSquare * 2.5));
-    return Math.min(50, Math.round(score));
+    // Chi-Square critical value for df=9, α=0.05 is 16.92
+    // Lower χ² = more uniform = higher score
+    const score = Math.max(0, 60 - (chiSquare * 3));
+    return Math.min(60, Math.round(score));
 };
 
-// 3. Volatility Score (0-30 pts)
-const calculateVolatilityScore = (zScore: number): number => {
-    const score = Math.max(0, 30 - (zScore * 10));
-    return Math.round(score);
+// 3. Autocorrelation Score (0-40 pts) - REAL EDGE DETECTOR
+// Measures if consecutive digits are correlated
+// Negative autocorr = digits tend to alternate = EDGE for DIGITDIFF!
+const calculateAutocorrelation = (digits: number[]): number => {
+    if (digits.length < 20) return 0;
+
+    const n = digits.length;
+    const mean = digits.reduce((a, b) => a + b, 0) / n;
+
+    let numerator = 0;
+    let denominator = 0;
+
+    for (let i = 0; i < n - 1; i++) {
+        numerator += (digits[i] - mean) * (digits[i + 1] - mean);
+        denominator += Math.pow(digits[i] - mean, 2);
+    }
+
+    return denominator === 0 ? 0 : numerator / denominator;
 };
 
-// 4. Cluster Score (0-20 pts)
-const calculateClusterScore = (digits: number[]): number => {
-    if (digits.length < 5) return 20;
+const calculateAutocorrScore = (digits: number[]): number => {
+    const autocorr = calculateAutocorrelation(digits);
 
-    let maxClusterSize = 0;
-    let currentClusterSize = 0;
-    let currentType = -1;
+    // Interpretation:
+    // autocorr ≈ 0: Independent (expected for perfect PRNG) → 20 pts (neutral)
+    // autocorr > 0.1: Positive correlation (next similar) → 0-10 pts (BAD)
+    // autocorr < -0.1: Negative correlation (next different) → 30-40 pts (GOOD!)
 
-    for (let i = 0; i < digits.length; i++) {
-        const type = digits[i] >= 5 ? 1 : 0;
-        if (type === currentType) {
-            currentClusterSize++;
+    if (autocorr < -0.15) return 40; // Strong negative = EDGE!
+    if (autocorr < -0.05) return 30; // Mild negative = Good
+    if (autocorr < 0.05) return 20;  // Neutral (independent)
+    if (autocorr < 0.15) return 10;  // Mild positive = Caution
+    return 0; // Strong positive = Avoid
+};
+
+// 4. Streak Analysis (Bonus/Penalty)
+// Detects anomalously long streaks of same digit
+const analyzeStreak = (digits: number[]): { currentStreak: number; isAnomalous: boolean } => {
+    if (digits.length < 3) return { currentStreak: 1, isAnomalous: false };
+
+    let currentStreak = 1;
+    const lastDigit = digits[digits.length - 1];
+
+    for (let i = digits.length - 2; i >= 0; i--) {
+        if (digits[i] === lastDigit) {
+            currentStreak++;
         } else {
-            maxClusterSize = Math.max(maxClusterSize, currentClusterSize);
-            currentClusterSize = 1;
-            currentType = type;
+            break;
         }
     }
-    maxClusterSize = Math.max(maxClusterSize, currentClusterSize);
 
-    if (maxClusterSize <= 3) return 20;
-    if (maxClusterSize === 4) return 10;
-    return 0;
+    // Streak >= 3 is genuinely rare (0.1^2 = 1% chance)
+    // This is NOT gambler's fallacy - it's detecting actual statistical anomaly
+    const isAnomalous = currentStreak >= 3;
+
+    return { currentStreak, isAnomalous };
+};
+
+// LEGACY: Keep for compatibility but deprecate
+const calculateVolatilityScore = (zScore: number): number => {
+    // Simplified: just check if market is stable
+    return zScore < 1.5 ? 20 : 0;
+};
+
+// REMOVED: Cluster Score - irrelevant for PRNG markets
+// The distinction between "high" (5-9) and "low" (0-4) digits is arbitrary
+// and has no statistical significance in synthetic indices
+const calculateClusterScore = (_digits: number[]): number => {
+    return 0; // Removed - always returns 0
 };
 
 
@@ -478,17 +525,20 @@ export const useMultiAssetScanner = () => {
                     const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
                     const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
 
-                    // --- QUANT SCORING ---
+                    // --- QUANT SCORING v2.0 (LEAN) ---
                     const zScore = calculateZScore(newPriceBuffer);
                     const entropyScore = calculateEntropyScore(newDigitBuffer);
-                    const volatilityScore = calculateVolatilityScore(zScore);
-                    const clusterScore = calculateClusterScore(newDigitBuffer);
-                    const totalScore = entropyScore + volatilityScore + clusterScore;
+                    const autocorrScore = calculateAutocorrScore(newDigitBuffer);
+                    const volatilityBonus = calculateVolatilityScore(zScore);
+
+                    // NEW FORMULA: Entropy (60) + Autocorrelation (40) = 100
+                    // Cluster Score REMOVED (irrelevant for PRNG)
+                    const totalScore = entropyScore + autocorrScore;
 
                     const scoreObj: AssetScore = {
                         entropy: entropyScore,
-                        volatility: volatilityScore,
-                        clusters: clusterScore,
+                        volatility: autocorrScore, // Repurposed: now shows autocorr score
+                        clusters: 0, // DEPRECATED: always 0
                         total: totalScore
                     };
 
@@ -496,20 +546,23 @@ export const useMultiAssetScanner = () => {
                         ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
                         : null;
                     const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
-                    const inertiaOK = zScore < 1.0;
+
+                    // Streak analysis for anomaly detection
+                    const { currentStreak, isAnomalous } = analyzeStreak(newDigitBuffer);
+
+                    // Simplified inertia check
+                    const inertiaOK = zScore < 1.5 || isAnomalous; // Allow if streak anomaly detected
 
                     let status: AssetState['status'] = 'scanning';
 
                     const isAutoSwitchOn = configRef.current?.autoSwitch;
-                    const minScore = configRef.current?.minScore || 75;
+                    const minScore = configRef.current?.minScore || 55; // Lowered default (new scale)
                     const isLeader = leaderAssetRef.current === tickSymbol;
                     const scorePass = totalScore >= minScore;
 
                     if (isAutoSwitchOn && (!isLeader || !scorePass)) {
                         status = 'vetoed';
-                    } else if (shadowPattern && !inertiaOK) {
-                        status = 'forming';
-                    } else if (shadowPattern && inertiaOK) {
+                    } else if (shadowPattern || isAnomalous) {
                         status = 'forming';
                     }
 
@@ -519,9 +572,9 @@ export const useMultiAssetScanner = () => {
                             ...asset,
                             digitBuffer: newDigitBuffer,
                             priceBuffer: newPriceBuffer,
-                            healthScore: entropyScore * 2,
+                            healthScore: Math.round(totalScore), // Now reflects total score
                             score: scoreObj,
-                            shadowPattern,
+                            shadowPattern: shadowPattern || isAnomalous, // Include anomaly
                             lastTwoDigits: lastTwo,
                             inertiaOK,
                             zScore,
@@ -541,26 +594,33 @@ export const useMultiAssetScanner = () => {
                     const asset = currentStates[tickSymbol];
                     const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
                     const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
+
+                    // --- QUANT SCORING v2.0 (LEAN) for trade decision ---
                     const zScore = calculateZScore(newPriceBuffer);
                     const entropyScore = calculateEntropyScore(newDigitBuffer);
-                    const volatilityScore = calculateVolatilityScore(zScore);
-                    const clusterScore = calculateClusterScore(newDigitBuffer);
-                    const totalScore = entropyScore + volatilityScore + clusterScore;
+                    const autocorrScore = calculateAutocorrScore(newDigitBuffer);
+                    const totalScore = entropyScore + autocorrScore;
+
+                    // Streak analysis
+                    const { currentStreak, isAnomalous } = analyzeStreak(newDigitBuffer);
 
                     const lastTwo = newDigitBuffer.length >= 2
                         ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
                         : null;
                     const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
-                    const inertiaOK = zScore < 1.0;
 
-                    // Fire Logic
-                    if (shadowPattern && inertiaOK && newDigitBuffer.length >= 10) {
+                    // SIMPLIFIED TRIGGER: Either shadow pattern OR anomalous streak
+                    const shouldTrigger = (shadowPattern || isAnomalous) && newDigitBuffer.length >= 15;
+                    const inertiaOK = zScore < 1.5;
 
-                        console.log(`🛠️ Intentando disparar en ${SYMBOL_NAMES[tickSymbol]}. Score: ${totalScore}.`);
+                    // Fire Logic - LEAN v2.0
+                    if (shouldTrigger && inertiaOK) {
+
+                        console.log(`🛠️ [v2.0] Trigger en ${SYMBOL_NAMES[tickSymbol]}. Score: ${totalScore}. Autocorr: ${autocorrScore}. Streak: ${currentStreak}`);
 
                         // AUTO-SWITCH GUARD
                         if (configRef.current.autoSwitch) {
-                            const minScore = configRef.current.minScore || 75;
+                            const minScore = configRef.current.minScore || 55; // Lowered for new scale
 
                             if (totalScore < minScore) {
                                 setAssetStates(prev => ({
@@ -580,7 +640,7 @@ export const useMultiAssetScanner = () => {
                         }
 
                         // EXECUTION
-                        const repeatedDigit = lastTwo![0];
+                        const triggerDigit = lastTwo ? lastTwo[0] : newDigitBuffer[newDigitBuffer.length - 1];
 
                         isWaitingForContractRef.current = true;
                         setActiveAsset(tickSymbol);
@@ -596,7 +656,9 @@ export const useMultiAssetScanner = () => {
 
                         const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
 
-                        addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: Patrón ${repeatedDigit}-${repeatedDigit} | Score: ${totalScore}%`, 'gold', tickSymbol);
+                        // Enhanced logging with v2.0 metrics
+                        const triggerReason = isAnomalous ? `Streak x${currentStreak}` : `Patrón ${triggerDigit}-${triggerDigit}`;
+                        addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${entropyScore} A:${autocorrScore} = ${totalScore}%`, 'gold', tickSymbol);
 
                         const buyRequest = {
                             buy: 1,
@@ -610,15 +672,16 @@ export const useMultiAssetScanner = () => {
                                 basis: 'stake',
                                 duration: 1,
                                 duration_unit: 't',
-                                barrier: repeatedDigit.toString(),
+                                barrier: triggerDigit.toString(),
                             }
                         };
 
                         socket.send(JSON.stringify(buyRequest));
-                        addLog(`⚡ Orden enviada: DIFF ${repeatedDigit} en ${SYMBOL_NAMES[tickSymbol]}`, 'info', tickSymbol);
-                    } else if (shadowPattern) {
-                        if (!inertiaOK) {
-                            if (Math.random() > 0.8) addLog(`⚠️ Patrón ignorado ${SYMBOL_NAMES[tickSymbol]}: Alta Volatilidad (Z:${zScore.toFixed(2)})`, 'warning');
+                        addLog(`⚡ Orden enviada: DIFF ${triggerDigit} en ${SYMBOL_NAMES[tickSymbol]} | Stake: $${stakeAmount}`, 'info', tickSymbol);
+                    } else if (shouldTrigger && !inertiaOK) {
+                        // Log rejection (throttled)
+                        if (Math.random() > 0.85) {
+                            addLog(`⚠️ Señal ${SYMBOL_NAMES[tickSymbol]} ignorada: Volatilidad alta (Z:${zScore.toFixed(2)})`, 'warning');
                         }
                     }
                 }

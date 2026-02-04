@@ -166,11 +166,17 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                     .eq('id', userId)
                     .single();
 
-                  console.log('🔍 Plan Check Debug:', { userId, profileData, profileError });
+                  console.log('🔍 Plan Check Debug:', {
+                    userId,
+                    profileData,
+                    profileError,
+                    loginid,
+                    isRealAccount: isReal
+                  });
 
                   // If there's an error fetching profile, ALLOW connection (fail-open for Pro users)
                   if (profileError) {
-                    console.warn('⚠️ Error fetching profile, allowing connection:', profileError);
+                    console.warn('⚠️ Error fetching profile, allowing connection (fail-open):', profileError);
                     completeAuthorization();
                     return;
                   }
@@ -179,7 +185,13 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                     const planType = profileData.plan_type?.toLowerCase() || 'free';
                     const isPaidPlan = PAID_PLANS.includes(planType);
 
-                    console.log('📊 Plan Validation:', { planType, isPaidPlan, PAID_PLANS });
+                    console.log('📊 Plan Validation:', {
+                      rawPlanType: profileData.plan_type,
+                      normalizedPlanType: planType,
+                      isPaidPlan,
+                      PAID_PLANS,
+                      willBlock: !isPaidPlan
+                    });
 
                     if (!isPaidPlan) {
                       // FREE USER TRYING TO USE REAL ACCOUNT - BLOCK IT!
@@ -205,8 +217,16 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                       );
 
                       return; // Stop execution
+                    } else {
+                      console.log('✅ PRO user verified - allowing real account connection');
                     }
+                  } else {
+                    // No profile data found - allow connection (fail-open)
+                    console.warn('⚠️ No profile data found, allowing connection (fail-open)');
                   }
+                } else {
+                  // No userId found - allow connection (fail-open)
+                  console.warn('⚠️ No userId found, allowing connection (fail-open)');
                 }
               } catch (err) {
                 console.error('Error checking user plan for real account:', err);

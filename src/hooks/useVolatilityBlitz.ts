@@ -392,7 +392,7 @@ export const useVolatilityBlitz = () => {
         if (now < coolDownUntilRef.current) {
             const remaining = Math.ceil(coolDownUntilRef.current - now);
             if (remaining % 30 === 0) {
-                addLog('GLOBAL', `⏸️ Cool-down ativo: ${remaining}s restantes`, 'warning');
+                addLog('GLOBAL', `⏸️ Bóveda Inteligente activa: ${remaining}s restantes`, 'warning');
             }
             isProcessing.current = false; // Unlock
             isAlreadyInTrade.current = false;
@@ -609,13 +609,13 @@ export const useVolatilityBlitz = () => {
                 const cooldown = DEFAULT_CONFIG.quick_reentry.cooldown_after_streak;
                 coolDownUntilRef.current = Date.now() / 1000 + cooldown;
                 consecutiveWinsRef.current = 0;
-                addLog('GLOBAL', `🔥 ${DEFAULT_CONFIG.quick_reentry.max_consecutive_wins} wins! Cooldown: ${cooldown}s`, 'warning');
+                addLog('GLOBAL', `🔥 ${DEFAULT_CONFIG.quick_reentry.max_consecutive_wins} wins! Bóveda Inteligente: ${cooldown}s`, 'warning');
             }
         } else {
             consecutiveWinsRef.current = 0;
             const cooldown = DEFAULT_CONFIG.risk.cool_down_after_loss;
             coolDownUntilRef.current = Date.now() / 1000 + cooldown;
-            addLog('GLOBAL', `⏸️ Cooldown após loss: ${cooldown}s`, 'warning');
+            addLog('GLOBAL', `⏸️ Bóveda Inteligente activada: ${cooldown}s`, 'warning');
         }
 
         // COOLDOWN DE 1s antes de liberar (Elite Sniper)

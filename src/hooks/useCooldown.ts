@@ -81,14 +81,14 @@ export const useCooldown = (key: string = 'global'): UseCooldownReturn => {
         localStorage.setItem(storageKey, endTime.toString());
         setIsCooldown(true);
         setRemainingSeconds(durationSeconds);
-        console.log(`[Cooldown] ❄️ Iniciado: ${durationSeconds}s`);
+        console.log(`[Bóveda Inteligente] ❄️ Activada: ${durationSeconds}s`);
     }, [storageKey]);
 
     const clearCooldown = useCallback(() => {
         localStorage.removeItem(storageKey);
         setIsCooldown(false);
         setRemainingSeconds(0);
-        console.log('[Cooldown] ✅ Limpo');
+        console.log('[Bóveda Inteligente] ✅ Desactivada');
     }, [storageKey]);
 
     return {

@@ -172,7 +172,7 @@ export class RiskManager {
         if (this.isCooldownActive()) {
             return {
                 allowed: false,
-                reason: `Cooldown activo: ${this.config.cooldownTicks - this.ticksSinceLastTrade} ticks restantes`
+                reason: `Bóveda Inteligente activa: ${this.config.cooldownTicks - this.ticksSinceLastTrade} ticks restantes`
             };
         }
 
