@@ -166,9 +166,20 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                     .eq('id', userId)
                     .single();
 
-                  if (!profileError && profileData) {
+                  console.log('🔍 Plan Check Debug:', { userId, profileData, profileError });
+
+                  // If there's an error fetching profile, ALLOW connection (fail-open for Pro users)
+                  if (profileError) {
+                    console.warn('⚠️ Error fetching profile, allowing connection:', profileError);
+                    completeAuthorization();
+                    return;
+                  }
+
+                  if (profileData) {
                     const planType = profileData.plan_type?.toLowerCase() || 'free';
                     const isPaidPlan = PAID_PLANS.includes(planType);
+
+                    console.log('📊 Plan Validation:', { planType, isPaidPlan, PAID_PLANS });
 
                     if (!isPaidPlan) {
                       // FREE USER TRYING TO USE REAL ACCOUNT - BLOCK IT!
@@ -199,6 +210,7 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                 }
               } catch (err) {
                 console.error('Error checking user plan for real account:', err);
+                // On error, ALLOW connection (fail-open)
               }
 
               // If we reach here, user has a paid plan or we couldn't verify - allow connection

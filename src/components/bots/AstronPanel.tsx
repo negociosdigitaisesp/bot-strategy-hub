@@ -22,7 +22,8 @@ import {
     BrainCircuit,
     Trophy,
     Lock,
-    Crown
+    Crown,
+    Snowflake
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBotAstron, LogEntry, ScannerSymbol, AssetState } from '../../hooks/useBotAstron';
@@ -42,6 +43,9 @@ interface FleetMonitorProps {
     warmUpProgress: number;
     opportunityMessage: string | null;
     autoSwitchEnabled: boolean;
+    isCoolingDown: boolean;
+    cooldownTime: number;
+    cooldownReason: 'profit' | 'loss' | null;
 }
 
 const FleetMonitor: React.FC<FleetMonitorProps> = ({
@@ -52,7 +56,10 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
     isWarmingUp,
     warmUpProgress,
     opportunityMessage,
-    autoSwitchEnabled
+    autoSwitchEnabled,
+    isCoolingDown,
+    cooldownTime,
+    cooldownReason
 }) => {
     const symbols: ScannerSymbol[] = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'];
 
@@ -60,8 +67,35 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
         <div className="bg-[#0B0E14]/80 backdrop-blur-xl rounded-2xl p-4 border border-white/5 relative overflow-hidden flex flex-col gap-4">
             {/* Ambient glow */}
             <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[60px] pointer-events-none transition-colors duration-500
-                ${autoSwitchEnabled ? 'bg-amber-500/10' : 'bg-[#00E5FF]/5'}
+                ${isCoolingDown ? 'bg-cyan-500/20' : autoSwitchEnabled ? 'bg-amber-500/10' : 'bg-[#00E5FF]/5'}
             `} />
+
+            {/* Cooldown Overlay */}
+            {isCoolingDown && (
+                <div className={`absolute inset-0 z-20 backdrop-blur-md flex flex-col items-center justify-center text-center p-4 animate-in fade-in duration-300 ${cooldownReason === 'loss' ? 'bg-red-950/90' : 'bg-[#0B0E14]/90'}`}>
+                    <div className={`p-3 rounded-full mb-3 animate-pulse border ${cooldownReason === 'loss' ? 'bg-red-500/10 border-red-500/20' : 'bg-cyan-500/10 border-cyan-500/20'}`}>
+                        {cooldownReason === 'loss' ? (
+                            <ShieldAlert size={28} className="text-red-500" />
+                        ) : (
+                            <Snowflake size={28} className="text-cyan-400" />
+                        )}
+                    </div>
+
+                    <h3 className={`font-bold font-mono text-sm mb-1 uppercase tracking-wider ${cooldownReason === 'loss' ? 'text-red-500' : 'text-cyan-400'}`}>
+                        {cooldownReason === 'loss' ? '🛡️ PROTEÇÃO ATIVADA' : '🏦 LUCRO RESERVADO'}
+                    </h3>
+
+                    <p className={`text-[10px] font-mono mb-3 max-w-[200px] leading-tight ${cooldownReason === 'loss' ? 'text-red-300/80' : 'text-gray-400'}`}>
+                        {cooldownReason === 'loss'
+                            ? 'Detectada instabilidade. Evitando ciclo ruim.'
+                            : 'Meta atingida! Resfriando para nova análise.'}
+                    </p>
+
+                    <div className="text-3xl font-black text-white font-mono tabular-nums tracking-widest">
+                        {cooldownTime}<span className="text-sm text-gray-500 ml-1">s</span>
+                    </div>
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -260,12 +294,16 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         // Multi-asset specific
         assetStates,
         activeAsset,
-        leaderAsset, // NEW leaderAsset from hook
+        leaderAsset,
         opportunityMessage,
         isWarmingUp,
         warmUpProgress,
         SCANNER_SYMBOLS,
-        SYMBOL_NAMES
+        SYMBOL_NAMES,
+        // Cooldown states
+        isCoolingDown,
+        cooldownTime,
+        cooldownReason
     } = useBotAstron();
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -282,10 +320,12 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const [maxGale, setMaxGale] = useState<string>('3');
     const [martingaleFactor, setMartingaleFactor] = useState<string>('2.5'); // NEW: Configurable factor
     const [autoSwitch, setAutoSwitch] = useState<boolean>(true); // NEW Auto-Switch State
-    const [assertivityLevel, setAssertivityLevel] = useState<'conservative' | 'balanced' | 'aggressive'>('aggressive'); // Default to aggressive for more signals
-    const [vaultTarget, setVaultTarget] = useState<string>('3.00');
-    const [useSoros, setUseSoros] = useState<boolean>(false); // NEW: Soros strategy toggle
-    const [sorosLevels, setSorosLevels] = useState<number>(1); // NEW: Soros Levels (1-5)
+    const [assertivityLevel, setAssertivityLevel] = useState<'conservative' | 'balanced' | 'aggressive'>('aggressive');
+    const [useSoros, setUseSoros] = useState<boolean>(false);
+    const [sorosLevels, setSorosLevels] = useState<number>(1);
+    // Cooldown Config States
+    const [profitTarget, setProfitTarget] = useState<string>('3.00');
+    const [maxLosses, setMaxLosses] = useState<string>('2');
 
     // Auto-scroll logs
     useEffect(() => {
@@ -329,20 +369,6 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             ), { duration: 3000 });
         }
 
-        // Vault Trigger ($1.00)
-        if (stats.vaultAccumulated >= 1.00 && stats.vaultAccumulated < 1.35) { // Range to avoid spam
-            toast.custom((t) => (
-                <div className="bg-gradient-to-r from-amber-500 to-yellow-600 border border-white/20 rounded-xl p-4 shadow-2xl flex items-center gap-3 animate-bounce">
-                    <div className="bg-white/20 p-2 rounded-full">
-                        <Crown size={24} className="text-white" />
-                    </div>
-                    <div>
-                        <h4 className="text-white font-black text-sm uppercase tracking-wider">💰 ¡BÓVEDA ASEGURADA!</h4>
-                        <p className="text-white/90 text-xs">Tu configuración de IA está funcionando al 100%.</p>
-                    </div>
-                </div>
-            ), { duration: 5000 });
-        }
     }, [stats.wins, stats.vaultAccumulated, isFree]);
 
     const handleToggleBot = () => {
@@ -373,7 +399,6 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             const stopLossVal = parseFloat(stopLoss);
             const takeProfitVal = parseFloat(takeProfit);
             const maxGaleVal = parseInt(maxGale);
-            const vaultTargetVal = parseFloat(vaultTarget);
 
             if (isNaN(stakeVal) || stakeVal <= 0) {
                 toast.error('Stake inválido');
@@ -397,7 +422,6 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
             const minScore = minScoreMap[assertivityLevel];
             const martingaleFactorVal = parseFloat(martingaleFactor) || 2.5;
 
-            // ✨ ELITE CALIBRATION LOGIC (FREE USERS)
             let finalStartConfig = {
                 stake: stakeVal,
                 stopLoss: stopLossVal,
@@ -405,25 +429,25 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 useMartingale: useMartingale,
                 maxMartingaleLevel: maxGaleVal,
                 martingaleFactor: martingaleFactorVal,
-                vaultEnabled: true,
-                vaultTarget: vaultTargetVal,
                 autoSwitchEnabled: autoSwitch,
-                minScore: minScore
+                minScore: minScore,
+                // Cooldown Config
+                profitTarget: parseFloat(profitTarget) || 3.0,
+                maxConsecutiveLosses: parseInt(maxLosses) || 2
             };
 
             if (isFree) {
                 // FORCE TURBO-SCALP LOGIC (AGGRESSIVE)
                 finalStartConfig = {
                     ...finalStartConfig,
-                    stake: 1.00, // HIGH STAKE for fast profit
-                    minScore: 40, // HIGH FREQUENCY (Mini opportunity)
-                    maxMartingaleLevel: 2, // Limit risk but allow recovery
+                    stake: 1.00,
+                    minScore: 40,
+                    maxMartingaleLevel: 2,
                     martingaleFactor: 2.5,
-                    vaultTarget: 5.00, // Quick target
                     stopLoss: 50.00,
                     takeProfit: 50.00,
-                    useSoros: isFree ? true : useSoros, // Force ON for free users, configurable for pro
-                    maxSorosLevels: isFree ? 1 : sorosLevels // Free: Level 2 (1 step), Pro: Configurable
+                    useSoros: true,
+                    maxSorosLevels: 1
                 };
 
                 toast.success('⚡ MODO TURBO-SCALP ACTIVADO: Alta Velocidad.');
@@ -544,6 +568,9 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                             warmUpProgress={warmUpProgress}
                             opportunityMessage={opportunityMessage}
                             autoSwitchEnabled={autoSwitch}
+                            isCoolingDown={isCoolingDown}
+                            cooldownTime={cooldownTime}
+                            cooldownReason={cooldownReason}
                         />
 
                         {/* Market Result (Overview) */}
@@ -565,16 +592,6 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                 <div className={`text-4xl font-black flex items-center justify-center gap-2 ${stats.totalProfit >= 0 ? 'text-[#00FF88]' : 'text-[#FF3D00]'} transition-all duration-300 scale-100`}>
                                     {stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(2)} <span className="text-lg opacity-50">$</span>
                                 </div>
-                                {/* Vault Progress */}
-                                {stats.vaultAccumulated !== undefined && stats.vaultAccumulated > 0 && (
-                                    <div className="mt-2 flex items-center justify-center gap-2">
-                                        <span className="text-[9px] text-amber-400 font-mono">🏦 BÓVEDA:</span>
-                                        <span className="text-xs text-amber-300 font-bold">${stats.vaultAccumulated.toFixed(2)}</span>
-                                        {stats.vaultCycles !== undefined && stats.vaultCycles > 0 && (
-                                            <span className="text-[9px] text-amber-400/60">({stats.vaultCycles} ciclos)</span>
-                                        )}
-                                    </div>
-                                )}
                             </div>
 
                             <div className="grid grid-cols-3 gap-3 mb-2 relative z-10">
@@ -738,26 +755,11 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     </p>
                                 </div>
 
-                                {/* Vault Target */}
-                                <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20">
-                                    <label className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-2 block font-mono">🏦 Meta Bóveda ($)</label>
-                                    <input
-                                        type="number"
-                                        step="0.50"
-                                        value={vaultTarget}
-                                        onChange={(e) => setVaultTarget(e.target.value)}
-                                        disabled={isRunning}
-                                        className="w-full bg-[#05050F] border border-amber-500/20 rounded-lg py-2 px-3 text-amber-300 font-mono text-sm focus:border-amber-400 focus:outline-none transition-all disabled:opacity-50"
-                                    />
-                                    <p className="text-[10px] text-amber-400/60 mt-2 font-mono">
-                                        Acumula ganancias de todos los activos.
-                                    </p>
-                                </div>
 
                                 {/* Soros Strategy with Motion UI */}
                                 <div className={`rounded-xl border transition-all duration-500 ease-out overflow-hidden ${useSoros
-                                        ? 'bg-purple-500/10 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)]'
-                                        : 'bg-gray-900/40 border-gray-800'
+                                    ? 'bg-purple-500/10 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.15)]'
+                                    : 'bg-gray-900/40 border-gray-800'
                                     }`}>
                                     <div className="p-5">
                                         <div className="flex items-center justify-between">
@@ -778,8 +780,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                             <div
                                                 onClick={() => !isRunning && setUseSoros(!useSoros)}
                                                 className={`w-12 h-7 rounded-full relative cursor-pointer transition-all duration-300 ${useSoros
-                                                        ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]'
-                                                        : 'bg-gray-700'
+                                                    ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]'
+                                                    : 'bg-gray-700'
                                                     } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
                                                 <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-md ${useSoros ? 'left-6' : 'left-1'
@@ -843,6 +845,55 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                             </p>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Cooldown Configuration Section */}
+                                <div className="bg-cyan-500/5 rounded-xl p-4 border border-cyan-500/20">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Snowflake size={16} className="text-cyan-400" />
+                                        <label className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider font-mono">
+                                            Protección de Ciclo
+                                        </label>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {/* Profit Target */}
+                                        <div>
+                                            <label className="text-[9px] text-gray-400 font-mono mb-1 block uppercase">
+                                                🏦 Meta Lucro ($)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.50"
+                                                min="1"
+                                                value={profitTarget}
+                                                onChange={(e) => setProfitTarget(e.target.value)}
+                                                disabled={isRunning}
+                                                className="w-full bg-[#05050F] border border-cyan-500/20 rounded-lg py-2 px-3 text-cyan-300 font-mono text-sm focus:border-cyan-400 focus:outline-none transition-all disabled:opacity-50"
+                                            />
+                                        </div>
+
+                                        {/* Max Losses */}
+                                        <div>
+                                            <label className="text-[9px] text-gray-400 font-mono mb-1 block uppercase">
+                                                🛡️ Máx Pérdidas
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="1"
+                                                min="1"
+                                                max="5"
+                                                value={maxLosses}
+                                                onChange={(e) => setMaxLosses(e.target.value)}
+                                                disabled={isRunning}
+                                                className="w-full bg-[#05050F] border border-cyan-500/20 rounded-lg py-2 px-3 text-cyan-300 font-mono text-sm focus:border-cyan-400 focus:outline-none transition-all disabled:opacity-50"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p className="text-[9px] text-cyan-400/60 mt-3 font-mono leading-relaxed">
+                                        Al alcanzar la meta o pérdidas consecutivas, el bot pausa 60-90s para evitar ciclos malos.
+                                    </p>
                                 </div>
 
                                 <div className="mt-auto pt-6 border-t border-gray-800/50">
@@ -1073,9 +1124,9 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                         <p className="text-sm font-medium tracking-wide font-mono">Esperando inicio...</p>
                                     </div>
                                 )}
-                                {logs.map((log) => {
+                                {logs.map((log, index) => {
                                     return (
-                                        <div key={log.id} className={`animate-enter-log group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-300 hover:scale-[1.01] ${log.type === 'success' ? 'bg-[#00E5FF]/5 border-[#00E5FF]/20 shadow-[0_0_10px_rgba(0,229,255,0.05)]' :
+                                        <div key={`${log.id}-${index}`} className={`animate-enter-log group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-300 hover:scale-[1.01] ${log.type === 'success' ? 'bg-[#00E5FF]/5 border-[#00E5FF]/20 shadow-[0_0_10px_rgba(0,229,255,0.05)]' :
                                             log.type === 'error' ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_10px_rgba(255,61,0,0.05)]' :
                                                 log.type === 'gold' ? 'bg-amber-500/5 border-amber-500/20 shadow-[0_0_10px_rgba(251,191,36,0.05)]' :
                                                     'bg-[#0B0E14]/50 border-gray-800 hover:bg-[#0B0E14]'

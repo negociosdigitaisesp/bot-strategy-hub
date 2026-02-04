@@ -27,13 +27,14 @@ export interface BotConfig {
     symbol?: string; // Legacy - now uses multi-asset
     useMartingale?: boolean;
     maxMartingaleLevel?: number;
-    martingaleFactor?: number; // NEW: Configurable Martingale multiplier
-    vaultEnabled?: boolean;
-    vaultTarget?: number;
-    autoSwitchEnabled?: boolean; // NEW: Smart Asset Selection
-    minScore?: number; // NEW: Minimum score threshold for trading
-    useSoros?: boolean; // NEW: Turbo-Scalp Mode
-    maxSorosLevels?: number; // NEW: Configurable Soros Levels
+    martingaleFactor?: number; // Configurable Martingale multiplier
+    autoSwitchEnabled?: boolean; // Smart Asset Selection
+    minScore?: number; // Minimum score threshold for trading
+    useSoros?: boolean; // Turbo-Scalp Mode
+    maxSorosLevels?: number; // Configurable Soros Levels
+    // Cooldown Config
+    profitTarget?: number;
+    maxConsecutiveLosses?: number;
 }
 
 export interface BotStats {
@@ -42,8 +43,8 @@ export interface BotStats {
     totalProfit: number;
     currentStake: number;
     consecutiveLosses?: number;
-    vaultAccumulated?: number;
-    vaultCycles?: number;
+    cycleProfit?: number;
+    cycleCount?: number;
 }
 
 export interface TickData {
@@ -88,56 +89,68 @@ export const useBotAstron = () => {
         totalProfit: scanner.stats.totalProfit,
         currentStake: scanner.stats.currentStake,
         consecutiveLosses: scanner.stats.consecutiveLosses,
-        vaultAccumulated: scanner.stats.vaultAccumulated,
-        vaultCycles: scanner.stats.vaultCycles,
+        cycleProfit: scanner.stats.cycleProfit,
+        cycleCount: scanner.stats.cycleCount,
     };
+
+    // Ref for assetStates to avoid re-binding the listener on every update
+    const assetStatesRef = useRef(scanner.assetStates);
+
+    // Sync Ref with state
+    useEffect(() => {
+        assetStatesRef.current = scanner.assetStates;
+    }, [scanner.assetStates]);
 
     // Handle tick updates from all assets to populate recentTicks for UI
     useEffect(() => {
         if (!socket || socket.readyState !== WebSocket.OPEN || !scanner.isRunning) return;
 
         const handleTick = (event: MessageEvent) => {
-            const data = JSON.parse(event.data);
+            try {
+                const data = JSON.parse(event.data);
 
-            if (data.msg_type === 'tick' && data.tick) {
-                const tickSymbol = data.tick.symbol as ScannerSymbol;
-                if (!SCANNER_SYMBOLS.includes(tickSymbol)) return;
+                if (data.msg_type === 'tick' && data.tick) {
+                    const tickSymbol = data.tick.symbol as ScannerSymbol;
+                    if (!SCANNER_SYMBOLS.includes(tickSymbol)) return;
 
-                const price = parseFloat(data.tick.quote);
-                const quote = price.toFixed(2);
-                const currentDigit = parseInt(quote.charAt(quote.length - 1));
+                    const price = parseFloat(data.tick.quote);
+                    const quote = price.toFixed(2);
+                    const currentDigit = parseInt(quote.charAt(quote.length - 1));
 
-                // Calculate change
-                const lastPrice = lastPricesRef.current[tickSymbol];
-                const changeVal = lastPrice !== 0 ? price - lastPrice : 0;
-                const isUp = changeVal >= 0;
-                const changeStr = (isUp ? '+' : '') + changeVal.toFixed(2);
+                    // Calculate change
+                    const lastPrice = lastPricesRef.current[tickSymbol];
+                    const changeVal = lastPrice !== 0 ? price - lastPrice : 0;
+                    const isUp = changeVal >= 0;
+                    const changeStr = (isUp ? '+' : '') + changeVal.toFixed(2);
 
-                lastPricesRef.current[tickSymbol] = price;
+                    lastPricesRef.current[tickSymbol] = price;
 
-                // Get asset state for signal
-                const assetState = scanner.assetStates[tickSymbol];
-                const signalStr = assetState ?
-                    `${assetState.status.toUpperCase()} Z:${assetState.zScore.toFixed(1)}` :
-                    '---';
+                    // Get asset state for signal from REF (not state dependency)
+                    const assetState = assetStatesRef.current[tickSymbol];
+                    const signalStr = assetState ?
+                        `${assetState.status.toUpperCase()} Z:${assetState.zScore.toFixed(1)}` :
+                        '---';
 
-                const newTick: TickData = {
-                    id: data.tick.id || Math.random().toString(),
-                    price: quote,
-                    lastDigit: currentDigit,
-                    signal: signalStr,
-                    change: changeStr,
-                    isUp,
-                    symbol: tickSymbol,
-                };
+                    const newTick: TickData = {
+                        id: data.tick.id || Math.random().toString(),
+                        price: quote,
+                        lastDigit: currentDigit,
+                        signal: signalStr,
+                        change: changeStr,
+                        isUp,
+                        symbol: tickSymbol,
+                    };
 
-                setRecentTicks(prev => [newTick, ...prev].slice(0, 20));
+                    setRecentTicks(prev => [newTick, ...prev].slice(0, 20));
+                }
+            } catch (error) {
+                console.error("Error parsing socket message in useBotAstron:", error);
             }
         };
 
         socket.addEventListener('message', handleTick);
         return () => socket.removeEventListener('message', handleTick);
-    }, [socket, scanner.isRunning, scanner.assetStates]);
+    }, [socket, scanner.isRunning]); // Dependency list reduced - listener stays bound!
 
     // Start bot wrapper
     const startBot = useCallback((config: BotConfig) => {
@@ -157,12 +170,12 @@ export const useBotAstron = () => {
             takeProfit: config.takeProfit,
             useMartingale: config.useMartingale,
             maxMartingaleLevel: config.maxMartingaleLevel,
-            martingaleFactor: config.martingaleFactor, // Pass Martingale factor
-            vaultEnabled: config.vaultEnabled,
-            vaultTarget: config.vaultTarget,
-            autoSwitch: config.autoSwitchEnabled, // Pass to hook
-            minScore: config.minScore, // Pass minScore threshold
-            useSoros: config.useSoros // Pass Soros config
+            martingaleFactor: config.martingaleFactor,
+            autoSwitch: config.autoSwitchEnabled,
+            minScore: config.minScore,
+            useSoros: config.useSoros,
+            profitTarget: config.profitTarget,
+            maxConsecutiveLosses: config.maxConsecutiveLosses
         });
     }, [scanner]);
 
@@ -181,10 +194,15 @@ export const useBotAstron = () => {
         // Multi-asset specific
         assetStates: scanner.assetStates,
         activeAsset: scanner.activeAsset,
-        leaderAsset: scanner.leaderAsset, // NEW
+        leaderAsset: scanner.leaderAsset,
         opportunityMessage: scanner.opportunityMessage,
         isWarmingUp: scanner.isWarmingUp,
         warmUpProgress: scanner.warmUpProgress,
+
+        // Cooldown States
+        isCoolingDown: scanner.isCoolingDown,
+        cooldownTime: scanner.cooldownTime,
+        cooldownReason: scanner.cooldownReason,
 
         // Actions
         startBot,

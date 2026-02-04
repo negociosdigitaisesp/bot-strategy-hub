@@ -25,13 +25,13 @@ export interface AssetState {
     displayName: string;
     digitBuffer: number[];      // Last 25 digits
     priceBuffer: number[];      // Last 25 prices for Z-Score
-    healthScore: number;        // Legacy random score (kept for compatibility if needed, but superseded by score.total)
-    score: AssetScore;          // NEW: Detailed Quant Score
+    healthScore: number;        // Legacy random score
+    score: AssetScore;          // Detailed Quant Score
     shadowPattern: boolean;     // Same digit repeated 2 times
     lastTwoDigits: [number, number] | null;
-    inertiaOK: boolean;         // Z-Score velocity < 1.0 (Legacy check, now part of score)
+    inertiaOK: boolean;         // Z-Score velocity < 1.0
     zScore: number;
-    status: 'scanning' | 'forming' | 'firing' | 'cooldown' | 'vetoed';
+    status: 'scanning' | 'forming' | 'firing' | 'vetoed';
     lastPrice: number;
     tickCount: number;
 }
@@ -43,13 +43,15 @@ export interface ScannerConfig {
     takeProfit: number;
     useMartingale?: boolean;
     maxMartingaleLevel?: number;
-    martingaleFactor?: number;  // NEW: Configurable Martingale multiplier (default 2.5)
-    vaultEnabled?: boolean;
-    vaultTarget?: number;
-    autoSwitch?: boolean;       // NEW: Smart Asset Selection
-    minScore?: number;          // NEW: Min score to trade (default 75)
-    useSoros?: boolean;         // NEW: Turbo-Scalp Mode (Mini-Soros L2)
-    maxSorosLevels?: number;    // NEW: Configurable Soros Levels
+    martingaleFactor?: number;  // Configurable Martingale multiplier (default 2.5)
+    autoSwitch?: boolean;       // Smart Asset Selection
+    minScore?: number;          // Min score to trade (default 75)
+    useSoros?: boolean;         // Turbo-Scalp Mode (Mini-Soros L2)
+    maxSorosLevels?: number;    // Configurable Soros Levels
+    // Profit Reservation & Loss Protection
+    profitTarget?: number;      // Cycle profit target to trigger cooldown (default $3)
+    maxConsecutiveLosses?: number; // Max losses before cooldown (default 2)
+    cooldownDuration?: number;  // Base cooldown duration in seconds (default 60)
 }
 
 // Scanner statistics
@@ -59,8 +61,8 @@ export interface ScannerStats {
     totalProfit: number;
     currentStake: number;
     consecutiveLosses: number;
-    vaultAccumulated: number;
-    vaultCycles: number;
+    cycleProfit: number;        // Profit accumulated in current cycle
+    cycleCount: number;         // Number of completed cycles
 }
 
 // Log entry
@@ -87,7 +89,7 @@ const SYMBOL_NAMES: Record<ScannerSymbol, string> = {
 
 // 1. Z-Score Calculation (Volatility)
 const calculateZScore = (prices: number[]): number => {
-    if (prices.length < 5) return 0;
+    if (prices.length < 10) return 0;
     const velocities: number[] = [];
     for (let i = 1; i < prices.length; i++) {
         velocities.push(prices[i] - prices[i - 1]);
@@ -107,23 +109,18 @@ const calculateEntropyScore = (digits: number[]): number => {
     const counts = new Array(10).fill(0);
     digits.forEach(d => counts[d]++);
 
-    // Chi-Square test
     const expected = digits.length / 10;
     let chiSquare = 0;
     counts.forEach(count => {
         chiSquare += Math.pow(count - expected, 2) / expected;
     });
 
-    // Lower chi-square = Higher Entropy = Better Score
-    // Critical value ~16.92. Map 0-20 ChiSquare to 50-0 pts
     const score = Math.max(0, 50 - (chiSquare * 2.5));
     return Math.min(50, Math.round(score));
 };
 
 // 3. Volatility Score (0-30 pts)
 const calculateVolatilityScore = (zScore: number): number => {
-    // Prefer Z-Score < 1.0 (Lateral). 
-    // Map Z-Score 0-3 to 30-0 pts.
     const score = Math.max(0, 30 - (zScore * 10));
     return Math.round(score);
 };
@@ -132,11 +129,9 @@ const calculateVolatilityScore = (zScore: number): number => {
 const calculateClusterScore = (digits: number[]): number => {
     if (digits.length < 5) return 20;
 
-    // Check for "High" (5-9) or "Low" (0-4) clusters
-    // We want to PENALIZE long strings of Highs or Lows
     let maxClusterSize = 0;
     let currentClusterSize = 0;
-    let currentType = -1; // 0=Low, 1=High
+    let currentType = -1;
 
     for (let i = 0; i < digits.length; i++) {
         const type = digits[i] >= 5 ? 1 : 0;
@@ -150,8 +145,6 @@ const calculateClusterScore = (digits: number[]): number => {
     }
     maxClusterSize = Math.max(maxClusterSize, currentClusterSize);
 
-    // If max cluster > 3, penalize.
-    // 3 or less = 20 pts. 4 = 10 pts. 5+ = 0 pts.
     if (maxClusterSize <= 3) return 20;
     if (maxClusterSize === 4) return 10;
     return 0;
@@ -164,7 +157,7 @@ const createInitialAssetState = (symbol: ScannerSymbol): AssetState => ({
     displayName: SYMBOL_NAMES[symbol],
     digitBuffer: [],
     priceBuffer: [],
-    healthScore: 50, // Keep for legacy
+    healthScore: 50,
     score: {
         entropy: 0,
         volatility: 0,
@@ -193,8 +186,8 @@ export const useMultiAssetScanner = () => {
         });
         return initial as Record<ScannerSymbol, AssetState>;
     });
-    const [activeAsset, setActiveAsset] = useState<ScannerSymbol | null>(null); // The one currently TRADING
-    const [leaderAsset, setLeaderAsset] = useState<ScannerSymbol | null>(null); // The one with HIGHEST SCORE
+    const [activeAsset, setActiveAsset] = useState<ScannerSymbol | null>(null);
+    const [leaderAsset, setLeaderAsset] = useState<ScannerSymbol | null>(null);
 
     const [opportunityMessage, setOpportunityMessage] = useState<string | null>(null);
     const [stats, setStats] = useState<ScannerStats>({
@@ -203,12 +196,15 @@ export const useMultiAssetScanner = () => {
         totalProfit: 0,
         currentStake: 0,
         consecutiveLosses: 0,
-        vaultAccumulated: 0,
-        vaultCycles: 0,
     });
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [isWarmingUp, setIsWarmingUp] = useState(true);
     const [warmUpProgress, setWarmUpProgress] = useState(0);
+
+    // Cooldown & Cycle Protection States
+    const [isCoolingDown, setIsCoolingDown] = useState(false);
+    const [cooldownTime, setCooldownTime] = useState(0);
+    const [cooldownReason, setCooldownReason] = useState<'profit' | 'loss' | null>(null);
 
     // Refs for stable values
     const configRef = useRef<ScannerConfig | null>(null);
@@ -218,9 +214,15 @@ export const useMultiAssetScanner = () => {
     const totalProfitRef = useRef<number>(0);
     const consecutiveLossesRef = useRef<number>(0);
     const assetStatesRef = useRef<Record<ScannerSymbol, AssetState>>(assetStates);
-    const vaultAccumulatedRef = useRef<number>(0);
     const leaderAssetRef = useRef<ScannerSymbol | null>(null);
-    const sorosLevelRef = useRef<number>(0); // 0=Base, 1=Level 2 (Stake+Profit)
+    const sorosLevelRef = useRef<number>(0);
+    // Cycle tracking refs
+    const cycleProfitRef = useRef<number>(0);
+    const cycleCountRef = useRef<number>(0);
+    // Cooldown ref for synchronous guard (avoids async state delay)
+    const isCoolingDownRef = useRef<boolean>(false);
+    // Watchdog Ref
+    const lastTickTimeRef = useRef<number>(Date.now());
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -230,6 +232,11 @@ export const useMultiAssetScanner = () => {
     useEffect(() => {
         leaderAssetRef.current = leaderAsset;
     }, [leaderAsset]);
+
+    // Keep cooldown ref in sync with state (for synchronous guard)
+    useEffect(() => {
+        isCoolingDownRef.current = isCoolingDown;
+    }, [isCoolingDown]);
 
     // Helper to add log
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info', symbol?: ScannerSymbol) => {
@@ -243,29 +250,125 @@ export const useMultiAssetScanner = () => {
         setLogs(prev => [...prev.slice(-100), newLog]);
     }, []);
 
+    // Start Cooldown Helper
+    const startCooldown = useCallback((reason: 'profit' | 'loss') => {
+        const baseDuration = configRef.current?.cooldownDuration || 60;
+        // Random duration between base and base+30 seconds
+        const duration = baseDuration + Math.floor(Math.random() * 30);
+
+        console.log(`🧊 COOLDOWN TRIGGERED: ${reason} - ${duration}s`);
+
+        setIsCoolingDown(true);
+        setCooldownTime(duration);
+        setCooldownReason(reason);
+
+        // Reset cycle tracking
+        cycleProfitRef.current = 0;
+        consecutiveLossesRef.current = 0;
+        sorosLevelRef.current = 0;
+        currentStakeRef.current = initialStakeRef.current;
+
+        // Increment cycle count
+        cycleCountRef.current += 1;
+
+        // Clear asset buffers for fresh analysis
+        setAssetStates(prev => {
+            const cleared: Record<ScannerSymbol, AssetState> = {} as any;
+            SCANNER_SYMBOLS.forEach(sym => {
+                cleared[sym] = {
+                    ...prev[sym],
+                    digitBuffer: [],
+                    priceBuffer: [],
+                    tickCount: 0,
+                    score: { entropy: 0, volatility: 0, clusters: 0, total: 0 }
+                };
+            });
+            return cleared;
+        });
+
+        const logMsg = reason === 'profit'
+            ? `🏦 Meta de lucro atingida! Resfriando ${duration}s...`
+            : `🛡️ Proteção ativada (${configRef.current?.maxConsecutiveLosses || 2} losses). Resfriando ${duration}s...`;
+        addLog(logMsg, reason === 'profit' ? 'gold' : 'warning');
+    }, [addLog]);
+
+    // Cooldown Timer Effect
+    useEffect(() => {
+        if (!isCoolingDown || cooldownTime <= 0) return;
+
+        const interval = setInterval(() => {
+            setCooldownTime(prev => {
+                if (prev <= 1) {
+                    // Cooldown finished - FORCE RESUME
+                    console.log('✅ COOLDOWN FINISHED: Resuming operations');
+
+                    // CRITICAL: Reset ref FIRST for immediate synchronous unblocking
+                    isCoolingDownRef.current = false;
+
+                    // Reset cooldown state
+                    setIsCoolingDown(false);
+                    setCooldownReason(null);
+
+                    // CRITICAL: Reset warmup to collect fresh data
+                    setIsWarmingUp(true);
+                    setWarmUpProgress(0);
+
+                    // CRITICAL: Clear contract wait flag
+                    isWaitingForContractRef.current = false;
+
+                    addLog('🚀 Resfriamento completo! Reiniciando análise...', 'success');
+                    addLog('⏳ Calibrando sistema...', 'info');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isCoolingDown, cooldownTime, addLog]);
+
+    // Watchdog Timer (Detect Freezes)
+    useEffect(() => {
+        if (!isRunning) return;
+
+        const interval = setInterval(() => {
+            if (isCoolingDownRef.current) {
+                lastTickTimeRef.current = Date.now(); // Reset watchdog during cooldown
+                return;
+            }
+
+            const timeSinceLastTick = Date.now() - lastTickTimeRef.current;
+            if (timeSinceLastTick > 5000) {
+                console.warn(`⚠️ Watchdog: No ticks for ${timeSinceLastTick}ms`);
+                addLog('⚠️ Alerta: Conexión lenta o inestable...', 'warning');
+                // Optional: Trigger resubscription if needed
+                // socket.send(JSON.stringify({ ticks: ... }));
+                lastTickTimeRef.current = Date.now(); // Reset to avoid spamming
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isRunning, addLog]);
+
     // Scanning Feedback Loop (Dopamine for waiting)
     useEffect(() => {
         if (!isRunning) return;
 
         const interval = setInterval(() => {
-            if (activeAsset) return; // Silent if trading
+            if (activeAsset) return;
 
-            // Pick a random asset to "scan" in logs
             const randomSym = SCANNER_SYMBOLS[Math.floor(Math.random() * SCANNER_SYMBOLS.length)];
             const state = assetStatesRef.current[randomSym];
             const currentScore = state.score.total;
             const targetScore = configRef.current?.minScore || 75;
 
-            // Only log if it's somewhat interesting (e.g. > 30)
             if (currentScore > 30) {
-                // Varying messages
                 const msgs = [
                     `🔎 Escaneando ${state.displayName}... Score ${currentScore}% (Buscando >${targetScore}%)`,
                     `📊 Análisis V${state.displayName.split('V')[1]}: ${currentScore}% - Calculando entrada...`,
                     `⚡ ${state.displayName}: Volatilidad detectada. Score ${currentScore}%`,
                     `🔄 Sincronizando ${state.displayName}...`
                 ];
-                // 30% chance to log to avoid spamming too much
                 if (Math.random() > 0.7) {
                     addLog(msgs[Math.floor(Math.random() * msgs.length)], 'info');
                 }
@@ -279,21 +382,33 @@ export const useMultiAssetScanner = () => {
     const checkWarmupStatus = useCallback(() => {
         const states = assetStatesRef.current;
         const totalTicks = SCANNER_SYMBOLS.reduce((sum, sym) => sum + states[sym].tickCount, 0);
-        const minRequired = SCANNER_SYMBOLS.length * 25; // 25 ticks per asset minimum
+        const minRequired = SCANNER_SYMBOLS.length * 25;
 
         const progress = Math.min(100, (totalTicks / minRequired) * 100);
         setWarmUpProgress(progress);
 
-        // Check if all assets have at least 15 ticks (slightly lowered for faster startup)
         const allReady = SCANNER_SYMBOLS.every(sym => states[sym].tickCount >= 15);
 
-        if (allReady && isWarmingUp) {
+        if (totalTicks >= minRequired && isWarmingUp) {
             setIsWarmingUp(false);
-            addLog('🔥 Sistema calibrado. Motor Quant Activo.', 'gold');
+            setWarmUpProgress(100);
         }
 
         return allReady;
-    }, [isWarmingUp, addLog]);
+    }, [isWarmingUp]);
+
+    // Warmup Completion Effect
+    const warmupLoggedRef = useRef(false);
+    useEffect(() => {
+        if (!isWarmingUp && !warmupLoggedRef.current && isRunning) {
+            warmupLoggedRef.current = true;
+            addLog('🔥 Sistema calibrado. Motor Quant Activo.', 'gold');
+            console.log('✅ WARMUP COMPLETE: All assets ready');
+        }
+        if (isWarmingUp) {
+            warmupLoggedRef.current = false;
+        }
+    }, [isWarmingUp, isRunning, addLog]);
 
     // Helper to find the current Leader Asset
     const updateLeaderAsset = useCallback(() => {
@@ -304,7 +419,6 @@ export const useMultiAssetScanner = () => {
 
         const states = assetStatesRef.current;
         let bestSymbol: ScannerSymbol | null = null;
-        // Start with -1 so any score >= 0 picks a leader, but practically scores are 0-100
         let highestScore = -1;
 
         SCANNER_SYMBOLS.forEach(sym => {
@@ -315,20 +429,10 @@ export const useMultiAssetScanner = () => {
             }
         });
 
-        const minScore = configRef.current?.minScore || 75;
-
-        // Only switch leader if it meets minimum threshold or if we just want to track the best one generally
-        // But for TRADING we will require it to be the leader AND meet threshold.
-        // For UI purposes, we always show the leader.
         if (bestSymbol && bestSymbol !== leaderAssetRef.current) {
-            // Only log if the previous leader was valid
-            if (leaderAssetRef.current) {
-                // Optional: Log switch to prevent spam
-                // addLog(`🔄 Auto-Switch: ${SYMBOL_NAMES[leaderAssetRef.current]} -> ${SYMBOL_NAMES[bestSymbol]} (Score: ${highestScore})`, 'info');
-            }
             setLeaderAsset(bestSymbol);
         }
-    }, [addLog]); // Removed dependency on states to avoid loop, using refs inside
+    }, []);
 
     // Stop the scanner
     const stopScanner = useCallback(() => {
@@ -346,341 +450,331 @@ export const useMultiAssetScanner = () => {
 
     // Handle incoming WebSocket messages
     const handleMessage = useCallback((event: MessageEvent) => {
-        const data = JSON.parse(event.data);
+        // COOLDOWN GUARD: Use REF for synchronous check (avoids state async delay)
+        if (isCoolingDownRef.current) {
+            return;
+        }
 
-        // Handle tick updates for any of our symbols
-        if (data.msg_type === 'tick' && data.tick) {
-            const tickSymbol = data.tick.symbol as ScannerSymbol;
+        try {
+            const data = JSON.parse(event.data);
 
-            // Only process if it's one of our tracked symbols
-            if (!SCANNER_SYMBOLS.includes(tickSymbol)) return;
+            // Update Watchdog on any valid message from our subscription
+            if (data.msg_type === 'tick') {
+                lastTickTimeRef.current = Date.now();
+            }
 
-            const price = parseFloat(data.tick.quote);
-            const quote = price.toFixed(2);
-            const currentDigit = parseInt(quote.charAt(quote.length - 1));
+            // Handle tick updates for any of our symbols
+            if (data.msg_type === 'tick' && data.tick) {
+                const tickSymbol = data.tick.symbol as ScannerSymbol;
 
-            setAssetStates(prev => {
-                const asset = prev[tickSymbol];
-                const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
-                const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
+                if (!SCANNER_SYMBOLS.includes(tickSymbol)) return;
 
-                // --- QUANT SCORING ---
-                const zScore = calculateZScore(newPriceBuffer);
-                const entropyScore = calculateEntropyScore(newDigitBuffer);
-                const volatilityScore = calculateVolatilityScore(zScore);
-                const clusterScore = calculateClusterScore(newDigitBuffer);
-                const totalScore = entropyScore + volatilityScore + clusterScore;
+                const price = parseFloat(data.tick.quote);
+                const quote = price.toFixed(2);
+                const currentDigit = parseInt(quote.charAt(quote.length - 1));
 
-                const scoreObj: AssetScore = {
-                    entropy: entropyScore,
-                    volatility: volatilityScore,
-                    clusters: clusterScore,
-                    total: totalScore
-                };
+                setAssetStates(prev => {
+                    const asset = prev[tickSymbol];
+                    const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
+                    const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
 
-                // Check Shadow Pattern (last two digits are the same)
-                const lastTwo = newDigitBuffer.length >= 2
-                    ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
-                    : null;
-                const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
+                    // --- QUANT SCORING ---
+                    const zScore = calculateZScore(newPriceBuffer);
+                    const entropyScore = calculateEntropyScore(newDigitBuffer);
+                    const volatilityScore = calculateVolatilityScore(zScore);
+                    const clusterScore = calculateClusterScore(newDigitBuffer);
+                    const totalScore = entropyScore + volatilityScore + clusterScore;
 
-                // Check Inertia - Now part of Volatility Score but we keep the boolean for strict trigger
-                const inertiaOK = zScore < 1.0;
-
-                // Determine status
-                let status: AssetState['status'] = 'scanning';
-
-                // If Auto-Switch is ON, penalize non-leaders
-                const isAutoSwitchOn = configRef.current?.autoSwitch;
-                const minScore = configRef.current?.minScore || 75;
-                const isLeader = leaderAssetRef.current === tickSymbol;
-                const scorePass = totalScore >= minScore;
-
-                if (isAutoSwitchOn && (!isLeader || !scorePass)) {
-                    status = 'vetoed';
-                } else if (shadowPattern && !inertiaOK) {
-                    status = 'forming'; // Pattern detected but volatility too high
-                } else if (shadowPattern && inertiaOK) {
-                    status = 'forming'; // Ready to fire
-                }
-
-                return {
-                    ...prev,
-                    [tickSymbol]: {
-                        ...asset,
-                        digitBuffer: newDigitBuffer,
-                        priceBuffer: newPriceBuffer,
-                        healthScore: entropyScore * 2, // Map 0-50 to 0-100 for legacy display
-                        score: scoreObj,
-                        shadowPattern,
-                        lastTwoDigits: lastTwo,
-                        inertiaOK,
-                        zScore,
-                        status,
-                        lastPrice: price,
-                        tickCount: asset.tickCount + 1,
-                    }
-                };
-            });
-
-            // Update leader periodically (on every tick might be too frequent but ensures responsiveness)
-            // We do it after state update in the next effect or here via ref check?
-            // Since we need the NEW state to update leader, and state update is async, 
-            // we'll rely on a separate effect tracking assetStates to update leader, OR do it inside the setAssetStates (risky for side effects).
-            // Better: Do implicit leader check right before trading decision.
-
-            // However, we want the UI to show the leader. 
-            // We'll calculate "Leader Candidate" here for trading logic using the JUST CALCULATED values.
-            // But for React State 'leaderAsset', we'll rely on the useEffect below.
-
-            // Check if we should trigger a trade
-            if (isRunning && !isWaitingForContractRef.current && socket && configRef.current) {
-                const currentStates = assetStatesRef.current; // This is 'prev' state effectively + this tick update is pending...
-                // Wait, we need the LATEST values we just computed for this symbol.
-                // We can't access them from 'currentStates' yet.
-                // So we assume the *previous* tick's leader status for other assets, but use fresh data for current asset.
-
-                // Let's perform a "Real-Time Leader Check" just for this firing moment.
-
-                if (!checkWarmupStatus()) return;
-
-                // Get fresh data for this symbol from the closure variables above
-                // We need to re-calculate them or grab them? We calculated them for setAssetStates.
-                // Let's assume the state update is fast enough or use Refs for critical buffers?
-                // Actually, inside this callback, 'assetStatesRef.current' is stale for THIS tick.
-                // But typically 1 tick difference is fine for leader selection context.
-
-                const asset = currentStates[tickSymbol];
-                // We need the NEW value for shadowPattern and Scores to decide strictly.
-                // Re-calculating for safety:
-                const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
-                const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
-                const zScore = calculateZScore(newPriceBuffer);
-                const entropyScore = calculateEntropyScore(newDigitBuffer);
-                const volatilityScore = calculateVolatilityScore(zScore);
-                const clusterScore = calculateClusterScore(newDigitBuffer);
-                const totalScore = entropyScore + volatilityScore + clusterScore;
-
-                const lastTwo = newDigitBuffer.length >= 2
-                    ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
-                    : null;
-                const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
-                const inertiaOK = zScore < 1.0;
-
-                // Fire Logic
-                if (shadowPattern && inertiaOK && newDigitBuffer.length >= 10) {
-
-                    // AUTO-SWITCH GUARD
-                    if (configRef.current.autoSwitch) {
-                        const minScore = configRef.current.minScore || 75;
-
-                        // 1. Check Score Threshold
-                        if (totalScore < minScore) {
-                            // addLog(`⚠️ Veto: ${SYMBOL_NAMES[tickSymbol]} Score ${totalScore} < ${minScore}`, 'warning');
-                            setAssetStates(prev => ({
-                                ...prev,
-                                [tickSymbol]: { ...prev[tickSymbol], status: 'vetoed' }
-                            }));
-                            return;
-                        }
-
-                        // 2. Check if this is the current leader
-                        // Use leaderAssetRef for leadership check
-                        const currentLeader = leaderAssetRef.current;
-                        if (currentLeader && currentLeader !== tickSymbol) {
-                            // Another asset is the designated leader
-                            // Allow trade only if leader is not actively forming
-                            const leaderState = currentStates[currentLeader];
-                            if (leaderState.status === 'forming' || leaderState.shadowPattern) {
-                                // Leader has a better opportunity
-                                return;
-                            }
-                        }
-                    }
-
-                    // EXECUTION
-                    const repeatedDigit = lastTwo![0];
-
-                    isWaitingForContractRef.current = true;
-                    setActiveAsset(tickSymbol);
-                    setOpportunityMessage(`🎯 Oportunidad en ${SYMBOL_NAMES[tickSymbol]} (Score: ${totalScore})`);
-
-                    setAssetStates(prev => ({
-                        ...prev,
-                        [tickSymbol]: {
-                            ...prev[tickSymbol],
-                            status: 'firing'
-                        }
-                    }));
-
-                    const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
-
-                    addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: Patrón ${repeatedDigit}-${repeatedDigit} | Score: ${totalScore}%`, 'gold', tickSymbol);
-
-                    // Execute DIGITDIFF trade
-                    const buyRequest = {
-                        buy: 1,
-                        subscribe: 1,
-                        price: 10000,
-                        parameters: {
-                            contract_type: 'DIGITDIFF',
-                            symbol: tickSymbol,
-                            currency: 'USD',
-                            amount: stakeAmount,
-                            basis: 'stake',
-                            duration: 1,
-                            duration_unit: 't',
-                            barrier: repeatedDigit.toString(),
-                        }
+                    const scoreObj: AssetScore = {
+                        entropy: entropyScore,
+                        volatility: volatilityScore,
+                        clusters: clusterScore,
+                        total: totalScore
                     };
 
-                    socket.send(JSON.stringify(buyRequest));
-                    addLog(`⚡ Orden enviada: DIFF ${repeatedDigit} en ${SYMBOL_NAMES[tickSymbol]}`, 'info', tickSymbol);
-                }
-            }
-        }
+                    const lastTwo = newDigitBuffer.length >= 2
+                        ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
+                        : null;
+                    const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
+                    const inertiaOK = zScore < 1.0;
 
-        // Handle buy response
-        if (data.msg_type === 'buy' && data.buy) {
-            addLog(`✅ Contrato abierto: ${data.buy.contract_id}`, 'success');
-        }
+                    let status: AssetState['status'] = 'scanning';
 
-        // Handle proposal_open_contract (contract result)
-        if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
-            const contract = data.proposal_open_contract;
+                    const isAutoSwitchOn = configRef.current?.autoSwitch;
+                    const minScore = configRef.current?.minScore || 75;
+                    const isLeader = leaderAssetRef.current === tickSymbol;
+                    const scorePass = totalScore >= minScore;
 
-            if (contract.is_sold) {
-                isWaitingForContractRef.current = false;
-                const profit = parseFloat(contract.profit);
-                const isWin = profit > 0;
-                const tradedSymbol = activeAsset;
-
-                // Reset active asset status
-                if (tradedSymbol) {
-                    setAssetStates(prev => ({
-                        ...prev,
-                        [tradedSymbol]: {
-                            ...prev[tradedSymbol],
-                            status: 'scanning'
-                        }
-                    }));
-                }
-
-                setActiveAsset(null);
-                setOpportunityMessage(null);
-
-                // Update global session stats
-                updateStats(profit, isWin);
-
-                if (isWin) {
-                    addLog(`💰 WIN +$${profit.toFixed(2)} en ${tradedSymbol ? SYMBOL_NAMES[tradedSymbol] : 'UNKNOWN'}`, 'gold', tradedSymbol || undefined);
-
-                    consecutiveLossesRef.current = 0;
-
-                    // SOROS LOGIC (Dynamic Levels)
-                    const useSoros = configRef.current?.useSoros;
-                    const maxSoros = configRef.current?.maxSorosLevels || 1;
-
-                    if (useSoros) {
-                        if (sorosLevelRef.current < maxSoros) {
-                            // Level UP (Compounding)
-                            sorosLevelRef.current += 1;
-                            const nextStake = parseFloat((currentStakeRef.current + profit).toFixed(2));
-                            currentStakeRef.current = nextStake;
-                            addLog(`🚀 SOROS NIVEL ${sorosLevelRef.current}: Apostando Ganancia ($${nextStake})`, 'gold');
-                        } else {
-                            // Max Level Reached -> Reset to Base (Cycle Complete)
-                            sorosLevelRef.current = 0;
-                            currentStakeRef.current = initialStakeRef.current;
-                            addLog(`🏆 CICLO SOROS COMPLETADO (${maxSoros} Niveles): Retorno a base ($${currentStakeRef.current})`, 'success');
-                        }
-                    } else {
-                        // Standard Reset
-                        currentStakeRef.current = initialStakeRef.current;
+                    if (isAutoSwitchOn && (!isLeader || !scorePass)) {
+                        status = 'vetoed';
+                    } else if (shadowPattern && !inertiaOK) {
+                        status = 'forming';
+                    } else if (shadowPattern && inertiaOK) {
+                        status = 'forming';
                     }
 
-                    // Update vault
-                    vaultAccumulatedRef.current += profit;
-                    const vaultTarget = configRef.current?.vaultTarget || 3.0;
+                    return {
+                        ...prev,
+                        [tickSymbol]: {
+                            ...asset,
+                            digitBuffer: newDigitBuffer,
+                            priceBuffer: newPriceBuffer,
+                            healthScore: entropyScore * 2,
+                            score: scoreObj,
+                            shadowPattern,
+                            lastTwoDigits: lastTwo,
+                            inertiaOK,
+                            zScore,
+                            status,
+                            lastPrice: price,
+                            tickCount: asset.tickCount + 1,
+                        }
+                    };
+                });
 
-                    if (vaultAccumulatedRef.current >= vaultTarget) {
-                        addLog(`🏦 ¡BÓVEDA LLENA! +$${vaultAccumulatedRef.current.toFixed(2)} asegurados`, 'gold');
+                // Check if we should trigger a trade
+                if (isRunning && !isWaitingForContractRef.current && socket && configRef.current) {
+                    const currentStates = assetStatesRef.current;
+
+                    if (!checkWarmupStatus()) return;
+
+                    const asset = currentStates[tickSymbol];
+                    const newDigitBuffer = [...asset.digitBuffer, currentDigit].slice(-25);
+                    const newPriceBuffer = [...asset.priceBuffer, price].slice(-25);
+                    const zScore = calculateZScore(newPriceBuffer);
+                    const entropyScore = calculateEntropyScore(newDigitBuffer);
+                    const volatilityScore = calculateVolatilityScore(zScore);
+                    const clusterScore = calculateClusterScore(newDigitBuffer);
+                    const totalScore = entropyScore + volatilityScore + clusterScore;
+
+                    const lastTwo = newDigitBuffer.length >= 2
+                        ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
+                        : null;
+                    const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
+                    const inertiaOK = zScore < 1.0;
+
+                    // Fire Logic
+                    if (shadowPattern && inertiaOK && newDigitBuffer.length >= 10) {
+
+                        console.log(`🛠️ Intentando disparar en ${SYMBOL_NAMES[tickSymbol]}. Score: ${totalScore}.`);
+
+                        // AUTO-SWITCH GUARD
+                        if (configRef.current.autoSwitch) {
+                            const minScore = configRef.current.minScore || 75;
+
+                            if (totalScore < minScore) {
+                                setAssetStates(prev => ({
+                                    ...prev,
+                                    [tickSymbol]: { ...prev[tickSymbol], status: 'vetoed' }
+                                }));
+                                return;
+                            }
+
+                            const currentLeader = leaderAssetRef.current;
+                            if (currentLeader && currentLeader !== tickSymbol) {
+                                const leaderState = currentStates[currentLeader];
+                                if (leaderState.status === 'forming' || leaderState.shadowPattern) {
+                                    return;
+                                }
+                            }
+                        }
+
+                        // EXECUTION
+                        const repeatedDigit = lastTwo![0];
+
+                        isWaitingForContractRef.current = true;
+                        setActiveAsset(tickSymbol);
+                        setOpportunityMessage(`🎯 Oportunidad en ${SYMBOL_NAMES[tickSymbol]} (Score: ${totalScore})`);
+
+                        setAssetStates(prev => ({
+                            ...prev,
+                            [tickSymbol]: {
+                                ...prev[tickSymbol],
+                                status: 'firing'
+                            }
+                        }));
+
+                        const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
+
+                        addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: Patrón ${repeatedDigit}-${repeatedDigit} | Score: ${totalScore}%`, 'gold', tickSymbol);
+
+                        const buyRequest = {
+                            buy: 1,
+                            subscribe: 1,
+                            price: 10000,
+                            parameters: {
+                                contract_type: 'DIGITDIFF',
+                                symbol: tickSymbol,
+                                currency: 'USD',
+                                amount: stakeAmount,
+                                basis: 'stake',
+                                duration: 1,
+                                duration_unit: 't',
+                                barrier: repeatedDigit.toString(),
+                            }
+                        };
+
+                        socket.send(JSON.stringify(buyRequest));
+                        addLog(`⚡ Orden enviada: DIFF ${repeatedDigit} en ${SYMBOL_NAMES[tickSymbol]}`, 'info', tickSymbol);
+                    } else if (shadowPattern) {
+                        if (!inertiaOK) {
+                            if (Math.random() > 0.8) addLog(`⚠️ Patrón ignorado ${SYMBOL_NAMES[tickSymbol]}: Alta Volatilidad (Z:${zScore.toFixed(2)})`, 'warning');
+                        }
+                    }
+                }
+            }
+
+            // Handle buy response
+            if (data.msg_type === 'buy' && data.buy) {
+                addLog(`✅ Contrato abierto: ${data.buy.contract_id}`, 'success');
+            }
+
+            // Handle proposal_open_contract (contract result)
+            if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
+                const contract = data.proposal_open_contract;
+
+                if (contract.is_sold) {
+                    isWaitingForContractRef.current = false;
+                    const profit = parseFloat(contract.profit);
+                    const isWin = profit > 0;
+                    const tradedSymbol = activeAsset;
+
+                    if (tradedSymbol) {
+                        setAssetStates(prev => ({
+                            ...prev,
+                            [tradedSymbol]: {
+                                ...prev[tradedSymbol],
+                                status: 'scanning'
+                            }
+                        }));
+                    }
+
+                    setActiveAsset(null);
+                    setOpportunityMessage(null);
+
+                    updateStats(profit, isWin);
+
+                    if (isWin) {
+                        addLog(`💰 WIN +$${profit.toFixed(2)} en ${tradedSymbol ? SYMBOL_NAMES[tradedSymbol] : 'UNKNOWN'}`, 'gold', tradedSymbol || undefined);
+
+                        consecutiveLossesRef.current = 0;
+
+                        // SOROS LOGIC (Dynamic Levels)
+                        const useSoros = configRef.current?.useSoros;
+                        const maxSoros = configRef.current?.maxSorosLevels || 1;
+
+                        if (useSoros) {
+                            if (sorosLevelRef.current < maxSoros) {
+                                sorosLevelRef.current += 1;
+                                const nextStake = parseFloat((currentStakeRef.current + profit).toFixed(2));
+                                currentStakeRef.current = nextStake;
+                                addLog(`🚀 SOROS NIVEL ${sorosLevelRef.current}: Apostando Ganancia ($${nextStake})`, 'gold');
+                            } else {
+                                sorosLevelRef.current = 0;
+                                currentStakeRef.current = initialStakeRef.current;
+                                addLog(`🏆 CICLO SOROS COMPLETADO (${maxSoros} Niveles): Retorno a base ($${currentStakeRef.current})`, 'success');
+                            }
+                        } else {
+                            currentStakeRef.current = initialStakeRef.current;
+                        }
+
                         setStats(prev => ({
                             ...prev,
-                            vaultCycles: prev.vaultCycles + 1,
-                            vaultAccumulated: 0,
+                            wins: prev.wins + 1,
+                            totalProfit: prev.totalProfit + profit,
+                            currentStake: initialStakeRef.current,
+                            consecutiveLosses: 0,
+                            cycleProfit: cycleProfitRef.current + profit,
+                            cycleCount: cycleCountRef.current,
                         }));
-                        vaultAccumulatedRef.current = 0;
+
+                        // PROFIT TARGET CHECK: Trigger cooldown if cycle profit reached
+                        cycleProfitRef.current += profit;
+                        const profitTarget = configRef.current?.profitTarget || 3.0;
+                        if (cycleProfitRef.current >= profitTarget) {
+                            addLog(`🎯 Lucro do ciclo: $${cycleProfitRef.current.toFixed(2)} (meta: $${profitTarget})`, 'gold');
+                            startCooldown('profit');
+                            return; // Exit early, cooldown started
+                        }
+                    } else {
+                        const lossAmount = Math.abs(profit);
+                        addLog(`💥 LOSS -$${lossAmount.toFixed(2)} en ${tradedSymbol ? SYMBOL_NAMES[tradedSymbol] : 'UNKNOWN'}`, 'error', tradedSymbol || undefined);
+
+                        const martingaleEnabled = configRef.current?.useMartingale !== false;
+                        const maxGale = configRef.current?.maxMartingaleLevel || 3;
+
+                        if (!martingaleEnabled) {
+                            addLog('🔄 Martingale OFF: Stake fijo', 'info');
+                        } else {
+                            consecutiveLossesRef.current += 1;
+
+                            if (consecutiveLossesRef.current >= maxGale) {
+                                addLog(`🛑 Max Gale (${maxGale}) alcanzado. Reseteando.`, 'warning');
+                                currentStakeRef.current = initialStakeRef.current;
+                                consecutiveLossesRef.current = 0;
+                                sorosLevelRef.current = 0;
+                            } else {
+                                sorosLevelRef.current = 0;
+                                const factor = configRef.current?.martingaleFactor || 2.5;
+                                const newStake = parseFloat((currentStakeRef.current * factor).toFixed(2));
+                                currentStakeRef.current = newStake;
+                                addLog(`📈 Gale Nivel ${consecutiveLossesRef.current} (x${factor}): $${newStake.toFixed(2)}`, 'warning');
+                            }
+
+                            // LOSS PROTECTION CHECK: Trigger cooldown if max consecutive losses reached
+                            const maxLosses = configRef.current?.maxConsecutiveLosses || 2;
+                            if (consecutiveLossesRef.current >= maxLosses) {
+                                setStats(prev => ({
+                                    ...prev,
+                                    losses: prev.losses + 1,
+                                    totalProfit: prev.totalProfit + profit,
+                                    currentStake: currentStakeRef.current,
+                                    consecutiveLosses: consecutiveLossesRef.current,
+                                    cycleProfit: cycleProfitRef.current,
+                                    cycleCount: cycleCountRef.current,
+                                }));
+                                startCooldown('loss');
+                                return; // Exit early, cooldown started
+                            }
+                        }
+
+                        setStats(prev => ({
+                            ...prev,
+                            losses: prev.losses + 1,
+                            totalProfit: prev.totalProfit + profit,
+                            currentStake: currentStakeRef.current,
+                            consecutiveLosses: consecutiveLossesRef.current,
+                            cycleProfit: cycleProfitRef.current,
+                            cycleCount: cycleCountRef.current,
+                        }));
                     }
 
-                    setStats(prev => ({
-                        ...prev,
-                        wins: prev.wins + 1,
-                        totalProfit: prev.totalProfit + profit,
-                        currentStake: initialStakeRef.current,
-                        consecutiveLosses: 0,
-                        vaultAccumulated: vaultAccumulatedRef.current,
-                    }));
-                } else {
-                    const lossAmount = Math.abs(profit);
-                    addLog(`💥 LOSS -$${lossAmount.toFixed(2)} en ${tradedSymbol ? SYMBOL_NAMES[tradedSymbol] : 'UNKNOWN'}`, 'error', tradedSymbol || undefined);
+                    totalProfitRef.current = stats.totalProfit + profit;
 
-                    const martingaleEnabled = configRef.current?.useMartingale !== false;
-                    const maxGale = configRef.current?.maxMartingaleLevel || 3;
-
-                    if (!martingaleEnabled) {
-                        addLog('🔄 Martingale OFF: Stake fijo', 'info');
-                    } else {
-                        consecutiveLossesRef.current += 1;
-
-                        if (consecutiveLossesRef.current >= maxGale) {
-                            addLog(`🛑 Max Gale (${maxGale}) alcanzado. Reseteando.`, 'warning');
-                            addLog(`🛑 Max Gale (${maxGale}) alcanzado. Reseteando.`, 'warning');
-                            currentStakeRef.current = initialStakeRef.current;
-                            consecutiveLossesRef.current = 0;
-                            sorosLevelRef.current = 0; // Reset Soros on Max Gale Loss
-                        } else {
-                            // Reset Soros on any Loss (Martingale takes over)
-                            sorosLevelRef.current = 0;
-                            // Configurable Martingale Factor (default 2.5)
-                            const factor = configRef.current?.martingaleFactor || 2.5;
-                            const newStake = parseFloat((currentStakeRef.current * factor).toFixed(2));
-                            currentStakeRef.current = newStake;
-                            addLog(`📈 Gale Nivel ${consecutiveLossesRef.current} (x${factor}): $${newStake.toFixed(2)}`, 'warning');
+                    // Check TP/SL
+                    if (configRef.current) {
+                        if (totalProfitRef.current >= configRef.current.takeProfit) {
+                            toast.success('¡Meta alcanzada!');
+                            stopScanner();
+                        } else if (totalProfitRef.current <= -configRef.current.stopLoss) {
+                            toast.error('Stop Loss activado');
+                            stopScanner();
                         }
                     }
-
-                    setStats(prev => ({
-                        ...prev,
-                        losses: prev.losses + 1,
-                        totalProfit: prev.totalProfit + profit,
-                        currentStake: currentStakeRef.current,
-                        consecutiveLosses: consecutiveLossesRef.current,
-                    }));
-                }
-
-                totalProfitRef.current = stats.totalProfit + profit;
-
-                // Check TP/SL
-                if (configRef.current) {
-                    if (totalProfitRef.current >= configRef.current.takeProfit) {
-                        toast.success('¡Meta alcanzada!');
-                        stopScanner();
-                    } else if (totalProfitRef.current <= -configRef.current.stopLoss) {
-                        toast.error('Stop Loss activado');
-                        stopScanner();
-                    }
                 }
             }
-        }
 
-        if (data.error) {
-            // Ignore "already subscribed" errors to prevent log spam
-            if (data.error.code === 'AlreadySubscribed' || data.error.message?.includes('already subscribed')) {
-                return;
+            if (data.error) {
+                if (data.error.code === 'AlreadySubscribed' || data.error.message?.includes('already subscribed')) {
+                    return;
+                }
+                addLog(`❌ Error: ${data.error.message}`, 'error');
+                isWaitingForContractRef.current = false;
             }
-            addLog(`❌ Error: ${data.error.message}`, 'error');
-            isWaitingForContractRef.current = false;
+
+        } catch (err) {
+            console.error("CRITICAL ERROR in Scanner:", err);
+            addLog('❌ Error interno en scanner. Recuperando...', 'error');
         }
 
     }, [socket, addLog, updateStats, isRunning, activeAsset, checkWarmupStatus, stats.totalProfit, stopScanner]);
@@ -692,7 +786,6 @@ export const useMultiAssetScanner = () => {
             return;
         }
 
-        // Find highest score
         let bestSym: ScannerSymbol | null = null;
         let bestScore = -1;
 
@@ -723,9 +816,6 @@ export const useMultiAssetScanner = () => {
         isWaitingForContractRef.current = false;
         consecutiveLossesRef.current = 0;
         totalProfitRef.current = 0;
-        consecutiveLossesRef.current = 0;
-        totalProfitRef.current = 0;
-        vaultAccumulatedRef.current = 0;
         sorosLevelRef.current = 0;
 
         // Reset all asset states
@@ -741,8 +831,8 @@ export const useMultiAssetScanner = () => {
             totalProfit: 0,
             currentStake: config.stake,
             consecutiveLosses: 0,
-            vaultAccumulated: 0,
-            vaultCycles: 0,
+            cycleProfit: 0,
+            cycleCount: 0,
         });
         setLogs([]);
         setActiveAsset(null);
@@ -750,6 +840,12 @@ export const useMultiAssetScanner = () => {
         setOpportunityMessage(null);
         setIsWarmingUp(true);
         setWarmUpProgress(0);
+        // Reset cooldown states
+        setIsCoolingDown(false);
+        setCooldownTime(0);
+        setCooldownReason(null);
+        cycleProfitRef.current = 0;
+        cycleCountRef.current = 0;
 
         setActiveBot('Bug Deriv Scanner');
         addLog('🚀 BUG DERIV SCANNER iniciado - Escaneando 5 activos', 'gold');
@@ -762,11 +858,28 @@ export const useMultiAssetScanner = () => {
         return true;
     }, [addLog, setActiveBot, socket]);
 
+    // Store handleMessage in ref to prevent subscription loops
+    const handleMessageRef = useRef(handleMessage);
+    useEffect(() => {
+        handleMessageRef.current = handleMessage;
+    }, [handleMessage]);
+
     // Socket subscription management
     useEffect(() => {
         if (!isRunning || !socket || socket.readyState !== WebSocket.OPEN) return;
 
-        const onMessage = (event: MessageEvent) => handleMessage(event);
+        // During cooldown, unsubscribe to save resources
+        if (isCoolingDown) {
+            console.log('🧳 COOLDOWN: Unsubscribing from all ticks to save resources');
+            socket.send(JSON.stringify({ forget_all: 'ticks' }));
+            return () => { };
+        }
+
+        console.log('🔄 SUBSCRIPTION MANAGER: Limpiando y re-suscribiendo...');
+
+        socket.send(JSON.stringify({ forget_all: 'ticks' }));
+
+        const onMessage = (event: MessageEvent) => handleMessageRef.current(event);
         socket.addEventListener('message', onMessage);
 
         // Subscribe to ALL symbols
@@ -781,9 +894,7 @@ export const useMultiAssetScanner = () => {
         return () => {
             socket.removeEventListener('message', onMessage);
         };
-    }, [isRunning, socket, handleMessage, addLog]);
-
-
+    }, [isRunning, socket, addLog, isCoolingDown]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -799,12 +910,17 @@ export const useMultiAssetScanner = () => {
         isRunning,
         assetStates,
         activeAsset,
-        leaderAsset, // Export for UI
+        leaderAsset,
         opportunityMessage,
         stats,
         logs,
         isWarmingUp,
         warmUpProgress,
+
+        // Cooldown States
+        isCoolingDown,
+        cooldownTime,
+        cooldownReason,
 
         // Actions
         startScanner,
