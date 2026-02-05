@@ -30,7 +30,7 @@ interface LogEntry {
 type TrendColor = 'Red' | 'Blue';
 
 export const useBotSX = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
 
     const { isEnabled: isRiskEnabled, settings: riskSettings } = useRiskSystem();
 
@@ -134,6 +134,7 @@ export const useBotSX = () => {
                 if (shouldEnter && socket && configRef.current) {
                     isWaitingForContractRef.current = true;
                     addLog(`🎯 ¡Patrón detectado! Ejecutando compra...`, 'success');
+                    const currency = account?.currency || 'USD';
 
                     // Send buy request for Accumulator
                     const buyRequest = {
@@ -143,7 +144,7 @@ export const useBotSX = () => {
                         parameters: {
                             contract_type: 'ACCU',
                             symbol: configRef.current.symbol || 'R_10',
-                            currency: 'USD',
+                            currency: currency,
                             amount: stats.currentStake,
                             basis: 'stake',
                             growth_rate: configRef.current.growthRate || 0.02,

@@ -27,7 +27,7 @@ interface LogEntry {
 }
 
 export const useBotMaquina = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
 
     // Bot State
@@ -105,6 +105,7 @@ export const useBotMaquina = () => {
                 if (contractType) {
                     isWaitingForContractRef.current = true;
                     const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
+                    const currency = account?.currency || 'USD';
 
                     // Send buy request
                     const buyRequest = {
@@ -114,7 +115,7 @@ export const useBotMaquina = () => {
                         parameters: {
                             contract_type: contractType,
                             symbol: configRef.current.symbol || 'R_75',
-                            currency: 'USD',
+                            currency: currency,
                             amount: stakeAmount,
                             basis: 'stake',
                             duration: 1,

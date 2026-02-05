@@ -30,7 +30,7 @@ export interface SniperStats {
 }
 
 export const useOneShotSniper = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
 
     // Estado principal
@@ -184,13 +184,14 @@ export const useOneShotSniper = () => {
         if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
         contractInProgressRef.current = true;
+        const currency = account?.currency || 'USD';
 
         const proposal = {
             proposal: 1,
             amount: amount,
             basis: 'stake',
             contract_type: type === 'EVEN' ? 'DIGITEVEN' : 'DIGITODD',
-            currency: 'USD',
+            currency: currency,
             duration: 1,
             duration_unit: 't',
             symbol: configRef.current.symbol

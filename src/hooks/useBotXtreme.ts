@@ -26,7 +26,7 @@ interface LogEntry {
 }
 
 export const useBotXtreme = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
 
     // Bot State
@@ -81,6 +81,7 @@ export const useBotXtreme = () => {
                 addLog(`🎯 ¡Dígito ${TRIGGER_DIGIT} detectado! Comprando DIGITDIFF...`, 'success');
 
                 const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
+                const currency = account?.currency || 'USD';
 
                 // Send buy request for DIGITDIFF
                 const buyRequest = {
@@ -90,7 +91,7 @@ export const useBotXtreme = () => {
                     parameters: {
                         contract_type: 'DIGITDIFF',
                         symbol: configRef.current.symbol || 'R_100',
-                        currency: 'USD',
+                        currency: currency,
                         amount: stakeAmount,
                         basis: 'stake',
                         duration: 1,

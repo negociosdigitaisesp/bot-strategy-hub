@@ -27,7 +27,7 @@ interface LogEntry {
 }
 
 export const useBotOmega = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
 
     // Bot State
     const [isRunning, setIsRunning] = useState(false);
@@ -79,6 +79,7 @@ export const useBotOmega = () => {
 
                 const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
                 const prediction = configRef.current.prediction ?? 3;
+                const currency = account?.currency || 'USD';
 
                 // Send buy request for Digit Differs
                 const buyRequest = {
@@ -88,7 +89,7 @@ export const useBotOmega = () => {
                     parameters: {
                         contract_type: 'DIGITDIFF',
                         symbol: configRef.current.symbol || 'R_100',
-                        currency: 'USD',
+                        currency: currency,
                         amount: stakeAmount,
                         basis: 'stake',
                         duration: 1,

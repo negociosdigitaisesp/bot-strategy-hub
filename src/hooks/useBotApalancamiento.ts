@@ -30,7 +30,7 @@ interface LogEntry {
 }
 
 export const useBotApalancamiento = () => {
-    const { socket } = useDeriv();
+    const { socket, account } = useDeriv();
 
     // Bot State
     const [isRunning, setIsRunning] = useState(false);
@@ -124,6 +124,7 @@ export const useBotApalancamiento = () => {
                 const prediction = getPrediction();
                 const tradingOption = tradingOptionRef.current;
                 const contractType = tradingOption === 0 ? 'DIGITUNDER' : 'DIGITOVER';
+                const currency = account?.currency || 'USD';
 
                 addLog(`🎯 ${contractType} ${prediction} | Stake: $${stakeAmount.toFixed(2)}`, 'success');
 
@@ -135,7 +136,7 @@ export const useBotApalancamiento = () => {
                     parameters: {
                         contract_type: contractType,
                         symbol: configRef.current.symbol || '1HZ75V',
-                        currency: 'USD',
+                        currency: currency,
                         amount: stakeAmount,
                         basis: 'stake',
                         duration: 1,

@@ -102,7 +102,7 @@ function getSignalState(
 }
 
 export const useSpikeSensor = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
 
     const [data, setData] = useState<SqueezeData>({
         signalState: 'neutral',
@@ -137,7 +137,7 @@ export const useSpikeSensor = () => {
             parameters: {
                 contract_type: contractType,
                 symbol: '1HZ100V',
-                currency: 'USD',
+                currency: account?.currency || 'USD',
                 amount: stake,
                 basis: 'stake',
                 duration: 5,

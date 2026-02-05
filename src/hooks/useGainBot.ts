@@ -26,7 +26,7 @@ interface LogEntry {
 }
 
 export const useGainBot = () => {
-    const { socket } = useDeriv();
+    const { socket, account } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
 
     // Bot State
@@ -129,6 +129,7 @@ export const useGainBot = () => {
                     isWaitingForContractRef.current = true;
 
                     const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
+                    const currency = account?.currency || 'USD';
 
                     const buyRequest = {
                         buy: 1,
@@ -137,7 +138,7 @@ export const useGainBot = () => {
                         parameters: {
                             contract_type: tradeType,
                             symbol: 'R_100',
-                            currency: 'USD',
+                            currency: currency,
                             amount: stakeAmount,
                             basis: 'stake',
                             duration: 1,

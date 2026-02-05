@@ -143,12 +143,13 @@ export const useStatisticalBot = () => {
         pendingContractRef.current = contract;
 
         // Construir request de propuesta
+        const currency = account?.currency || 'USD';
         const proposalRequest: any = {
             proposal: 1,
             amount: contract.stake,
             basis: 'stake',
             contract_type: contract.type,
-            currency: 'USD',
+            currency: currency,
             duration: 5,
             duration_unit: 't',
             symbol: bot.getConfig().symbol

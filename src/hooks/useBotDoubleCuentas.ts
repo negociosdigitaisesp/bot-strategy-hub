@@ -27,7 +27,7 @@ interface LogEntry {
 }
 
 export const useBotDoubleCuentas = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
 
     // Bot State
     const [isRunning, setIsRunning] = useState(false);
@@ -80,6 +80,7 @@ export const useBotDoubleCuentas = () => {
 
                 const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
                 const prediction = configRef.current.prediction ?? 3; // Default 3 based on XML
+                const currency = account?.currency || 'USD';
 
                 // Send buy request for Digit Over
                 const buyRequest = {
@@ -89,7 +90,7 @@ export const useBotDoubleCuentas = () => {
                     parameters: {
                         contract_type: 'DIGITOVER',
                         symbol: configRef.current.symbol || 'R_75',
-                        currency: 'USD',
+                        currency: currency,
                         amount: stakeAmount,
                         basis: 'stake',
                         duration: 1,

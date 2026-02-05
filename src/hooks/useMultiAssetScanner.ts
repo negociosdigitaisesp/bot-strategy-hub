@@ -235,7 +235,7 @@ const createInitialAssetState = (symbol: ScannerSymbol): AssetState => ({
 });
 
 export const useMultiAssetScanner = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
 
     // Scanner State
@@ -754,6 +754,7 @@ export const useMultiAssetScanner = () => {
                                 : `Patrón ${triggerDigit}-${triggerDigit}`;
                         addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${entropyScore} A:${autocorrScore} = ${totalScore}%`, 'gold', tickSymbol);
 
+                        const currency = account?.currency || 'USD';
                         const buyRequest = {
                             buy: 1,
                             subscribe: 1,
@@ -761,7 +762,7 @@ export const useMultiAssetScanner = () => {
                             parameters: {
                                 contract_type: 'DIGITDIFF',
                                 symbol: tickSymbol,
-                                currency: 'USD',
+                                currency: currency,
                                 amount: stakeAmount,
                                 basis: 'stake',
                                 duration: 1,

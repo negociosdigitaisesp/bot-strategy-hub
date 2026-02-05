@@ -34,7 +34,7 @@ interface LogEntry {
 }
 
 export const useBotQuantum = () => {
-    const { socket } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
 
     // Bot State
     const [isRunning, setIsRunning] = useState(false);
@@ -124,6 +124,7 @@ export const useBotQuantum = () => {
 
                 const stakeAmount = currentStakeRef.current;
                 const prediction = digitRef.current;
+                const currency = account?.currency || 'USD';
 
                 addLog(`🎯 DIGITDIFF ≠${prediction} | Stake: $${stakeAmount.toFixed(2)}`, 'success');
 
@@ -137,7 +138,7 @@ export const useBotQuantum = () => {
                     parameters: {
                         contract_type: 'DIGITDIFF',
                         symbol: configRef.current.symbol || 'R_100',
-                        currency: 'USD',
+                        currency: currency,
                         amount: stakeAmount,
                         basis: 'stake',
                         duration: 1,

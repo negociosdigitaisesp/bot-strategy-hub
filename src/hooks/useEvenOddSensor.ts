@@ -118,7 +118,7 @@ const getSignalState = (
 };
 
 export const useEvenOddSensor = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
 
     const [data, setData] = useState<EvenOddData>({
         lastDigits: [],
@@ -182,6 +182,7 @@ export const useEvenOddSensor = () => {
         }
 
         const contractType = direction === 'ODD' ? 'DIGITODD' : 'DIGITEVEN';
+        const currency = account?.currency || 'USD';
 
         const buyRequest = {
             buy: 1,
@@ -190,7 +191,7 @@ export const useEvenOddSensor = () => {
             parameters: {
                 contract_type: contractType,
                 symbol: '1HZ100V',
-                currency: 'USD',
+                currency: currency,
                 amount: stake,
                 basis: 'stake',
                 duration: 1,

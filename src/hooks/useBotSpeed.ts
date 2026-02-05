@@ -28,7 +28,7 @@ interface LogEntry {
 }
 
 export const useBotSpeed = () => {
-    const { socket } = useDeriv();
+    const { socket, account } = useDeriv();
 
     // Bot State
     const [isRunning, setIsRunning] = useState(false);
@@ -94,6 +94,7 @@ export const useBotSpeed = () => {
 
                 const stakeAmount = getCurrentStake();
                 const prediction = configRef.current.prediction ?? 1;
+                const currency = account?.currency || 'USD';
 
                 addLog(`🎯 Ejecutando DIGITOVER > ${prediction} | Stake: $${stakeAmount.toFixed(2)}`, 'success');
 
@@ -105,7 +106,7 @@ export const useBotSpeed = () => {
                     parameters: {
                         contract_type: 'DIGITOVER',
                         symbol: configRef.current.symbol || 'R_75',
-                        currency: 'USD',
+                        currency: currency,
                         amount: stakeAmount,
                         basis: 'stake',
                         duration: 1,

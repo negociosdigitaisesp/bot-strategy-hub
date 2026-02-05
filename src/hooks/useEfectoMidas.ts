@@ -38,7 +38,7 @@ interface DigitFrequency {
 }
 
 export const useEfectoMidas = () => {
-    const { socket, isConnected } = useDeriv();
+    const { socket, isConnected, account } = useDeriv();
     const { updateStats, setActiveBot } = useTradingSession();
 
     // Bot State
@@ -175,6 +175,7 @@ export const useEfectoMidas = () => {
 
                     const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
                     const percentageConfidence = (confidence * 100).toFixed(1);
+                    const currency = account?.currency || 'USD';
 
                     setSelectedDigit(coldDigit);
                     addLog(`🎯 SINAL: Dígito ${coldDigit} Frio (${(minFreq * 100).toFixed(0)}%). Desvio: ${(deviation * 100).toFixed(1)}%`, 'gold');
@@ -187,7 +188,7 @@ export const useEfectoMidas = () => {
                         parameters: {
                             contract_type: 'DIGITDIFF',
                             symbol: configRef.current.symbol || 'R_10', // Default R_10
-                            currency: 'USD',
+                            currency: currency,
                             amount: stakeAmount,
                             basis: 'stake',
                             duration: 1,
