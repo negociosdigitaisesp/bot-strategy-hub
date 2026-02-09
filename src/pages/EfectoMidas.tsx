@@ -90,7 +90,7 @@ const EfectoMidas = () => {
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
     // Freemium limiter
-    const { isFree, checkStakeLimit, isLimitReached, currentProfit, daysLeft, isOnSessionCooldown } = useFreemiumLimiter();
+    const { isFree, isLoading, checkStakeLimit, isLimitReached, currentProfit, daysLeft, isOnSessionCooldown } = useFreemiumLimiter();
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [showOfferModal, setShowOfferModal] = useState(false);
     const [showLossAversionModal, setShowLossAversionModal] = useState(false);
@@ -184,8 +184,8 @@ const EfectoMidas = () => {
                 return;
             }
 
-            // 🚦 TRAFFIC MANAGEMENT (SOFT LOCK)
-            if (isFree) {
+            // 🚦 TRAFFIC MANAGEMENT (SOFT LOCK) - Only block FREE users AFTER loading
+            if (!isLoading && isFree) {
                 setShowTrafficLock(true);
                 return; // BLOCK EXECUTION
             }

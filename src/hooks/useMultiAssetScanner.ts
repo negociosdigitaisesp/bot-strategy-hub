@@ -754,7 +754,9 @@ export const useMultiAssetScanner = () => {
                                 : `Patrón ${triggerDigit}-${triggerDigit}`;
                         addLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${entropyScore} A:${autocorrScore} = ${totalScore}%`, 'gold', tickSymbol);
 
-                        const currency = account?.currency || 'USD';
+                        // CRITICAL: Ensure currency is valid (not '...' loading state)
+                        const rawCurrency = account?.currency;
+                        const currency = (rawCurrency && rawCurrency !== '...' && rawCurrency !== '') ? rawCurrency : 'USD';
                         const buyRequest = {
                             buy: 1,
                             subscribe: 1,
@@ -926,7 +928,10 @@ export const useMultiAssetScanner = () => {
                 if (data.error.code === 'AlreadySubscribed' || data.error.message?.includes('already subscribed')) {
                     return;
                 }
-                addLog(`❌ Error: ${data.error.message}`, 'error');
+                const errorMsg = data.error.message || 'Error desconocido';
+                const errorCode = data.error.code || 'UNKNOWN';
+                addLog(`⚠️ Error de Bróker [${errorCode}]: ${errorMsg}`, 'error');
+                console.error('[DERIV API ERROR]', data.error);
                 isWaitingForContractRef.current = false;
             }
 

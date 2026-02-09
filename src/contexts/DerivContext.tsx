@@ -332,10 +332,14 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.msg_type === 'balance') {
-        const { balance, currency } = data.balance;
+        const rawBalance = data.balance?.balance;
+        const currency = data.balance?.currency || 'USD';
+        // Defensive parse: handle null/undefined/NaN
+        const parsedBalance = parseFloat(rawBalance);
+        const safeBalance = isNaN(parsedBalance) ? 0.00 : parsedBalance;
         setAccount(prev => {
           if (!prev) return null;
-          return { ...prev, balance: balance.toString(), currency };
+          return { ...prev, balance: safeBalance.toFixed(2), currency };
         });
       }
     };

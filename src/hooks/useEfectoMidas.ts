@@ -78,6 +78,10 @@ export const useEfectoMidas = () => {
     const isWaitingForContractRef = useRef<boolean>(false);
     const totalProfitRef = useRef<number>(0);
 
+    // Rate Limit Protection
+    const lastBuyTimestampRef = useRef<number>(0);
+    const MIN_BUY_INTERVAL_MS = 2000; // 2 seconds minimum between orders
+
     // STRATEGY REFS
     const historyRef = useRef<number[]>([]); // Rolling window of last 100 ticks
     const consecutiveLossesRef = useRef<number>(0);
@@ -170,12 +174,22 @@ export const useEfectoMidas = () => {
 
                 // 4. Entry Trigger
                 if (deviation >= 0.04) {
+                    // Rate limit guard - prevent spam
+                    const now = Date.now();
+                    if (now - lastBuyTimestampRef.current < MIN_BUY_INTERVAL_MS) {
+                        addLog(`⏳ Esperando cooldown (anti-spam)...`, 'warning');
+                        return;
+                    }
+                    lastBuyTimestampRef.current = now;
+
                     isWaitingForContractRef.current = true;
                     setIsShadowMode(false); // UI update
 
                     const stakeAmount = parseFloat(currentStakeRef.current.toFixed(2));
                     const percentageConfidence = (confidence * 100).toFixed(1);
-                    const currency = account?.currency || 'USD';
+                    // CRITICAL: Ensure currency is valid (not '...' loading state)
+                    const rawCurrency = account?.currency;
+                    const currency = (rawCurrency && rawCurrency !== '...' && rawCurrency !== '') ? rawCurrency : 'USD';
 
                     setSelectedDigit(coldDigit);
                     addLog(`🎯 SINAL: Dígito ${coldDigit} Frio (${(minFreq * 100).toFixed(0)}%). Desvio: ${(deviation * 100).toFixed(1)}%`, 'gold');
@@ -281,7 +295,10 @@ export const useEfectoMidas = () => {
         }
 
         if (data.error) {
-            addLog(`❌ Erro: ${data.error.message}`, 'error');
+            const errorMsg = data.error.message || 'Error desconocido';
+            const errorCode = data.error.code || 'UNKNOWN';
+            addLog(`⚠️ Error de Bróker [${errorCode}]: ${errorMsg}`, 'error');
+            console.error('[DERIV API ERROR]', data.error);
             isWaitingForContractRef.current = false;
         }
 

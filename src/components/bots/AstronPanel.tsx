@@ -361,7 +361,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
     const logsContainerRef = useRef<HTMLDivElement>(null);
 
     // Freemium limiter
-    const { isFree, checkStakeLimit, isLimitReached, currentProfit, daysLeft, isOnSessionCooldown } = useFreemiumLimiter();
+    const { isFree, isLoading, checkStakeLimit, isLimitReached, currentProfit, daysLeft, isOnSessionCooldown } = useFreemiumLimiter();
     const [showLossAversionModal, setShowLossAversionModal] = useState(false);
     const isExpired = daysLeft !== null && daysLeft <= 0;
 
@@ -438,8 +438,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 return;
             }
 
-            // 🚦 TRAFFIC MANAGEMENT (SOFT LOCK)
-            if (isFree) {
+            // 🚦 TRAFFIC MANAGEMENT (SOFT LOCK) - Only block FREE users AFTER loading
+            if (!isLoading && isFree) {
                 setShowTrafficLock(true);
                 return; // BLOCK EXECUTION
             }
