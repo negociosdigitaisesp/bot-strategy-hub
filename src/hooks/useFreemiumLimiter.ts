@@ -66,32 +66,8 @@ export const useFreemiumLimiter = () => {
         estimatedLostProfit: 0,
     });
 
-    // Load cooldown state from localStorage on mount
-    useEffect(() => {
-        const storedCooldownEnd = localStorage.getItem(COOLDOWN_CONFIG.STORAGE_KEY);
-        if (storedCooldownEnd) {
-            const endsAt = parseInt(storedCooldownEnd, 10);
-            const now = Date.now();
-            if (endsAt > now) {
-                // Calculate missed signals based on time elapsed
-                const elapsedMs = now - (endsAt - COOLDOWN_CONFIG.DURATION_MS);
-                const missedSignals = Math.floor(elapsedMs / (10 * 60 * 1000)); // 1 signal per 10 min
-                const estimatedLostProfit = missedSignals * (2.5 + Math.random() * 2); // $2.50-$4.50 per signal
-
-                setState(prev => ({
-                    ...prev,
-                    isOnSessionCooldown: true,
-                    cooldownEndsAt: endsAt,
-                    cooldownRemainingMs: endsAt - now,
-                    missedSignals,
-                    estimatedLostProfit: Number(estimatedLostProfit.toFixed(2)),
-                }));
-            } else {
-                // Cooldown expired, clear it
-                localStorage.removeItem(COOLDOWN_CONFIG.STORAGE_KEY);
-            }
-        }
-    }, []);
+    // BYPASS DE ÉLITE: Cooldown loading moved to after plan verification
+    // This prevents PRO users from seeing cooldown state on mount
 
     // Simulate missed signals during cooldown (psychological pressure)
     useEffect(() => {
@@ -218,8 +194,49 @@ export const useFreemiumLimiter = () => {
                     isLoading: false,
                     daysLeft,
                     daysActive,
-                    expirationDate
+                    expirationDate,
+                    // BYPASS DE ÉLITE: Reset cooldown state for PRO users
+                    isOnSessionCooldown: isPro ? false : prev.isOnSessionCooldown,
+                    cooldownEndsAt: isPro ? null : prev.cooldownEndsAt,
+                    cooldownRemainingMs: isPro ? 0 : prev.cooldownRemainingMs,
+                    isLimitReached: isPro ? false : prev.isLimitReached,
+                    missedSignals: isPro ? 0 : prev.missedSignals,
+                    estimatedLostProfit: isPro ? 0 : prev.estimatedLostProfit,
                 }));
+
+                // BYPASS DE ÉLITE: Clear localStorage cooldown for PRO users
+                if (isPro) {
+                    const hadCooldown = localStorage.getItem(COOLDOWN_CONFIG.STORAGE_KEY);
+                    if (hadCooldown) {
+                        console.log('⚡ BYPASS DE ÉLITE - Clearing cooldown for PRO user');
+                        localStorage.removeItem(COOLDOWN_CONFIG.STORAGE_KEY);
+                    }
+                } else {
+                    // For FREE users, restore cooldown from localStorage if exists
+                    const storedCooldownEnd = localStorage.getItem(COOLDOWN_CONFIG.STORAGE_KEY);
+                    if (storedCooldownEnd) {
+                        const endsAt = parseInt(storedCooldownEnd, 10);
+                        const now = Date.now();
+                        if (endsAt > now) {
+                            // Calculate missed signals based on time elapsed
+                            const elapsedMs = now - (endsAt - COOLDOWN_CONFIG.DURATION_MS);
+                            const missedSignals = Math.floor(elapsedMs / (10 * 60 * 1000)); // 1 signal per 10 min
+                            const estimatedLostProfit = missedSignals * (2.5 + Math.random() * 2); // $2.50-$4.50 per signal
+
+                            setState(prev => ({
+                                ...prev,
+                                isOnSessionCooldown: true,
+                                cooldownEndsAt: endsAt,
+                                cooldownRemainingMs: endsAt - now,
+                                missedSignals,
+                                estimatedLostProfit: Number(estimatedLostProfit.toFixed(2)),
+                            }));
+                        } else {
+                            // Cooldown expired, clear it
+                            localStorage.removeItem(COOLDOWN_CONFIG.STORAGE_KEY);
+                        }
+                    }
+                }
             } catch (err) {
                 console.error('Error in fetchPlanType:', err);
                 setState(prev => ({ ...prev, isLoading: false }));
@@ -270,13 +287,20 @@ export const useFreemiumLimiter = () => {
 
     // Monitorear si se alcanzó el límite de ganancia
     useEffect(() => {
-        if (state.isFree && !state.isOnSessionCooldown && sessionProfit >= FREEMIUM_LIMITS.MAX_PROFIT) {
+        // BYPASS DE ÉLITE: Verificar plan_type directamente antes de activar cooldown
+        const PAID_PLANS = ['pro', 'premium', 'elite', 'whale', 'vitalicio', 'iniciado', 'mensual', 'anual'];
+        const isPaidPlan = PAID_PLANS.includes(state.planType.toLowerCase());
+
+        if (state.isFree && !state.isOnSessionCooldown && sessionProfit >= FREEMIUM_LIMITS.MAX_PROFIT && !isPaidPlan) {
+            console.log('🔒 FREEMIUM LIMIT REACHED - Activating cooldown');
             // Sync profit before cooldown
             syncProfitToSupabase(sessionProfit);
             // Trigger cooldown
             startCooldown();
+        } else if (isPaidPlan && sessionProfit >= FREEMIUM_LIMITS.MAX_PROFIT) {
+            console.log('⚡ BYPASS DE ÉLITE - PRO user, no cooldown applied');
         }
-    }, [sessionProfit, state.isFree, state.isOnSessionCooldown, startCooldown, syncProfitToSupabase]);
+    }, [sessionProfit, state.isFree, state.isOnSessionCooldown, state.planType, startCooldown, syncProfitToSupabase]);
 
     // Request browser notification permission
     const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
