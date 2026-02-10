@@ -94,6 +94,14 @@ export const JITTER_CONFIG = {
     STALE_SYMBOL_TIMEOUT_MS: 2000,   // 2s without tick = stale symbol
 };
 
+// Orbit Mode (Predictive Latency Compensation) config
+export const ORBIT_CONFIG = {
+    LATENCY_THRESHOLD_MS: 400,      // Drift > 400ms activates Orbit Mode
+    JITTER_TOLERANCE_MS: 100,       // Relaxed jitter threshold in Orbit Mode
+    PREDICTION_OFFSET_MS: 15,       // Send 15ms before predicted tick time
+    NTP_SYNC_INTERVAL_MS: 15000,    // Recalibrate clock every 15s in high latency
+};
+
 // ============================================
 // MESSAGES: Main Thread → Worker
 // ============================================
@@ -110,10 +118,18 @@ export type WorkerCommand =
 // ============================================
 export type WorkerEvent =
     | { type: 'TICK_UPDATE'; states: Record<ScannerSymbol, AssetState>; priorityOrder: ScannerSymbol[] }
-    | { type: 'TRADE_OPENED'; symbol: ScannerSymbol; stake: number; triggerDigit: number; score: number; triggerReason: string }
+    | { type: 'TRADE_OPENED'; symbol: ScannerSymbol; stake: number; triggerDigit: number; score: number; triggerReason: string; orbitMode: boolean }
     | { type: 'TRADE_RESULT'; contractId: string; profit: number; isWin: boolean; symbol: ScannerSymbol }
     | { type: 'LOG'; entry: LogEntry }
-    | { type: 'NETWORK_STATUS'; latency: number; drift: number; jitter: number; isStressed: boolean; staleTicks: number }
+    | {
+        type: 'NETWORK_STATUS';
+        latency: number;
+        drift: number;
+        jitter: number;
+        isStressed: boolean;
+        staleTicks: number;
+        isOrbitMode: boolean; // NEW: Orbit Mode active?
+    }
     | { type: 'WARMUP_PROGRESS'; progress: number; isReady: boolean }
     | { type: 'ANOMALY_UPDATE'; isDetected: boolean; autocorr: number; anomalyType: 'negative' | 'positive' | null }
     | { type: 'DESYNC'; signalDigit: number; executionDigit: number; symbol: string }

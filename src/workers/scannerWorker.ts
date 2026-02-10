@@ -8,7 +8,7 @@
 import type {
     WorkerCommand, WorkerEvent, ScannerConfig, ScannerSymbol, AssetState, AssetScore,
 } from './scannerWorkerTypes';
-import { SCANNER_SYMBOLS, SYMBOL_NAMES, ANOMALY_CONFIG, JITTER_CONFIG } from './scannerWorkerTypes';
+import { SCANNER_SYMBOLS, SYMBOL_NAMES, ANOMALY_CONFIG, JITTER_CONFIG, ORBIT_CONFIG } from './scannerWorkerTypes';
 
 // ============================================
 // STATE
@@ -183,14 +183,18 @@ function updateJitterFilter(pingMs: number) {
         const stdDev = Math.sqrt(variance);
         currentJitter = stdDev;
 
+        const isOrbitMode = Math.abs(serverTimeOffset) > ORBIT_CONFIG.LATENCY_THRESHOLD_MS;
+        const jitterThreshold = isOrbitMode ? ORBIT_CONFIG.JITTER_TOLERANCE_MS : JITTER_CONFIG.STRESS_THRESHOLD_MS;
+
         const wasStressed = isNetworkStressed;
-        isNetworkStressed = stdDev > JITTER_CONFIG.STRESS_THRESHOLD_MS;
+        isNetworkStressed = stdDev > jitterThreshold;
 
         if (isNetworkStressed && !wasStressed) {
-            emitLog(`🌐 NETWORK_STRESS: Jitter ${stdDev.toFixed(1)}ms (>${JITTER_CONFIG.STRESS_THRESHOLD_MS}ms) — TRADES BLOQUEADOS`, 'error');
+            emitLog(`🌐 NETWORK_STRESS: Jitter ${stdDev.toFixed(1)}ms (>${jitterThreshold}ms) — TRADES BLOQUEADOS`, 'error');
             console.warn(`🌐 [JITTER] NETWORK_STRESS ON: stdDev=${stdDev.toFixed(1)}ms`);
         } else if (!isNetworkStressed && wasStressed) {
-            emitLog(`✅ Red estabilizada: Jitter ${stdDev.toFixed(1)}ms — Trades habilitados`, 'success');
+            const relaxMsg = isOrbitMode ? ' (Modo Órbita Relajado)' : '';
+            emitLog(`✅ Red estabilizada${relaxMsg}: Jitter ${stdDev.toFixed(1)}ms — Trades habilitados`, 'success');
             console.log(`🌐 [JITTER] NETWORK_STRESS OFF: stdDev=${stdDev.toFixed(1)}ms`);
         }
     }
@@ -203,6 +207,7 @@ function updateJitterFilter(pingMs: number) {
         jitter: currentJitter,
         isStressed: isNetworkStressed,
         staleTicks,
+        isOrbitMode: Math.abs(serverTimeOffset) > ORBIT_CONFIG.LATENCY_THRESHOLD_MS,
     });
 }
 
@@ -509,7 +514,11 @@ function evaluateTradeForTick(
                 ? `Streak x${ctx.currentStreak}`
                 : `Patrón ${triggerDigit}-${triggerDigit}`;
 
-        emitLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${ctx.entropyScore} A:${ctx.autocorrScore} = ${ctx.totalScore}%`, 'gold', tickSymbol);
+        // Check if Orbit Mode applies
+        const currentDriftMs = serverTimeOffset;
+        const isOrbitMode = Math.abs(currentDriftMs) > ORBIT_CONFIG.LATENCY_THRESHOLD_MS;
+
+        emitLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${ctx.entropyScore} A:${ctx.autocorrScore} = ${ctx.totalScore}%${isOrbitMode ? ' | 🪐 ORBIT MODE' : ''}`, 'gold', tickSymbol);
 
         emit({
             type: 'TRADE_OPENED',
@@ -518,6 +527,7 @@ function evaluateTradeForTick(
             triggerDigit,
             score: ctx.totalScore,
             triggerReason,
+            orbitMode: isOrbitMode,
         });
 
         const buyRequest = {
@@ -536,32 +546,54 @@ function evaluateTradeForTick(
             }
         };
 
-        // Drift compensation
-        const currentDriftMs = serverTimeOffset;
+        // PREDICTIVE ORBIT MODE vs STANDARD PULSE
         const avgExecTimeMs = avgScoringTime;
-        const totalCompensation = Math.abs(currentDriftMs) + avgExecTimeMs;
-        const shouldSendAnticipated = currentDriftMs < -250;
 
-        if (shouldSendAnticipated) {
-            console.log(`🚀 [PULSE] Anticipatory send: drift=${currentDriftMs}ms, exec=${avgExecTimeMs.toFixed(1)}ms`);
-            ws.send(JSON.stringify(buyRequest));
+        if (isOrbitMode) {
+            // 🪐 Orbit Mode: Aim for START of NEXT second (T+1)
+            // Calculate time to next second boundary
+            const useServerTime = Date.now() + currentDriftMs;
+            const nextSecondBoundary = Math.ceil(useServerTime / 1000) * 1000;
+            const timeToBoundary = nextSecondBoundary - useServerTime;
+
+            // Schedule to arrive 15ms before boundary (ORBIT_CONFIG.PREDICTION_OFFSET_MS)
+            const networkMargin = ORBIT_CONFIG.PREDICTION_OFFSET_MS;
+            const scheduleDelay = Math.max(0, timeToBoundary - networkMargin);
+
+            console.log(`🪐 [ORBIT] Drift ${currentDriftMs}ms | Next Boundary: ${timeToBoundary}ms | Sched Delay: ${scheduleDelay.toFixed(0)}ms`);
+            emitLog(`🪐 MODO ÓRBITA (Drift ${currentDriftMs}ms): Programando tiro en ${scheduleDelay.toFixed(0)}ms para T+1`, 'warning', tickSymbol);
+
+            setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify(buyRequest));
+                    emitLog(`🚀 TIRO ORBITAL ENVIADO`, 'info', tickSymbol);
+                }
+            }, scheduleDelay);
+
         } else {
-            const optimalDelay = Math.max(0, Math.min(50, -currentDriftMs / 2));
-            if (optimalDelay > 5) {
-                console.log(`⏱️ [PULSE] Delayed send: ${optimalDelay.toFixed(0)}ms (drift=${currentDriftMs}ms)`);
-                setTimeout(() => {
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify(buyRequest));
-                    }
-                }, optimalDelay);
-            } else {
+            // Standard Pulse Logic (for low latency)
+            const shouldSendAnticipated = currentDriftMs < -250;
+
+            if (shouldSendAnticipated) {
+                console.log(`🚀 [PULSE] Anticipatory send: drift=${currentDriftMs}ms, exec=${avgExecTimeMs.toFixed(1)}ms`);
                 ws.send(JSON.stringify(buyRequest));
+            } else {
+                const optimalDelay = Math.max(0, Math.min(50, -currentDriftMs / 2));
+                if (optimalDelay > 5) {
+                    console.log(`⏱️ [PULSE] Delayed send: ${optimalDelay.toFixed(0)}ms (drift=${currentDriftMs}ms)`);
+                    setTimeout(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify(buyRequest));
+                        }
+                    }, optimalDelay);
+                } else {
+                    ws.send(JSON.stringify(buyRequest));
+                }
             }
         }
 
         const execLatency = (performance.now() - signalTimestamp).toFixed(0);
-        emitLog(`⚡ Orden enviada: DIFF ${triggerDigit} en ${SYMBOL_NAMES[tickSymbol]} | Stake: $${stakeAmount} | [PULSE] ${execLatency}ms | Drift: ${drift}ms | Comp: ${totalCompensation.toFixed(0)}ms`, 'info', tickSymbol);
-        console.log(`⚡ [PULSE] BUY SENT: exec=${execLatency}ms | drift=${drift}ms | avgCalc=${avgExecTimeMs.toFixed(1)}ms | comp=${totalCompensation.toFixed(0)}ms`);
+        console.log(`⚡ [PULSE/ORBIT] BUY PROCESSED: exec=${execLatency}ms | orbit=${isOrbitMode}`);
     } else if (shouldTrigger && !ctx.inertiaOK) {
         if (Math.random() > 0.9) {
             emitLog(`⚠️ Señal ${SYMBOL_NAMES[tickSymbol]} ignorada: Volatilidad alta (Z:${ctx.zScore.toFixed(2)})`, 'warning');
@@ -611,6 +643,7 @@ function handleWsMessage(event: MessageEvent) {
                 jitter: currentJitter,
                 isStressed: isNetworkStressed,
                 staleTicks,
+                isOrbitMode: Math.abs(serverTimeOffset) > ORBIT_CONFIG.LATENCY_THRESHOLD_MS,
             });
             return;
         }
@@ -779,7 +812,7 @@ function connectWebSocket(wsUrl: string, token: string) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ time: 1 }));
             }
-        }, 60000);
+        }, ORBIT_CONFIG.NTP_SYNC_INTERVAL_MS); // 15s interval for high drift environments
     };
 
     ws.onmessage = handleWsMessage;

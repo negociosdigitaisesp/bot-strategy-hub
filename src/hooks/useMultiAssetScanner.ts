@@ -83,6 +83,7 @@ export const useMultiAssetScanner = () => {
     // HFT v4.0 States
     const [isNetworkStressed, setIsNetworkStressed] = useState(false);
     const [networkJitter, setNetworkJitter] = useState(0);
+    const [isOrbitMode, setIsOrbitMode] = useState(false);
     const [priorityOrder, setPriorityOrder] = useState<ScannerSymbol[]>([...SCANNER_SYMBOLS]);
 
     // Refs for stake management
@@ -96,8 +97,10 @@ export const useMultiAssetScanner = () => {
     const cycleCountRef = useRef<number>(0);
     const isCoolingDownRef = useRef<boolean>(false);
 
-    // Keep cooldown ref in sync
+    // Keep refs in sync
     useEffect(() => { isCoolingDownRef.current = isCoolingDown; }, [isCoolingDown]);
+    const isOrbitModeRef = useRef<boolean>(false);
+    useEffect(() => { isOrbitModeRef.current = isOrbitMode; }, [isOrbitMode]);
 
     // Helper to add log
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info', symbol?: ScannerSymbol) => {
@@ -323,6 +326,17 @@ export const useMultiAssetScanner = () => {
                 setNetworkJitter(msg.jitter);
                 setIsNetworkStressed(msg.isStressed);
                 setStaleTicks(msg.staleTicks);
+
+                if (msg.isOrbitMode !== isOrbitModeRef.current) {
+                    setIsOrbitMode(msg.isOrbitMode);
+                    if (msg.isOrbitMode) {
+                        toast.warning('⚠️ Sincronizando Órbita (Alta Latencia)');
+                        addLog('🪐 MODO ÓRBITA ACTIVADO: Drift > 400ms. Ajustando disparo a T+1.', 'warning');
+                    } else {
+                        toast.success('✅ Órbita Estable');
+                        addLog('🌍 MODO PULSO RESTAURADO: Latencia normalizada.', 'success');
+                    }
+                }
                 break;
 
             case 'WARMUP_PROGRESS':
@@ -574,6 +588,7 @@ export const useMultiAssetScanner = () => {
         // HFT v4.0 States
         isNetworkStressed,
         networkJitter,
+        isOrbitMode,
         priorityOrder,
 
         // Actions
