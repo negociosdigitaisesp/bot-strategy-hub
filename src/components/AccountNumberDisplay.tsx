@@ -48,18 +48,20 @@ export const AccountNumberDisplay: React.FC<AccountNumberDisplayProps> = ({
             </span>
 
             {showToggle && (
-                <button
-                    onClick={toggleVisibility}
-                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                <span
+                    onClick={(e) => { e.stopPropagation(); toggleVisibility(); }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); toggleVisibility(); } }}
+                    className="p-1 hover:bg-white/10 rounded transition-colors cursor-pointer"
                     title={isVisible ? 'Ocultar número da conta' : 'Mostrar número da conta'}
-                    type="button"
                 >
                     {isVisible ? (
                         <Eye size={iconSize} className="text-slate-400 hover:text-slate-300" />
                     ) : (
                         <EyeOff size={iconSize} className="text-slate-400 hover:text-slate-300" />
                     )}
-                </button>
+                </span>
             )}
         </div>
     );
