@@ -463,11 +463,14 @@ export const useBotAstron = () => {
             workerRef.current.terminate();
         }
 
-        try {
-            const workerUrl = new URL('../workers/scannerWorker.ts', import.meta.url);
-            console.log('🔧 Criando Worker em:', workerUrl.href);
 
-            const worker = new Worker(workerUrl, { type: 'module' });
+        try {
+            // Use Vite's worker import pattern with ?worker suffix
+            // This ensures the worker is bundled as .js with correct MIME type
+            const worker = new Worker(
+                new URL('../workers/scannerWorker.ts?worker', import.meta.url),
+                { type: 'module' }
+            );
             workerRef.current = worker;
 
             worker.onmessage = handleWorkerMessage;
