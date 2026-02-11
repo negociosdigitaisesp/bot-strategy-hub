@@ -46,7 +46,7 @@ interface FleetMonitorProps {
     autoSwitchEnabled: boolean;
     isCoolingDown: boolean;
     cooldownTime: number;
-    cooldownReason: 'profit' | 'loss' | null;
+    cooldownReason: string;
     // Anomaly Detection v3.0
     isAnomalyDetected?: boolean;
     currentAutocorr?: number;
@@ -282,11 +282,11 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
 
                             {/* Metrics Mini */}
                             <div className="grid grid-cols-3 gap-0.5 text-[8px] text-gray-500 font-mono opacity-80">
-                                <div className="text-center bg-white/5 rounded py-0.5" title="Entropía">
-                                    E:{asset.score.entropy}
-                                </div>
-                                <div className="text-center bg-white/5 rounded py-0.5" title="Volatilidad">
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Volatilidad (ATR)">
                                     V:{asset.score.volatility}
+                                </div>
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Calma">
+                                    S:{asset.score.calm}
                                 </div>
                                 <div className="text-center bg-white/5 rounded py-0.5" title="Clusters">
                                     C:{asset.score.clusters}
@@ -427,6 +427,19 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         }
 
     }, [stats.wins, stats.vaultAccumulated, isFree]);
+
+    // DEBUG: Monitor Asset States for Corruption
+    useEffect(() => {
+        if (Object.keys(assetStates).length === 0) return;
+
+        const corrupted = Object.entries(assetStates).find(([key, val]) => {
+            return !val || !val.score || typeof val.score.volatility === 'undefined';
+        });
+
+        if (corrupted) {
+            console.error('🔥 DATA INTEGRITY ERROR: Asset state corrupted:', corrupted);
+        }
+    }, [assetStates]);
 
     const handleToggleBot = () => {
         if (isRunning) {
@@ -1044,43 +1057,9 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
 
                                 {/* Table Body - Tick List */}
                                 <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#05050F]">
-                                    {recentTicks.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs opacity-50 font-mono">
-                                            <Activity className="mb-2 animate-bounce" size={20} />
-                                            Esperando datos...
-                                        </div>
-                                    )}
-                                    <div className="flex flex-col">
-                                        {recentTicks.map((tick, index) => (
-                                            <div key={tick.id} className={`
-                                            grid grid-cols-4 px-6 py-2.5 border-b border-white/[0.03] items-center 
-                                            transition-all duration-500 font-mono
-                                            ${index === 0 ? 'bg-[#00E5FF]/5 animate-enter-row border-l-2 border-l-[#00E5FF]' : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'}
-                                        `}>
-                                                {/* Symbol */}
-                                                <div className="text-xs font-bold text-white/60">
-                                                    {tick.symbol ? SYMBOL_NAMES[tick.symbol] : '---'}
-                                                </div>
-                                                {/* Price */}
-                                                <div className={`text-sm font-medium ${tick.isUp ? 'text-[#2F80ED]' : 'text-red-500'} flex items-baseline gap-1`}>
-                                                    <span className="opacity-60 text-xs tracking-tighter">{tick.price.slice(0, -1)}</span>
-                                                    <span className={`text-base font-bold ${tick.isUp ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-red-400'}`}>{tick.price.slice(-1)}</span>
-                                                </div>
-                                                {/* Signal/Status */}
-                                                <div className="text-center">
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${tick.signal?.includes('FIRING') ? 'bg-amber-500/20 text-amber-300' :
-                                                        tick.signal?.includes('FORMING') ? 'bg-yellow-500/20 text-yellow-300' :
-                                                            index === 0 ? 'bg-white/10 text-white' : 'text-gray-500 opacity-60'
-                                                        }`}>
-                                                        {tick.signal}
-                                                    </span>
-                                                </div>
-                                                {/* Change */}
-                                                <div className={`text-right text-xs font-bold ${tick.change.startsWith('+') ? 'text-[#00E5FF]' : 'text-[#FF3D00]'}`}>
-                                                    {tick.change}
-                                                </div>
-                                            </div>
-                                        ))}
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs opacity-50 font-mono">
+                                        <Activity className="mb-2 animate-bounce" size={20} />
+                                        Sistema Multi-Activo em desenvolvimento...
                                     </div>
                                     {/* Gradient Overlay at bottom for fade effect */}
                                     <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-[#05050F] to-transparent pointer-events-none z-10"></div>
@@ -1198,6 +1177,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <div className="grid grid-cols-5 gap-1 mt-2">
                                         {SCANNER_SYMBOLS.map(symbol => {
                                             const asset = assetStates[symbol];
+                                            if (!asset) return null;
                                             return (
                                                 <div
                                                     key={symbol}

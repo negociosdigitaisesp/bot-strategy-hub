@@ -1,14 +1,14 @@
 // ============================================
-// QUANT SHIELD — HFT WEB WORKER v5.0
+// THE BUG DERIV SCANNER — HFT WEB WORKER v4.0
 // ============================================
-// Higher/Lower Barrier strategy — LAG-PROOF.
-// Uses ATR + Median Range to set dynamic barriers.
-// Runs in a dedicated thread for maximum performance.
+// Runs in a dedicated thread. Owns WebSocket, scoring, jitter filter,
+// priority queue, and per-symbol auto-reconnect.
+// Communicates with main thread via postMessage().
 
 import type {
     WorkerCommand, WorkerEvent, ScannerConfig, ScannerSymbol, AssetState, AssetScore,
 } from './scannerWorkerTypes';
-import { SCANNER_SYMBOLS, SYMBOL_NAMES, VOLATILITY_CONFIG, JITTER_CONFIG, ORBIT_CONFIG } from './scannerWorkerTypes';
+import { SCANNER_SYMBOLS, SYMBOL_NAMES, ANOMALY_CONFIG, JITTER_CONFIG, ORBIT_CONFIG } from './scannerWorkerTypes';
 
 // ============================================
 // STATE
@@ -22,8 +22,8 @@ let currency = 'USD';
 
 // Per-symbol state
 const assetStates: Record<string, AssetState> = {};
-const subscriptionIds: Record<string, string> = {};
-const lastTickTime: Record<string, number> = {};
+const subscriptionIds: Record<string, string> = {};  // symbol → subscription_id
+const lastTickTime: Record<string, number> = {};      // symbol → timestamp
 
 // Execution lock
 let isSocketBusy = false;
@@ -36,10 +36,15 @@ let serverTimeOffset = 0;
 let isTimeSynced = false;
 let staleTicks = 0;
 
-// Trade tracking
+// Anomaly detection
+let anomalyConfirmationCount = 0;
+let anomalyType: 'negative' | 'positive' | null = null;
 let lastTradeTimestamp = 0;
-let lastTradeDirection: 'CALL' | 'PUT' = 'CALL';
-let lastTradeSymbol = '';
+
+// Signal diagnostics
+let signalTimestamp = 0;
+let signalDigit = -1;
+let signalSymbol = '';
 
 // Performance tracking
 let avgScoringTime = 0;
@@ -55,107 +60,73 @@ let currentLatency = 0;
 // Warmup
 let warmupLogged = false;
 
-// Intervals
+// Auto-reconnect interval
 let reconnectIntervalId: ReturnType<typeof setInterval> | null = null;
 let heartbeatIntervalId: ReturnType<typeof setInterval> | null = null;
 let ntpSyncIntervalId: ReturnType<typeof setInterval> | null = null;
 
-// Calm regime tracking (global cross-asset)
-let calmConfirmationCount = 0;
-
 // ============================================
-// SCORING ALGORITHMS
+// SCORING ALGORITHMS (Pure Functions)
 // ============================================
-
-/**
- * Calculate ATR (Average True Range) from price buffer.
- * Uses absolute price differences as "ranges".
- */
-function calculateATR(ranges: number[], period: number): number {
-    if (ranges.length < period) {
-        if (ranges.length === 0) return 0;
-        return ranges.reduce((a, b) => a + b, 0) / ranges.length;
+function calculateZScore(prices: number[]): number {
+    if (prices.length < 10) return 0;
+    const velocities: number[] = [];
+    for (let i = 1; i < prices.length; i++) {
+        velocities.push(prices[i] - prices[i - 1]);
     }
-    const slice = ranges.slice(-period);
-    return slice.reduce((a, b) => a + b, 0) / slice.length;
+    if (velocities.length < 2) return 0;
+    const mean = velocities.reduce((a, b) => a + b, 0) / velocities.length;
+    const variance = velocities.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / velocities.length;
+    const stdDev = Math.sqrt(variance);
+    if (stdDev === 0) return 0;
+    const latestVelocity = velocities[velocities.length - 1];
+    return Math.abs((latestVelocity - mean) / stdDev);
 }
 
-/**
- * Calculate Median Range — more robust than ATR mean against spikes.
- */
-function calculateMedianRange(ranges: number[]): number {
-    if (ranges.length === 0) return 0;
-    const sorted = [...ranges].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-        ? (sorted[mid - 1] + sorted[mid]) / 2
-        : sorted[mid];
+function calculateEntropyScore(digits: number[]): number {
+    if (digits.length < 15) return 30;
+    const counts = new Array(10).fill(0);
+    digits.forEach(d => counts[d]++);
+    const expected = digits.length / 10;
+    let chiSquare = 0;
+    counts.forEach(count => {
+        chiSquare += Math.pow(count - expected, 2) / expected;
+    });
+    const score = Math.max(0, 60 - (chiSquare * 3));
+    return Math.min(60, Math.round(score));
 }
 
-/**
- * ATR-based volatility score (0-40).
- * Lower ATR = higher score (calmer market = better for barrier strategy).
- */
-function calculateVolatilityScore(atr: number, medianRange: number): number {
-    if (atr === 0 || medianRange === 0) return 20;
-    // Ratio of ATR to Median — if close to 1, market is stable
-    const ratio = atr / medianRange;
-    // Stable market (ratio ~1.0) = high score, volatile (ratio > 2.0) = low score
-    if (ratio <= 1.0) return 40;
-    if (ratio <= 1.2) return 35;
-    if (ratio <= 1.5) return 25;
-    if (ratio <= 2.0) return 15;
-    return 5;
+function calculateAutocorrelation(digits: number[]): number {
+    if (digits.length < 20) return 0;
+    const n = digits.length;
+    const mean = digits.reduce((a, b) => a + b, 0) / n;
+    let numerator = 0;
+    let denominator = 0;
+    for (let i = 0; i < n - 1; i++) {
+        numerator += (digits[i] - mean) * (digits[i + 1] - mean);
+        denominator += Math.pow(digits[i] - mean, 2);
+    }
+    return denominator === 0 ? 0 : numerator / denominator;
 }
 
-/**
- * Calm market score (0-40).
- * Checks if recent ranges are consistently below median.
- */
-function calculateCalmScore(ranges: number[], medianRange: number): number {
-    if (ranges.length < 5 || medianRange === 0) return 20;
-    const recent = ranges.slice(-5);
-    const calmCount = recent.filter(r => r <= medianRange * VOLATILITY_CONFIG.CALM_REGIME_MULTIPLIER).length;
-    // All 5 calm = 40, 4 = 32, 3 = 24, 2 = 16, 1 = 8, 0 = 0
-    return Math.round((calmCount / 5) * 40);
-}
-
-/**
- * Volatility clustering bonus (0-20).
- * Rewards consistency: if ranges are tightly clustered (low std dev of ranges).
- */
-function calculateClusterScore(ranges: number[]): number {
-    if (ranges.length < 10) return 10;
-    const recent = ranges.slice(-10);
-    const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
-    if (mean === 0) return 10;
-    const variance = recent.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / recent.length;
-    const cv = Math.sqrt(variance) / mean; // Coefficient of variation
-    // Low CV = tightly clustered = high score
-    if (cv <= 0.3) return 20;
-    if (cv <= 0.5) return 15;
-    if (cv <= 0.8) return 10;
-    if (cv <= 1.2) return 5;
+function calculateAutocorrScore(digits: number[]): number {
+    const autocorr = calculateAutocorrelation(digits);
+    if (autocorr < -0.15) return 40;
+    if (autocorr < -0.05) return 30;
+    if (autocorr < 0.05) return 20;
+    if (autocorr < 0.15) return 10;
     return 0;
 }
 
-/**
- * Determine price direction from last N prices.
- */
-function getDirection(prices: number[], lookback: number): { direction: 'up' | 'down' | 'flat'; consecutive: number } {
-    if (prices.length < lookback + 1) return { direction: 'flat', consecutive: 0 };
-
-    const recent = prices.slice(-(lookback + 1));
-    let ups = 0;
-    let downs = 0;
-    for (let i = 1; i < recent.length; i++) {
-        if (recent[i] > recent[i - 1]) ups++;
-        else if (recent[i] < recent[i - 1]) downs++;
+function analyzeStreak(digits: number[]): { currentStreak: number; isAnomalous: boolean } {
+    if (digits.length < 3) return { currentStreak: 1, isAnomalous: false };
+    let currentStreak = 1;
+    const lastDigit = digits[digits.length - 1];
+    for (let i = digits.length - 2; i >= 0; i--) {
+        if (digits[i] === lastDigit) currentStreak++;
+        else break;
     }
-
-    if (ups >= lookback) return { direction: 'up', consecutive: ups };
-    if (downs >= lookback) return { direction: 'down', consecutive: downs };
-    return { direction: 'flat', consecutive: 0 };
+    return { currentStreak, isAnomalous: currentStreak >= 3 };
 }
 
 // ============================================
@@ -165,18 +136,17 @@ function createInitialAssetState(symbol: ScannerSymbol): AssetState {
     return {
         symbol,
         displayName: SYMBOL_NAMES[symbol],
+        digitBuffer: [],
         priceBuffer: [],
-        rangeBuffer: [],
         healthScore: 50,
-        score: { volatility: 0, calm: 0, clusters: 0, total: 0 },
+        score: { entropy: 0, volatility: 0, clusters: 0, total: 0 },
+        shadowPattern: false,
+        lastTwoDigits: null,
+        inertiaOK: false,
+        zScore: 0,
+        status: 'scanning',
         lastPrice: 0,
         tickCount: 0,
-        status: 'scanning',
-        currentATR: 0,
-        medianRange: 0,
-        isCalm: false,
-        lastDirection: 'flat',
-        consecutiveDirection: 0,
     };
 }
 
@@ -221,8 +191,11 @@ function updateJitterFilter(pingMs: number) {
 
         if (isNetworkStressed && !wasStressed) {
             emitLog(`🌐 NETWORK_STRESS: Jitter ${stdDev.toFixed(1)}ms (>${jitterThreshold}ms) — TRADES BLOQUEADOS`, 'error');
+            console.warn(`🌐 [JITTER] NETWORK_STRESS ON: stdDev=${stdDev.toFixed(1)}ms`);
         } else if (!isNetworkStressed && wasStressed) {
-            emitLog(`✅ Red estabilizada: Jitter ${stdDev.toFixed(1)}ms — Trades habilitados`, 'success');
+            const relaxMsg = isOrbitMode ? ' (Modo Órbita Relajado)' : '';
+            emitLog(`✅ Red estabilizada${relaxMsg}: Jitter ${stdDev.toFixed(1)}ms — Trades habilitados`, 'success');
+            console.log(`🌐 [JITTER] NETWORK_STRESS OFF: stdDev=${stdDev.toFixed(1)}ms`);
         }
     }
 
@@ -262,15 +235,18 @@ function startAutoReconnect() {
         for (const sym of SCANNER_SYMBOLS) {
             const lastTick = lastTickTime[sym] || 0;
             if (lastTick > 0 && (now - lastTick) > JITTER_CONFIG.STALE_SYMBOL_TIMEOUT_MS) {
+                console.warn(`🔄 [RECONNECT] ${SYMBOL_NAMES[sym]} stale for ${now - lastTick}ms — re-subscribing`);
                 emitLog(`🔄 Re-suscribiendo ${SYMBOL_NAMES[sym]} (sin datos por ${((now - lastTick) / 1000).toFixed(1)}s)`, 'warning', sym);
 
+                // Forget old subscription if we have an ID
                 if (subscriptionIds[sym]) {
                     ws.send(JSON.stringify({ forget: subscriptionIds[sym] }));
                     delete subscriptionIds[sym];
                 }
 
+                // Re-subscribe
                 ws.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
-                lastTickTime[sym] = now;
+                lastTickTime[sym] = now; // Reset to avoid spamming
                 emit({ type: 'SYMBOL_RECONNECTED', symbol: sym });
             }
         }
@@ -281,6 +257,7 @@ function startAutoReconnect() {
 // TICK PROCESSING PIPELINE
 // ============================================
 function processTick(tickSymbol: ScannerSymbol, price: number, epoch?: number) {
+    // Update last tick time for auto-reconnect
     lastTickTime[tickSymbol] = Date.now();
 
     // NTP stale tick rejection
@@ -288,84 +265,78 @@ function processTick(tickSymbol: ScannerSymbol, price: number, epoch?: number) {
         const tickServerTime = epoch * 1000;
         const correctedLocalTime = Date.now() + serverTimeOffset;
         const tickAge = correctedLocalTime - tickServerTime;
-        if (tickAge > 500) {
+        if (tickAge > 300) {
             staleTicks++;
-            // Higher/Lower is more tolerant — only reject very old ticks
-            if (tickAge > 2000) {
-                return;
+            if (tickAge > 1000) {
+                console.warn(`⛔ [STALE] Tick REJECTED: ${tickSymbol} age=${tickAge.toFixed(0)}ms`);
             }
+            return;
         }
     }
 
+    const quote = price.toFixed(2);
+    const currentDigit = parseInt(quote.charAt(quote.length - 1));
     const scoringStartTime = performance.now();
+
     const asset = assetStates[tickSymbol];
     if (!asset) return;
 
-    // Calculate range (absolute price difference)
-    const range = asset.lastPrice > 0 ? Math.abs(price - asset.lastPrice) : 0;
-
     // Buffer update
-    const newPriceBuffer = asset.priceBuffer.length >= VOLATILITY_CONFIG.BUFFER_SIZE
+    const newDigitBuffer = asset.digitBuffer.length >= ANOMALY_CONFIG.BUFFER_SIZE
+        ? [...asset.digitBuffer.slice(1), currentDigit]
+        : [...asset.digitBuffer, currentDigit];
+    const newPriceBuffer = asset.priceBuffer.length >= ANOMALY_CONFIG.BUFFER_SIZE
         ? [...asset.priceBuffer.slice(1), price]
         : [...asset.priceBuffer, price];
 
-    const newRangeBuffer = asset.rangeBuffer.length >= VOLATILITY_CONFIG.BUFFER_SIZE
-        ? [...asset.rangeBuffer.slice(1), range]
-        : asset.lastPrice > 0
-            ? [...asset.rangeBuffer, range]
-            : [...asset.rangeBuffer];
-
-    // ============================================
-    // VOLATILITY SCORING
-    // ============================================
+    // Scoring
     const calcStart = performance.now();
-
-    const atr = calculateATR(newRangeBuffer, VOLATILITY_CONFIG.ATR_PERIOD);
-    const medianRange = calculateMedianRange(newRangeBuffer);
-
-    const volatilityScore = calculateVolatilityScore(atr, medianRange);
-    const calmScore = calculateCalmScore(newRangeBuffer, medianRange);
-    const clusterScore = calculateClusterScore(newRangeBuffer);
-
-    const totalScore = volatilityScore + calmScore + clusterScore;
-
+    const zScore = calculateZScore(newPriceBuffer);
+    const entropyScore = calculateEntropyScore(newDigitBuffer);
+    const autocorrScore = calculateAutocorrScore(newDigitBuffer);
+    const rawAutocorr = calculateAutocorrelation(newDigitBuffer);
     const calcTime = performance.now() - calcStart;
+
+    // Performance tracking
     scoringCount++;
     avgScoringTime = avgScoringTime * 0.9 + calcTime * 0.1;
     if (scoringCount % 50 === 0) {
         emit({ type: 'EXEC_TIME', avgMs: avgScoringTime });
     }
 
-    const scoreObj: AssetScore = {
-        volatility: volatilityScore,
-        calm: calmScore,
-        clusters: clusterScore,
-        total: totalScore,
-    };
+    const totalScore = entropyScore + autocorrScore;
+    const scoreObj: AssetScore = { entropy: entropyScore, volatility: autocorrScore, clusters: 0, total: totalScore };
 
-    // Direction analysis
-    const { direction, consecutive } = getDirection(newPriceBuffer, VOLATILITY_CONFIG.DIRECTION_LOOKBACK);
+    // Anomaly detection
+    const isAutocorrAnomaly = Math.abs(rawAutocorr) > ANOMALY_CONFIG.AUTOCORR_ANOMALY_THRESHOLD;
+    const detectedAnomalyType: 'negative' | 'positive' | null =
+        rawAutocorr < -ANOMALY_CONFIG.AUTOCORR_ANOMALY_THRESHOLD ? 'negative' :
+            rawAutocorr > ANOMALY_CONFIG.AUTOCORR_ANOMALY_THRESHOLD ? 'positive' : null;
 
-    // Is market calm enough?
-    const isCalm = calmScore >= 24; // At least 3 out of 5 recent ticks below threshold
-
-    // Calm regime global confirmation
-    if (isCalm) {
-        calmConfirmationCount = Math.min(calmConfirmationCount + 1, VOLATILITY_CONFIG.ANOMALY_CONFIRMATION_TICKS + 1);
+    if (isAutocorrAnomaly) {
+        anomalyConfirmationCount++;
+        anomalyType = detectedAnomalyType;
     } else {
-        calmConfirmationCount = Math.max(0, calmConfirmationCount - 1);
+        anomalyConfirmationCount = 0;
+        anomalyType = null;
     }
-    const isConfirmedCalm = calmConfirmationCount >= VOLATILITY_CONFIG.ANOMALY_CONFIRMATION_TICKS;
 
-    // Emit anomaly update (calm regime = our "anomaly" / edge)
-    emit({
-        type: 'ANOMALY_UPDATE',
-        isDetected: isConfirmedCalm,
-        calmScore: totalScore,
-        regime: isCalm ? 'calm' : totalScore > 50 ? 'neutral' : 'volatile',
-    });
+    const isConfirmedAnomaly = anomalyConfirmationCount >= ANOMALY_CONFIG.ANOMALY_CONFIRMATION_TICKS;
 
-    // Determine status
+    // Emit anomaly update
+    if (isConfirmedAnomaly && anomalyConfirmationCount === ANOMALY_CONFIG.ANOMALY_CONFIRMATION_TICKS) {
+        const typeEmoji = anomalyType === 'negative' ? '📉' : '📈';
+        emitLog(`${typeEmoji} ANOMALÍA CONFIRMADA: Autocorr ${rawAutocorr.toFixed(3)} (${anomalyType}) en ${SYMBOL_NAMES[tickSymbol]}`, 'gold', tickSymbol);
+    }
+    emit({ type: 'ANOMALY_UPDATE', isDetected: isConfirmedAnomaly, autocorr: rawAutocorr, anomalyType });
+
+    const lastTwo = newDigitBuffer.length >= 2
+        ? [newDigitBuffer[newDigitBuffer.length - 2], newDigitBuffer[newDigitBuffer.length - 1]] as [number, number]
+        : null;
+    const shadowPattern = lastTwo !== null && lastTwo[0] === lastTwo[1];
+    const { currentStreak, isAnomalous: isStreakAnomalous } = analyzeStreak(newDigitBuffer);
+    const inertiaOK = zScore < 1.5;
+
     let status: AssetState['status'] = 'scanning';
     const isAutoSwitchOn = config?.autoSwitch;
     const minScore = config?.minScore || 55;
@@ -375,28 +346,27 @@ function processTick(tickSymbol: ScannerSymbol, price: number, epoch?: number) {
 
     if (isAutoSwitchOn && (!isLeader || !scorePass)) {
         status = 'vetoed';
-    } else if (isCalm && direction !== 'flat' && consecutive >= 2) {
+    } else if (isConfirmedAnomaly || shadowPattern || isStreakAnomalous) {
         status = 'forming';
     }
 
     // Update asset state
     assetStates[tickSymbol] = {
         ...asset,
+        digitBuffer: newDigitBuffer,
         priceBuffer: newPriceBuffer,
-        rangeBuffer: newRangeBuffer,
         healthScore: Math.round(totalScore),
         score: scoreObj,
+        shadowPattern: shadowPattern || isStreakAnomalous || isConfirmedAnomaly,
+        lastTwoDigits: lastTwo,
+        inertiaOK,
+        zScore,
+        status,
         lastPrice: price,
         tickCount: asset.tickCount + 1,
-        status,
-        currentATR: atr,
-        medianRange,
-        isCalm,
-        lastDirection: direction,
-        consecutiveDirection: consecutive,
     };
 
-    // Emit state update
+    // Emit state update with priority order
     const updatedPriorityOrder = getPriorityOrder();
     emit({
         type: 'TICK_UPDATE',
@@ -407,57 +377,61 @@ function processTick(tickSymbol: ScannerSymbol, price: number, epoch?: number) {
     // Check warmup
     checkWarmup();
 
-    // Performance tracking
+    // Track scoring time
     const totalScoringTime = performance.now() - scoringStartTime;
     if (totalScoringTime > 10) {
         console.warn(`⚠️ [PULSE] Slow scoring: ${tickSymbol} took ${totalScoringTime.toFixed(1)}ms`);
     }
 
     // ============================================
-    // TRADE DECISION
+    // TRADE DECISION — Priority Queue Order
     // ============================================
-    evaluateTradeForTick(tickSymbol, price, {
-        totalScore,
-        isCalm,
-        isConfirmedCalm,
-        direction,
-        consecutive,
-        atr,
-        medianRange,
-        newPriceBuffer,
-        newRangeBuffer,
+    evaluateTradeForTick(tickSymbol, currentDigit, price, {
+        newDigitBuffer, newPriceBuffer, zScore, entropyScore, autocorrScore,
+        rawAutocorr, totalScore, isConfirmedAnomaly, shadowPattern,
+        isStreakAnomalous, currentStreak, inertiaOK, lastTwo,
     });
 }
 
 // ============================================
-// TRADE EVALUATION — HIGHER/LOWER BARRIER
+// TRADE EVALUATION
 // ============================================
 interface TradeContext {
-    totalScore: number;
-    isCalm: boolean;
-    isConfirmedCalm: boolean;
-    direction: 'up' | 'down' | 'flat';
-    consecutive: number;
-    atr: number;
-    medianRange: number;
+    newDigitBuffer: number[];
     newPriceBuffer: number[];
-    newRangeBuffer: number[];
+    zScore: number;
+    entropyScore: number;
+    autocorrScore: number;
+    rawAutocorr: number;
+    totalScore: number;
+    isConfirmedAnomaly: boolean;
+    shadowPattern: boolean;
+    isStreakAnomalous: boolean;
+    currentStreak: number;
+    inertiaOK: boolean;
+    lastTwo: [number, number] | null;
 }
 
 function evaluateTradeForTick(
     tickSymbol: ScannerSymbol,
+    currentDigit: number,
     price: number,
     ctx: TradeContext,
 ) {
     if (!isRunning || isPaused || isWaitingForContract || isSocketBusy || !ws || !config) return;
 
-    // JITTER GUARD
-    if (isNetworkStressed) return;
+    // ============================================
+    // JITTER GUARD: Block trades during NETWORK_STRESS
+    // ============================================
+    if (isNetworkStressed) {
+        return;  // CRITICAL: No trades with unstable network
+    }
 
-    // Auto-reset stuck lock
+    // Auto-reset stuck execution lock
     if (isSocketBusy && socketBusyTimestamp > 0) {
         const busyDuration = Date.now() - socketBusyTimestamp;
         if (busyDuration > 5000) {
+            console.error(`🚨 [ATOMIC] Socket busy for ${busyDuration}ms - FORCE UNLOCKING`);
             emitLog(`🚨 Semáforo atascado ${(busyDuration / 1000).toFixed(1)}s - Reset forzado`, 'error');
             isSocketBusy = false;
             socketBusyTimestamp = 0;
@@ -465,135 +439,166 @@ function evaluateTradeForTick(
         }
     }
 
-    // Warmup check
-    const allReady = SCANNER_SYMBOLS.every(sym => (assetStates[sym]?.tickCount ?? 0) >= VOLATILITY_CONFIG.MIN_TICKS_FOR_TRADE);
+    // Check warmup
+    const allReady = SCANNER_SYMBOLS.every(sym => (assetStates[sym]?.tickCount ?? 0) >= 15);
     if (!allReady) return;
 
-    // Anti-clustering cooldown
+    // Anti-clustering temporal cooldown
     const timeSinceLastTrade = Date.now() - lastTradeTimestamp;
-    if (timeSinceLastTrade < VOLATILITY_CONFIG.ANTI_CLUSTERING_COOLDOWN_MS) return;
+    if (timeSinceLastTrade < ANOMALY_CONFIG.ANTI_CLUSTERING_COOLDOWN_MS) return;
 
-    // Minimum ticks
-    const hasEnoughTicks = ctx.newRangeBuffer.length >= VOLATILITY_CONFIG.MIN_TICKS_FOR_TRADE;
-    if (!hasEnoughTicks) return;
+    const hasEnoughTicks = ctx.newDigitBuffer.length >= ANOMALY_CONFIG.MIN_TICKS_FOR_TRADE;
+    const shouldTrigger = hasEnoughTicks && (ctx.isConfirmedAnomaly || ctx.shadowPattern || ctx.isStreakAnomalous);
 
-    // ============================================
-    // ENTRY CONDITIONS
-    // ============================================
-    // 1. Market must be calm (low volatility regime)
-    // 2. Price must have a clear short-term direction (3 ticks same way)
-    // 3. Score must pass minimum threshold
-    // 4. We trade OPPOSITE to the direction (mean reversion on volatility)
-    //    - If price went UP 3 ticks → market "stretched" → PUT (price won't go HIGHER than barrier)
-    //    - If price went DOWN 3 ticks → market "stretched" → CALL (price won't go LOWER than barrier)
+    if (shouldTrigger && ctx.inertiaOK) {
+        console.log(`🛠️ [v4.0] Trigger en ${SYMBOL_NAMES[tickSymbol]}. Score: ${ctx.totalScore}. Autocorr: ${ctx.rawAutocorr.toFixed(3)}. Anomaly: ${ctx.isConfirmedAnomaly}`);
 
-    const shouldTrigger = ctx.isCalm
-        && ctx.direction !== 'flat'
-        && ctx.consecutive >= VOLATILITY_CONFIG.DIRECTION_LOOKBACK
-        && ctx.medianRange > 0;
-
-    if (!shouldTrigger) return;
-
-    // Auto-switch guard
-    if (config.autoSwitch) {
-        const minScore = config.minScore || 55;
-        if (ctx.totalScore < minScore) {
-            assetStates[tickSymbol] = { ...assetStates[tickSymbol], status: 'vetoed' };
-            return;
-        }
-
-        const priorityOrder = getPriorityOrder();
-        if (priorityOrder[0] !== tickSymbol) {
-            const leaderState = assetStates[priorityOrder[0]];
-            if (leaderState && (leaderState.status === 'forming' || leaderState.isCalm)) {
+        // Auto-switch guard
+        if (config.autoSwitch) {
+            const minScore = config.minScore || 55;
+            if (ctx.totalScore < minScore) {
+                assetStates[tickSymbol] = { ...assetStates[tickSymbol], status: 'vetoed' };
                 return;
             }
+            // Check if another asset is leader and forming
+            const priorityOrder = getPriorityOrder();
+            if (priorityOrder[0] !== tickSymbol) {
+                const leaderState = assetStates[priorityOrder[0]];
+                if (leaderState && (leaderState.status === 'forming' || leaderState.shadowPattern)) {
+                    return;
+                }
+            }
         }
-    }
 
-    // Anomaly-only mode: require confirmed calm regime
-    if (config.anomalyOnlyMode && !ctx.isConfirmedCalm) {
-        if (Math.random() > 0.95) {
-            emitLog(`⏸️ Modo SOLO ANOMALÍA: Esperando régimen calmado confirmado...`, 'info', tickSymbol);
+        // Anomaly-only mode guard
+        if (config.anomalyOnlyMode) {
+            if (!ctx.isConfirmedAnomaly) {
+                if (Math.random() > 0.95) {
+                    emitLog(`⏸️ Modo SOLO ANOMALÍA: Esperando anomalía confirmada...`, 'info', tickSymbol);
+                }
+                return;
+            }
+            if (ctx.rawAutocorr > 0) {
+                emitLog(`⚠️ Anomalía positiva detectada - EVITANDO trade`, 'warning', tickSymbol);
+                return;
+            }
+            emitLog(`📉 MODO ANOMALÍA: Edge confirmado (r=${ctx.rawAutocorr.toFixed(3)})`, 'gold', tickSymbol);
         }
-        return;
-    }
 
-    // ============================================
-    // CALCULATE BARRIER & DIRECTION
-    // ============================================
-    const safetyFactor = VOLATILITY_CONFIG.SAFETY_FACTOR_DEFAULT;
-    const barrierOffset = ctx.medianRange * safetyFactor;
+        // EXECUTE TRADE
+        const triggerDigit = ctx.lastTwo ? ctx.lastTwo[0] : ctx.newDigitBuffer[ctx.newDigitBuffer.length - 1];
 
-    // Mean reversion: trade opposite to recent direction
-    // UP 3 ticks → PUT (barrier above) — price won't reach that high
-    // DOWN 3 ticks → CALL (barrier below) — price won't reach that low
-    const tradeDirection: 'CALL' | 'PUT' = ctx.direction === 'up' ? 'PUT' : 'CALL';
+        // Capture signal timestamp
+        signalTimestamp = performance.now();
+        signalDigit = currentDigit;
+        signalSymbol = SYMBOL_NAMES[tickSymbol];
+        const drift = serverTimeOffset;
+        console.log(`⏱️ [ATOMIC] T1: Signal at ${signalTimestamp.toFixed(2)}ms | Digit: ${triggerDigit} | Tick: ${currentDigit} | Drift: ${drift}ms | ${SYMBOL_NAMES[tickSymbol]}`);
 
-    // For Deriv API: barrier is the offset from entry spot
-    // CALL (Higher) with negative barrier = price must stay ABOVE barrier
-    // PUT (Lower) with positive barrier = price must stay BELOW barrier
-    // We use the OPPOSITE: bet that price WONT reach the barrier
-    const barrierString = tradeDirection === 'PUT'
-        ? `+${barrierOffset.toFixed(4)}`   // PUT: barrier above → price won't go HIGHER
-        : `-${barrierOffset.toFixed(4)}`; // CALL: barrier below → price won't go LOWER
+        lastTradeTimestamp = Date.now();
 
-    const triggerReason = `${ctx.direction === 'up' ? '📈→📉' : '📉→📈'} Mean-Rev | ATR:${ctx.atr.toFixed(4)} Med:${ctx.medianRange.toFixed(4)}`;
+        // Lock
+        isSocketBusy = true;
+        socketBusyTimestamp = Date.now();
+        isWaitingForContract = true;
 
-    // ============================================
-    // EXECUTE TRADE
-    // ============================================
-    lastTradeTimestamp = Date.now();
-    lastTradeDirection = tradeDirection;
-    lastTradeSymbol = SYMBOL_NAMES[tickSymbol];
+        // Update status to firing
+        assetStates[tickSymbol] = { ...assetStates[tickSymbol], status: 'firing' };
 
-    isSocketBusy = true;
-    socketBusyTimestamp = Date.now();
-    isWaitingForContract = true;
+        const stakeAmount = parseFloat(currentStake.toFixed(2));
 
-    assetStates[tickSymbol] = { ...assetStates[tickSymbol], status: 'firing' };
+        // Trigger reason
+        const triggerReason = ctx.isConfirmedAnomaly
+            ? `ANOMALÍA (r=${ctx.rawAutocorr.toFixed(3)})`
+            : ctx.isStreakAnomalous
+                ? `Streak x${ctx.currentStreak}`
+                : `Patrón ${triggerDigit}-${triggerDigit}`;
 
-    const stakeAmount = parseFloat(currentStake.toFixed(2));
-    const duration = config.duration || 5;
+        // Check if Orbit Mode applies
+        const currentDriftMs = serverTimeOffset;
+        const isOrbitMode = Math.abs(currentDriftMs) > ORBIT_CONFIG.LATENCY_THRESHOLD_MS;
 
-    emitLog(
-        `🛡️ QUANT SHIELD ${SYMBOL_NAMES[tickSymbol]}: ${tradeDirection} | Barrier: ${barrierString} | Score: ${ctx.totalScore}% | ${triggerReason}`,
-        'gold',
-        tickSymbol
-    );
+        emitLog(`🎯 SEÑAL ${SYMBOL_NAMES[tickSymbol]}: ${triggerReason} | E:${ctx.entropyScore} A:${ctx.autocorrScore} = ${ctx.totalScore}%${isOrbitMode ? ' | 🪐 ORBIT MODE' : ''}`, 'gold', tickSymbol);
 
-    emit({
-        type: 'TRADE_OPENED',
-        symbol: tickSymbol,
-        stake: stakeAmount,
-        direction: tradeDirection,
-        barrierOffset: barrierString,
-        score: ctx.totalScore,
-        triggerReason,
-    });
-
-    const buyRequest = {
-        buy: 1,
-        subscribe: 1,
-        price: 10000,
-        parameters: {
-            contract_type: tradeDirection,
+        emit({
+            type: 'TRADE_OPENED',
             symbol: tickSymbol,
-            currency: currency,
-            amount: stakeAmount,
-            basis: 'stake',
-            duration: duration,
-            duration_unit: 't',
-            barrier: barrierString,
+            stake: stakeAmount,
+            triggerDigit,
+            score: ctx.totalScore,
+            triggerReason,
+            orbitMode: isOrbitMode,
+        });
+
+        const buyRequest = {
+            buy: 1,
+            subscribe: 1,
+            price: 10000,
+            parameters: {
+                contract_type: 'DIGITDIFF',
+                symbol: tickSymbol,
+                currency: currency,
+                amount: stakeAmount,
+                basis: 'stake',
+                duration: 1,
+                duration_unit: 't',
+                barrier: triggerDigit.toString(),
+            }
+        };
+
+        // PREDICTIVE ORBIT MODE vs STANDARD PULSE
+        const avgExecTimeMs = avgScoringTime;
+
+        if (isOrbitMode) {
+            // 🪐 Orbit Mode: Aim for START of NEXT second (T+1)
+            // Calculate time to next second boundary
+            const useServerTime = Date.now() + currentDriftMs;
+            const nextSecondBoundary = Math.ceil(useServerTime / 1000) * 1000;
+            const timeToBoundary = nextSecondBoundary - useServerTime;
+
+            // Schedule to arrive 15ms before boundary (ORBIT_CONFIG.PREDICTION_OFFSET_MS)
+            const networkMargin = ORBIT_CONFIG.PREDICTION_OFFSET_MS;
+            const scheduleDelay = Math.max(0, timeToBoundary - networkMargin);
+
+            console.log(`🪐 [ORBIT] Drift ${currentDriftMs}ms | Next Boundary: ${timeToBoundary}ms | Sched Delay: ${scheduleDelay.toFixed(0)}ms`);
+            emitLog(`🪐 MODO ÓRBITA (Drift ${currentDriftMs}ms): Programando tiro en ${scheduleDelay.toFixed(0)}ms para T+1`, 'warning', tickSymbol);
+
+            setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify(buyRequest));
+                    emitLog(`🚀 TIRO ORBITAL ENVIADO`, 'info', tickSymbol);
+                }
+            }, scheduleDelay);
+
+        } else {
+            // Standard Pulse Logic (for low latency)
+            const shouldSendAnticipated = currentDriftMs < -250;
+
+            if (shouldSendAnticipated) {
+                console.log(`🚀 [PULSE] Anticipatory send: drift=${currentDriftMs}ms, exec=${avgExecTimeMs.toFixed(1)}ms`);
+                ws.send(JSON.stringify(buyRequest));
+            } else {
+                const optimalDelay = Math.max(0, Math.min(50, -currentDriftMs / 2));
+                if (optimalDelay > 5) {
+                    console.log(`⏱️ [PULSE] Delayed send: ${optimalDelay.toFixed(0)}ms (drift=${currentDriftMs}ms)`);
+                    setTimeout(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify(buyRequest));
+                        }
+                    }, optimalDelay);
+                } else {
+                    ws.send(JSON.stringify(buyRequest));
+                }
+            }
         }
-    };
 
-    // Send immediately — Higher/Lower is lag-tolerant
-    // Barrier is relative to entry spot, so latency doesn't affect safety margin
-    ws.send(JSON.stringify(buyRequest));
-
-    const execLatency = (performance.now() - lastTradeTimestamp).toFixed(0);
-    console.log(`⚡ [SHIELD] BUY ${tradeDirection} SENT: ${SYMBOL_NAMES[tickSymbol]} | Barrier: ${barrierString} | exec=${execLatency}ms`);
+        const execLatency = (performance.now() - signalTimestamp).toFixed(0);
+        console.log(`⚡ [PULSE/ORBIT] BUY PROCESSED: exec=${execLatency}ms | orbit=${isOrbitMode}`);
+    } else if (shouldTrigger && !ctx.inertiaOK) {
+        if (Math.random() > 0.9) {
+            emitLog(`⚠️ Señal ${SYMBOL_NAMES[tickSymbol]} ignorada: Volatilidad alta (Z:${ctx.zScore.toFixed(2)})`, 'warning');
+        }
+    }
 }
 
 // ============================================
@@ -601,15 +606,16 @@ function evaluateTradeForTick(
 // ============================================
 function checkWarmup() {
     const totalTicks = SCANNER_SYMBOLS.reduce((sum, sym) => sum + (assetStates[sym]?.tickCount ?? 0), 0);
-    const minRequired = SCANNER_SYMBOLS.length * VOLATILITY_CONFIG.MIN_TICKS_FOR_TRADE;
+    const minRequired = SCANNER_SYMBOLS.length * 25;
     const progress = Math.min(100, (totalTicks / minRequired) * 100);
-    const allReady = SCANNER_SYMBOLS.every(sym => (assetStates[sym]?.tickCount ?? 0) >= VOLATILITY_CONFIG.MIN_TICKS_FOR_TRADE);
+    const allReady = SCANNER_SYMBOLS.every(sym => (assetStates[sym]?.tickCount ?? 0) >= 15);
 
     emit({ type: 'WARMUP_PROGRESS', progress, isReady: totalTicks >= minRequired && allReady });
 
     if (totalTicks >= minRequired && !warmupLogged) {
         warmupLogged = true;
-        emitLog('🔥 Sistema calibrado. Motor Quant Shield Activo.', 'gold');
+        emitLog('🔥 Sistema calibrado. Motor Quant Activo.', 'gold');
+        console.log('✅ WARMUP COMPLETE: All assets ready');
     }
 }
 
@@ -622,12 +628,13 @@ function handleWsMessage(event: MessageEvent) {
     try {
         const data = JSON.parse(event.data);
 
-        // NTP time sync
+        // NTP time sync response
         if (data.msg_type === 'time' && data.time) {
             const serverTimeMs = data.time * 1000;
             const localTime = Date.now();
             serverTimeOffset = serverTimeMs - localTime;
             isTimeSynced = true;
+            console.log(`🕐 [NTP SYNC] Server offset: ${serverTimeOffset}ms`);
             emitLog(`🕐 Sincronizado con servidor: drift ${serverTimeOffset}ms`, 'info');
             emit({
                 type: 'NETWORK_STATUS',
@@ -647,12 +654,15 @@ function handleWsMessage(event: MessageEvent) {
             lastPingTime = 0;
             updateJitterFilter(pingLatency);
             if (pingLatency > 300) {
+                console.warn(`⚠️ [HEARTBEAT] WebSocket LENTO: ${pingLatency.toFixed(0)}ms`);
                 emitLog(`⚠️ WebSocket lento: ${pingLatency.toFixed(0)}ms`, 'warning');
+            } else {
+                console.log(`💓 [HEARTBEAT] WebSocket latency: ${pingLatency.toFixed(0)}ms`);
             }
             return;
         }
 
-        // Tick subscription id capture
+        // Tick subscription response → capture subscription ID
         if (data.msg_type === 'tick' && data.subscription) {
             const sym = data.tick?.symbol;
             if (sym && SCANNER_SYMBOLS.includes(sym as ScannerSymbol)) {
@@ -672,7 +682,7 @@ function handleWsMessage(event: MessageEvent) {
         // Buy response
         if (data.msg_type === 'buy' && data.buy) {
             const t2 = performance.now();
-            const latencyMs = lastTradeTimestamp > 0 ? t2 - lastTradeTimestamp : -1;
+            const latencyMs = signalTimestamp > 0 ? t2 - signalTimestamp : -1;
 
             isSocketBusy = false;
             socketBusyTimestamp = 0;
@@ -681,16 +691,38 @@ function handleWsMessage(event: MessageEvent) {
 
             if (latencyMs > 0) {
                 const latencyIcon = latencyMs > 500 ? '🚨' : latencyMs > 200 ? '⚠️' : '✅';
+                console.log(`${latencyIcon} [SYNC] Ejecutando en ${latencyMs.toFixed(0)}ms | Drift: ${drift}ms | Contrato: ${data.buy.contract_id}`);
                 emitLog(`${latencyIcon} [SYNC] ${latencyMs.toFixed(0)}ms | Drift: ${drift}ms | ID: ${data.buy.contract_id}`, latencyMs > 500 ? 'error' : 'success');
                 emit({ type: 'TRADE_LATENCY', latencyMs, driftMs: drift });
+
+                if (latencyMs > 500) {
+                    console.error(`🚨🚨🚨 LATENCIA CRÍTICA: ${latencyMs.toFixed(0)}ms | Drift: ${drift}ms`);
+                    emitLog(`🚨 LATENCIA CRÍTICA: ${latencyMs.toFixed(0)}ms - Datos posiblemente stale!`, 'error');
+                }
             } else {
                 emitLog(`✅ Contrato abierto: ${data.buy.contract_id}`, 'success');
             }
+
+            signalTimestamp = 0;
         }
 
         // Contract result
         if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
             const contract = data.proposal_open_contract;
+
+            // Desync detection
+            if (contract.entry_tick_display_value && signalDigit >= 0) {
+                const entryTickStr = contract.entry_tick_display_value.toString();
+                const executionDigit = parseInt(entryTickStr.charAt(entryTickStr.length - 1));
+                if (executionDigit !== signalDigit) {
+                    console.error(`🚨 DESINCRONIZACIÓN: Señal=${signalDigit} vs Ejecutado=${executionDigit}`);
+                    emit({ type: 'DESYNC', signalDigit, executionDigit, symbol: signalSymbol });
+                    emitLog(`🚨 DESINCRONIZACIÓN: Señal dígito ${signalDigit} → Ejecutado dígito ${executionDigit}`, 'error');
+                } else {
+                    console.log(`✅ [SYNC OK] Dígito señal=${signalDigit} == Dígito ejecución=${executionDigit}`);
+                }
+                signalDigit = -1;
+            }
 
             if (contract.is_sold) {
                 isWaitingForContract = false;
@@ -748,7 +780,7 @@ function connectWebSocket(wsUrl: string, token: string) {
         console.log('🔌 [WORKER] WebSocket connected');
         emit({ type: 'WS_CONNECTED' });
 
-        // Authorize
+        // Authorize with token
         ws!.send(JSON.stringify({ authorize: token }));
 
         // Request server time sync
@@ -765,7 +797,7 @@ function connectWebSocket(wsUrl: string, token: string) {
         // Start auto-reconnect watchdog
         startAutoReconnect();
 
-        // Heartbeat (10s)
+        // Heartbeat (10s) — feeds jitter filter
         if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
         heartbeatIntervalId = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
@@ -774,24 +806,27 @@ function connectWebSocket(wsUrl: string, token: string) {
             }
         }, 10000);
 
-        // NTP re-sync
+        // NTP re-sync (60s)
         if (ntpSyncIntervalId) clearInterval(ntpSyncIntervalId);
         ntpSyncIntervalId = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ time: 1 }));
             }
-        }, ORBIT_CONFIG.NTP_SYNC_INTERVAL_MS);
+        }, ORBIT_CONFIG.NTP_SYNC_INTERVAL_MS); // 15s interval for high drift environments
     };
 
     ws.onmessage = handleWsMessage;
 
     ws.onclose = () => {
+        console.warn('🔌 [WORKER] WebSocket disconnected');
         emit({ type: 'WS_DISCONNECTED' });
         emitLog('⚠️ WebSocket desconectado. Reintentando...', 'warning');
 
+        // Auto-reconnect after 2s
         if (isRunning && !isPaused) {
             setTimeout(() => {
                 if (isRunning && !isPaused) {
+                    console.log('🔄 [WORKER] Auto-reconnecting WebSocket...');
                     connectWebSocket(wsUrl, token);
                 }
             }, 2000);
@@ -808,18 +843,20 @@ function connectWebSocket(wsUrl: string, token: string) {
 // FLUSH BUFFERS
 // ============================================
 function flushBuffers(reason: string) {
+    console.log(`⚠️ BUFFER LIMPIO: Datos stale eliminados (razón: ${reason})`);
     SCANNER_SYMBOLS.forEach(sym => {
         if (assetStates[sym]) {
             assetStates[sym] = {
                 ...assetStates[sym],
+                digitBuffer: [],
                 priceBuffer: [],
-                rangeBuffer: [],
                 tickCount: 0,
-                score: { volatility: 0, calm: 0, clusters: 0, total: 0 },
+                score: { entropy: 0, volatility: 0, clusters: 0, total: 0 },
             };
         }
     });
-    calmConfirmationCount = 0;
+    anomalyConfirmationCount = 0;
+    anomalyType = null;
     warmupLogged = false;
     emitLog(`🧹 Buffers limpiados: ${reason}`, 'warning');
 }
@@ -852,8 +889,8 @@ self.onmessage = (event: MessageEvent<WorkerCommand>) => {
 
     switch (cmd.type) {
         case 'START': {
-            console.log('🚀 [WORKER] Starting Quant Shield...');
-            cleanup();
+            console.log('🚀 [WORKER] Starting scanner...');
+            cleanup(); // Clean any previous state
 
             config = cmd.config;
             authToken = cmd.authToken;
@@ -865,8 +902,11 @@ self.onmessage = (event: MessageEvent<WorkerCommand>) => {
             isNetworkStressed = false;
             pingHistory.length = 0;
             currentJitter = 0;
-            calmConfirmationCount = 0;
+            anomalyConfirmationCount = 0;
+            anomalyType = null;
             lastTradeTimestamp = 0;
+            signalTimestamp = 0;
+            signalDigit = -1;
             isSocketBusy = false;
             socketBusyTimestamp = 0;
             isWaitingForContract = false;
@@ -874,33 +914,37 @@ self.onmessage = (event: MessageEvent<WorkerCommand>) => {
             scoringCount = 0;
             avgScoringTime = 0;
 
+            // Initialize asset states
             SCANNER_SYMBOLS.forEach(sym => {
                 assetStates[sym] = createInitialAssetState(sym);
                 lastTickTime[sym] = 0;
                 delete subscriptionIds[sym];
             });
 
-            emitLog('🛡️ QUANT SHIELD v5.0 [WORKER] — Higher/Lower Barrier Strategy', 'gold');
+            emitLog('🚀 BUG DERIV SCANNER v4.0 [WORKER] iniciado - Escaneando 5 activos', 'gold');
             if (config.autoSwitch) {
                 emitLog('🧠 Selección Inteligente ACTIVADA', 'info');
             }
-            emitLog('⏳ Calibrando volatilidad de 5 activos...', 'info');
-            emitLog('🌐 Jitter Filter ACTIVADO', 'info');
+            emitLog('⏳ Calibrando sistema...', 'info');
+            emitLog('🌐 Jitter Filter ACTIVADO (umbral: 50ms)', 'info');
             emitLog('📊 Priority Queue ACTIVADO', 'info');
-            emitLog('🔄 Auto-Reconnect ACTIVADO', 'info');
+            emitLog('🔄 Auto-Reconnect ACTIVADO (umbral: 2s)', 'info');
 
             connectWebSocket(cmd.wsUrl, cmd.authToken);
             break;
         }
 
         case 'STOP': {
-            emitLog('🛑 Quant Shield detenido', 'warning');
+            console.log('🛑 [WORKER] Stopping scanner...');
+            emitLog('🛑 Scanner detenido', 'warning');
             cleanup();
             break;
         }
 
         case 'PAUSE': {
+            console.log('🧊 [WORKER] Pausing (cooldown)...');
             isPaused = true;
+            // Unsubscribe to save resources
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ forget_all: 'ticks' }));
             }
@@ -909,12 +953,14 @@ self.onmessage = (event: MessageEvent<WorkerCommand>) => {
         }
 
         case 'RESUME': {
+            console.log('✅ [WORKER] Resuming from cooldown...');
             isPaused = false;
             warmupLogged = false;
             flushBuffers('cooldown_resume');
             isWaitingForContract = false;
             isSocketBusy = false;
 
+            // Re-subscribe
             if (ws && ws.readyState === WebSocket.OPEN) {
                 SCANNER_SYMBOLS.forEach(sym => {
                     ws!.send(JSON.stringify({ ticks: sym, subscribe: 1 }));
@@ -924,6 +970,7 @@ self.onmessage = (event: MessageEvent<WorkerCommand>) => {
                 emitLog('🚀 Resfriamento completo! Reiniciando análise...', 'success');
                 emitLog('⏳ Calibrando sistema...', 'info');
             } else {
+                // WebSocket might be dead, reconnect
                 if (authToken && config) {
                     const wsUrl = `wss://ws.derivws.com/websockets/v3?app_id=1089`;
                     connectWebSocket(wsUrl, authToken);

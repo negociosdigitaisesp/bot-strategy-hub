@@ -1,75 +1,101 @@
 // ============================================
-// SCANNER WEB WORKER - Shared Types
+// QUANT SHIELD — SHARED TYPES & CONSTANTS
 // ============================================
-// Message protocol between Main Thread ↔ Web Worker
 
-export const SCANNER_SYMBOLS = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'] as const;
-export type ScannerSymbol = typeof SCANNER_SYMBOLS[number];
+// Scanner Symbols
+export type ScannerSymbol = 'R_10' | 'R_25' | 'R_50' | 'R_75' | 'R_100';
 
-// Symbol display names
+export const SCANNER_SYMBOLS: ScannerSymbol[] = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'];
+
 export const SYMBOL_NAMES: Record<ScannerSymbol, string> = {
-    'R_10': 'V10',
-    'R_25': 'V25',
-    'R_50': 'V50',
-    'R_75': 'V75',
-    'R_100': 'V100',
+    R_10: 'V10',
+    R_25: 'V25',
+    R_50: 'V50',
+    R_75: 'V75',
+    R_100: 'V100',
 };
 
-// Asset Score Component
+// ============================================
+// SCORING & STRATEGY CONFIG
+// ============================================
+export const VOLATILITY_CONFIG = {
+    BUFFER_SIZE: 30,             // Rolling window for volatility calc
+    MIN_TICKS_FOR_TRADE: 20,     // Minimum ticks before trading
+    ATR_PERIOD: 15,              // ATR calculation lookback
+    SAFETY_FACTOR_DEFAULT: 2.2,  // Barrier = medianRange * safetyFactor
+    CALM_REGIME_MULTIPLIER: 1.5, // If last 3 ranges > median * this → block
+    DIRECTION_LOOKBACK: 3,       // How many ticks to determine direction
+    ANTI_CLUSTERING_COOLDOWN_MS: 3000, // Min interval between trades
+    ANOMALY_CONFIRMATION_TICKS: 3,     // Ticks to confirm low-vol anomaly
+};
+
+export const JITTER_CONFIG = {
+    PING_HISTORY_SIZE: 10,
+    STRESS_THRESHOLD_MS: 50,
+    STALE_SYMBOL_TIMEOUT_MS: 5000,
+};
+
+export const ORBIT_CONFIG = {
+    LATENCY_THRESHOLD_MS: 400,
+    JITTER_TOLERANCE_MS: 100,
+    NTP_SYNC_INTERVAL_MS: 15000,
+    PREDICTION_OFFSET_MS: 15,
+};
+
+// ============================================
+// ASSET STATE
+// ============================================
 export interface AssetScore {
-    entropy: number;
-    volatility: number;
-    clusters: number;
-    total: number;
+    volatility: number;   // ATR-based score (0-40)
+    calm: number;         // Market calmness score (0-40)
+    clusters: number;     // Volatility clustering bonus (0-20)
+    total: number;        // Combined
 }
 
-// Asset state for each tracked symbol
 export interface AssetState {
     symbol: ScannerSymbol;
     displayName: string;
-    digitBuffer: number[];
     priceBuffer: number[];
+    rangeBuffer: number[];       // |price[i] - price[i-1]| for each tick
     healthScore: number;
     score: AssetScore;
-    shadowPattern: boolean;
-    lastTwoDigits: [number, number] | null;
-    inertiaOK: boolean;
-    zScore: number;
-    status: 'scanning' | 'forming' | 'firing' | 'vetoed';
     lastPrice: number;
     tickCount: number;
+    status: 'scanning' | 'forming' | 'firing' | 'vetoed';
+    currentATR: number;
+    medianRange: number;
+    isCalm: boolean;             // Is current regime calm enough to trade?
+    lastDirection: 'up' | 'down' | 'flat';
+    consecutiveDirection: number; // How many ticks in same direction
 }
 
-// Scanner configuration
+// ============================================
+// SCANNER CONFIG (from main thread)
+// ============================================
 export interface ScannerConfig {
     stake: number;
     stopLoss: number;
     takeProfit: number;
-    useMartingale?: boolean;
-    maxMartingaleLevel?: number;
-    martingaleFactor?: number;
-    autoSwitch?: boolean;
-    minScore?: number;
+    useMartingale: boolean;
+    maxMartingaleLevel: number;
+    martingaleFactor: number;
+    autoSwitch: boolean;
+    minScore: number;
+    // Cooldown
+    profitTarget: number;
+    maxConsecutiveLosses: number;
+    // Anomaly
+    anomalyOnlyMode: boolean;
+    // Soros
     useSoros?: boolean;
     maxSorosLevels?: number;
-    profitTarget?: number;
-    maxConsecutiveLosses?: number;
-    cooldownDuration?: number;
-    anomalyOnlyMode?: boolean;
+    // Duration
+    duration?: number;           // Default 5 ticks
 }
 
-// Scanner statistics
-export interface ScannerStats {
-    wins: number;
-    losses: number;
-    totalProfit: number;
-    currentStake: number;
-    consecutiveLosses: number;
-    cycleProfit: number;
-    cycleCount: number;
-}
-
-// Log entry
+// ============================================
+// LOG ENTRY
+// ============================================
 export interface LogEntry {
     id: string;
     time: string;
@@ -78,64 +104,32 @@ export interface LogEntry {
     symbol?: ScannerSymbol;
 }
 
-// Anomaly detection config
-export const ANOMALY_CONFIG = {
-    BUFFER_SIZE: 50,
-    AUTOCORR_ANOMALY_THRESHOLD: 0.10,
-    ANOMALY_CONFIRMATION_TICKS: 3,
-    ANTI_CLUSTERING_COOLDOWN_MS: 3000,
-    MIN_TICKS_FOR_TRADE: 30,
-};
-
-// Jitter Filter config
-export const JITTER_CONFIG = {
-    PING_HISTORY_SIZE: 10,          // Track last 10 pings
-    STRESS_THRESHOLD_MS: 50,         // StdDev > 50ms = NETWORK_STRESS
-    STALE_SYMBOL_TIMEOUT_MS: 2000,   // 2s without tick = stale symbol
-};
-
-// Orbit Mode (Predictive Latency Compensation) config
-export const ORBIT_CONFIG = {
-    LATENCY_THRESHOLD_MS: 400,      // Drift > 400ms activates Orbit Mode
-    JITTER_TOLERANCE_MS: 100,       // Relaxed jitter threshold in Orbit Mode
-    PREDICTION_OFFSET_MS: 15,       // Send 15ms before predicted tick time
-    NTP_SYNC_INTERVAL_MS: 15000,    // Recalibrate clock every 15s in high latency
-};
-
 // ============================================
-// MESSAGES: Main Thread → Worker
+// WORKER COMMANDS (main → worker)
 // ============================================
 export type WorkerCommand =
-    | { type: 'START'; config: ScannerConfig; wsUrl: string; authToken: string; currency: string }
+    | { type: 'START'; config: ScannerConfig; authToken: string; currency: string; wsUrl: string }
     | { type: 'STOP' }
-    | { type: 'PAUSE' }    // Cooldown started
-    | { type: 'RESUME' }   // Cooldown ended
+    | { type: 'PAUSE' }
+    | { type: 'RESUME' }
     | { type: 'UPDATE_STAKE'; stake: number }
     | { type: 'UPDATE_CONFIG'; config: Partial<ScannerConfig> };
 
 // ============================================
-// MESSAGES: Worker → Main Thread
+// WORKER EVENTS (worker → main)
 // ============================================
 export type WorkerEvent =
-    | { type: 'TICK_UPDATE'; states: Record<ScannerSymbol, AssetState>; priorityOrder: ScannerSymbol[] }
-    | { type: 'TRADE_OPENED'; symbol: ScannerSymbol; stake: number; triggerDigit: number; score: number; triggerReason: string; orbitMode: boolean }
-    | { type: 'TRADE_RESULT'; contractId: string; profit: number; isWin: boolean; symbol: ScannerSymbol }
     | { type: 'LOG'; entry: LogEntry }
-    | {
-        type: 'NETWORK_STATUS';
-        latency: number;
-        drift: number;
-        jitter: number;
-        isStressed: boolean;
-        staleTicks: number;
-        isOrbitMode: boolean; // NEW: Orbit Mode active?
-    }
+    | { type: 'TICK_UPDATE'; states: Record<ScannerSymbol, AssetState>; priorityOrder: ScannerSymbol[] }
     | { type: 'WARMUP_PROGRESS'; progress: number; isReady: boolean }
-    | { type: 'ANOMALY_UPDATE'; isDetected: boolean; autocorr: number; anomalyType: 'negative' | 'positive' | null }
-    | { type: 'DESYNC'; signalDigit: number; executionDigit: number; symbol: string }
+    | { type: 'TRADE_OPENED'; symbol: ScannerSymbol; stake: number; direction: 'CALL' | 'PUT'; barrierOffset: string; score: number; triggerReason: string }
+    | { type: 'TRADE_RESULT'; contractId: string; profit: number; isWin: boolean; symbol: ScannerSymbol }
     | { type: 'TRADE_LATENCY'; latencyMs: number; driftMs: number }
+    | { type: 'ANOMALY_UPDATE'; isDetected: boolean; calmScore: number; regime: 'calm' | 'volatile' | 'neutral' }
+    | { type: 'NETWORK_STATUS'; latency: number; drift: number; jitter: number; isStressed: boolean; staleTicks: number; isOrbitMode: boolean }
+    | { type: 'DESYNC'; signalDirection: string; executionPrice: number; symbol: string }
     | { type: 'EXEC_TIME'; avgMs: number }
-    | { type: 'ERROR'; message: string; code?: string }
+    | { type: 'SYMBOL_RECONNECTED'; symbol: ScannerSymbol }
     | { type: 'WS_CONNECTED' }
     | { type: 'WS_DISCONNECTED' }
-    | { type: 'SYMBOL_RECONNECTED'; symbol: ScannerSymbol };
+    | { type: 'ERROR'; message: string; code: string };
