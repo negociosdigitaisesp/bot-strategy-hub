@@ -317,7 +317,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
 
     const activeAssetState = activeAsset ? assetStates[activeAsset] : null;
     const activeScore = activeAssetState ? activeAssetState.score.total : 0;
-    const isUp = activeAssetState?.lastDirection === 'up';
+    const isUp = activeAssetState?.score?.direction === 'up';
 
     return (
         <div className="min-h-screen bg-slate-950 text-white p-3 pt-20 sm:p-6 font-sans">
