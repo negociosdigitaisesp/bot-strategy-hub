@@ -19,15 +19,4 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  worker: {
-    format: 'es',
-    rollupOptions: {
-      output: {
-        entryFileNames: 'assets/[name]-[hash].js',
-      },
-    },
-  },
-  optimizeDeps: {
-    exclude: ['src/workers/scannerWorker.ts'],
-  },
 }));
