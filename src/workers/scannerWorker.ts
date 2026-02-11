@@ -11,6 +11,17 @@ import type {
 import { SCANNER_SYMBOLS, SYMBOL_NAMES, VOLATILITY_CONFIG, JITTER_CONFIG, ORBIT_CONFIG } from './scannerWorkerTypes';
 
 // ============================================
+// CONSTANTS
+// ============================================
+const BARRIER_PRECISION: Record<ScannerSymbol, number> = {
+    R_10: 3,
+    R_25: 3,
+    R_50: 4,
+    R_75: 4,
+    R_100: 2,
+};
+
+// ============================================
 // STATE
 // ============================================
 let ws: WebSocket | null = null;
@@ -534,9 +545,10 @@ function evaluateTradeForTick(
     // CALL (Higher) with negative barrier = price must stay ABOVE barrier
     // PUT (Lower) with positive barrier = price must stay BELOW barrier
     // We use the OPPOSITE: bet that price WONT reach the barrier
+    const precision = BARRIER_PRECISION[tickSymbol] || 3;
     const barrierString = tradeDirection === 'PUT'
-        ? `+${barrierOffset.toFixed(4)}`   // PUT: barrier above → price won't go HIGHER
-        : `-${barrierOffset.toFixed(4)}`; // CALL: barrier below → price won't go LOWER
+        ? `+${barrierOffset.toFixed(precision)}`   // PUT: barrier above → price won't go HIGHER
+        : `-${barrierOffset.toFixed(precision)}`; // CALL: barrier below → price won't go LOWER
 
     const triggerReason = `${ctx.direction === 'up' ? '📈→📉' : '📉→📈'} Mean-Rev | ATR:${ctx.atr.toFixed(4)} Med:${ctx.medianRange.toFixed(4)}`;
 
@@ -628,7 +640,10 @@ function handleWsMessage(event: MessageEvent) {
             const localTime = Date.now();
             serverTimeOffset = serverTimeMs - localTime;
             isTimeSynced = true;
-            emitLog(`🕐 Sincronizado con servidor: drift ${serverTimeOffset}ms`, 'info');
+            // Only log if drift is significant (> 500ms) to avoid spam
+            if (Math.abs(serverTimeOffset) > 500) {
+                emitLog(`🕐 Sincronizado: drift ${serverTimeOffset}ms`, 'warning');
+            }
             emit({
                 type: 'NETWORK_STATUS',
                 latency: currentLatency,
