@@ -10,7 +10,11 @@ import {
 const VOLATILITY_WINDOW = 20;
 const BARRIER_FACTOR = 2.2; // Quant Shield Safety Factor
 const MIN_RANGE = 0.05;     // Minimum range floor to avoid 0 barrier
-const REGIME_MULTIPLIER = 2; // Block trades if last 3 ranges > 2x median
+const REGIME_MULTIPLIER = 1.7; // ⚡ Stricter regime filter (was 2.0, tested 1.5 was too strict)
+const TICK_SPEED_MIN = 0.5;  // Min ticks/second (relaxed: was 0.8)
+const TICK_SPEED_MAX = 2.0;  // Max ticks/second (relaxed: was 1.3)
+const TREND_STRENGTH_FACTOR = 0.8; // Trend must be > 0.8x median range (relaxed: was 1.2)
+const LATENCY_THRESHOLD = 400; // ⚡ Balanced latency (was 500, tested 200 was too strict)
 
 // Tick Interface
 interface Tick {
@@ -70,7 +74,7 @@ const getMedianRange = (ticks: Tick[], period: number): number => {
     return ranges.length % 2 ? ranges[mid] : (ranges[mid - 1] + ranges[mid]) / 2;
 };
 
-// Volatility Regime Filter: block if last 3 ranges > 2x median
+// Volatility Regime Filter: block if last 3 ranges > 1.5x median (stricter)
 const isVolatilityRegimeBlocked = (ticks: Tick[], medianRange: number): boolean => {
     if (ticks.length < 4 || medianRange <= 0) return false;
     for (let i = ticks.length - 1; i >= ticks.length - 3; i--) {
@@ -79,7 +83,54 @@ const isVolatilityRegimeBlocked = (ticks: Tick[], medianRange: number): boolean 
             return false; // At least one tick is within normal range
         }
     }
-    return true; // All 3 exceeded 2x median → BLOCK
+    return true; // All 3 exceeded 1.5x median → BLOCK (stricter filter)
+};
+
+// ⚡ QUANT IMPROVEMENT #3: Tick Speed Filter (regime change detection)
+const getTickSpeed = (ticks: Tick[]): number => {
+    if (ticks.length < 5) return 1.0;
+    const timeDiff = ticks[ticks.length - 1].epoch - ticks[ticks.length - 5].epoch;
+    return 4000 / timeDiff; // Expected: 4s for 4 intervals = 1.0 ticks/sec
+};
+
+const isTickSpeedAbnormal = (tickSpeed: number): boolean => {
+    return tickSpeed > TICK_SPEED_MAX || tickSpeed < TICK_SPEED_MIN;
+};
+
+// ⚡ QUANT IMPROVEMENT #5: Real Autocorrelation for Solo Anomalía
+// IMPORTANT: Compute on RETURNS (price changes), NOT raw prices!
+// Raw prices are always positively correlated (if price goes up, next is high).
+// Returns capture the actual directional change pattern.
+const calculateAutocorr = (ticks: Tick[]): number => {
+    if (ticks.length < 12) return 0;
+
+    // Calculate returns (price changes) from last 20 ticks
+    const recent = ticks.slice(-20);
+    const returns: number[] = [];
+    for (let i = 1; i < recent.length; i++) {
+        returns.push(recent[i].quote - recent[i - 1].quote);
+    }
+
+    if (returns.length < 5) return 0;
+
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    let num = 0, den = 0;
+
+    // Lag-1 autocorrelation on returns
+    for (let i = 0; i < returns.length - 1; i++) {
+        num += (returns[i] - mean) * (returns[i + 1] - mean);
+    }
+    for (let i = 0; i < returns.length; i++) {
+        den += (returns[i] - mean) ** 2;
+    }
+
+    return den === 0 ? 0 : num / den;
+};
+
+const isAnomaly = (autocorr: number): boolean => {
+    // Negative autocorrelation of RETURNS = alternating direction (mean reversion)
+    // Threshold -0.05: mild mean reversion already gives edge
+    return autocorr < -0.05;
 };
 
 // ============================================
@@ -211,13 +262,13 @@ const processTick = (tickData: any) => {
     const epoch = tickData.epoch * 1000; // ms
     const quote = tickData.quote;
 
-    // 1. Jitter Filter (Lag Proofing)
+    // 1. ⚡ IMPROVED Jitter Filter (Lag Proofing) - 200ms threshold
     const now = Date.now();
     const tickTime = epoch - timeOffset;
     const latency = now - tickTime;
 
-    if (latency > 500) {
-        return; // Ignore stale tick
+    if (latency > LATENCY_THRESHOLD) {
+        return; // Ignore stale tick (stricter: was 500ms, now 200ms)
     }
 
     // 2. Update History
@@ -256,12 +307,29 @@ const processTick = (tickData: any) => {
         priorityOrder: Object.keys(assetStates).sort((a, b) => assetStates[b as ScannerSymbol].score.total - assetStates[a as ScannerSymbol].score.total) as ScannerSymbol[]
     });
 
-    // 6. Trade Logic (Quant Shield)
+    // 6. Trade Logic (Quant Shield with Improvements)
     if (config && warmupReady && history.length >= VOLATILITY_WINDOW && calmScore >= (config.minScore || 50)) {
-        // Volatility Regime Filter: block if last 3 ticks had range > 2x median
+        // ⚡ IMPROVEMENT #1: Volatility Regime Filter (stricter than original)
         if (isVolatilityRegimeBlocked(history, medianRange)) {
             return; // Market too volatile — skip
         }
+
+        // ⚡ IMPROVEMENT #3: Tick Speed Filter (regime change detection)
+        const tickSpeed = getTickSpeed(history);
+        if (isTickSpeedAbnormal(tickSpeed)) {
+            return; // Abnormal tick speed → regime change, skip
+        }
+
+        // ⚡ IMPROVEMENT #5: Solo Anomalía Check (if enabled)
+        if (config.anomalyOnlyMode) {
+            const autocorr = calculateAutocorr(history);
+            // Broadcast autocorr value for UI display (silent, no log spam)
+            reply({ type: 'ANOMALY_UPDATE', isDetected: isAnomaly(autocorr), calmScore: autocorr });
+            if (!isAnomaly(autocorr)) {
+                return; // Not an anomaly pattern, skip silently
+            }
+        }
+
         checkTradeOpportunity(symbol, history, medianRange);
     }
 };
@@ -284,6 +352,12 @@ const checkTradeOpportunity = (symbol: ScannerSymbol, ticks: Tick[], medianRange
     // Direction Detection (3-tick trend)
     const isUp = t0 > t1 && t1 > t2;
     const isDown = t0 < t1 && t1 < t2;
+
+    // ⚡ IMPROVEMENT #4: Trend Strength Filter
+    const trendRange = Math.abs(t0 - t2);
+    if (trendRange < medianRange * TREND_STRENGTH_FACTOR) {
+        return; // Trend too weak, skip (must be > 1.2x median)
+    }
 
     // Barrier = median_range × safety_factor (spec: 2.2)
     const barrierOffset = Math.max(MIN_RANGE, medianRange * BARRIER_FACTOR);

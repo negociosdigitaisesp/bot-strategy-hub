@@ -183,14 +183,17 @@ export const useBotAstron = () => {
     // ============================================
     // BÓVEDA INTELIGENTE
     // ============================================
-    const processVault = useCallback((profit: number) => {
-        // Accumulate 30% of each win in the vault
+    const processVault = useCallback((profit: number): number => {
+        // Accumulate 30% of each win in the vault, return net profit (70%)
         if (profit > 0) {
             const vaultDeposit = profit * 0.30;
+            const netProfit = profit * 0.70;  // 70% goes to totalProfit
             vaultAccumulatedRef.current += vaultDeposit;
             vaultCountRef.current += 1;
             addLog(`🏦 BÓVEDA: +$${vaultDeposit.toFixed(2)} guardado (Total: $${vaultAccumulatedRef.current.toFixed(2)})`, 'gold');
+            return netProfit;
         }
+        return profit;  // If loss, return full negative amount
     }, [addLog]);
 
     // ============================================
@@ -203,14 +206,13 @@ export const useBotAstron = () => {
         // Update session stats
         updateSessionStats(profit, isWin);
 
-        totalProfitRef.current += profit;
-
         if (isWin) {
             consecutiveLossesRef.current = 0;
             consecutiveWinsRef.current += 1;
 
             // === BÓVEDA INTELIGENTE ===
-            processVault(profit);
+            const netProfit = processVault(profit);  // Returns net profit (70%)
+            totalProfitRef.current += netProfit;     // Add only net profit to total
 
             // === SOROS SYSTEM ===
             if (cfg.useSoros && sorosLevelRef.current < (cfg.maxSorosLevels || 3)) {
@@ -241,18 +243,19 @@ export const useBotAstron = () => {
             setStats(prev => ({
                 ...prev,
                 wins: prev.wins + 1,
-                totalProfit: prev.totalProfit + profit,
+                totalProfit: prev.totalProfit + netProfit,  // Use net profit (70%)
                 currentStake: currentStakeRef.current,
                 consecutiveLosses: 0,
                 consecutiveWins: consecutiveWinsRef.current,
-                lastProfit: profit,
+                lastProfit: netProfit,  // Show net profit in stats
                 sorosLevel: sorosLevelRef.current,
                 vaultAccumulated: vaultAccumulatedRef.current,
                 vaultCount: vaultCountRef.current,
             }));
 
         } else {
-            // LOSS
+            // LOSS - no vault deposit, use full loss amount
+            totalProfitRef.current += profit;  // Add full loss (negative value)
             consecutiveWinsRef.current = 0;
             consecutiveLossesRef.current += 1;
             sorosLevelRef.current = 0; // Reset Soros on loss
