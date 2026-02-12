@@ -30,7 +30,8 @@ import {
     Rocket,
     LayoutDashboard,
     Bot,
-    Crosshair
+    Crosshair,
+    Atom
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -195,12 +196,12 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
 
         {
             name: 'BUG DERIV',
-            icon: <Bug size={20} />,
-            path: '/astron-bot',
+            icon: <Atom size={20} />,
+            path: '/bug-deriv',
             isImportant: true,
             requiresUpgrade: true,
-            description: 'Mean Reversion Strategy',
-            badge: 'NEW'
+            description: 'Estrategia de Apalancamiento',
+            badge: '2.2X'
         },
 
 

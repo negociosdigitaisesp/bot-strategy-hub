@@ -24,7 +24,8 @@ import {
     Lock,
     Crown,
     Snowflake,
-    AlertCircle
+    AlertCircle,
+    Atom
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBotAstron, LogEntry, ScannerSymbol, AssetState } from '../../hooks/useBotAstron';
@@ -46,7 +47,7 @@ interface FleetMonitorProps {
     autoSwitchEnabled: boolean;
     isCoolingDown: boolean;
     cooldownTime: number;
-    cooldownReason: 'profit' | 'loss' | null;
+    cooldownReason: string;
     // Anomaly Detection v3.0
     isAnomalyDetected?: boolean;
     currentAutocorr?: number;
@@ -115,10 +116,10 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
                     </div>
                     <div>
                         <h3 className={`text-sm font-bold font-mono transition-colors ${autoSwitchEnabled ? 'text-amber-400' : 'text-white'}`}>
-                            {autoSwitchEnabled ? 'SMART FLEET MONITOR' : 'RADAR MONITOR'}
+                            {autoSwitchEnabled ? 'RADAR DE APALANCAMIENTO' : 'RADAR MONITOR'}
                         </h3>
                         <p className="text-[9px] text-gray-500 uppercase tracking-wider">
-                            {autoSwitchEnabled ? 'Auto-Selection Active' : 'Passive Scanning Mode'}
+                            {autoSwitchEnabled ? 'Buscando Multiplicadores 2.2x' : 'Escaneo Pasivo'}
                         </p>
                     </div>
                 </div>
@@ -210,7 +211,7 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
             {autoSwitchEnabled && isRunning && !isWarmingUp && (
                 <div className="px-3 py-2 bg-[#1A1D26] rounded-lg border border-white/5 flex items-center justify-between">
                     <span className="text-[10px] text-gray-400 font-mono">LÍDER ACTUAL:</span>
-                    {leaderAsset ? (
+                    {leaderAsset && assetStates[leaderAsset] ? (
                         <span className="text-xs font-bold text-amber-400 font-mono flex items-center gap-1">
                             <Trophy size={10} /> {assetStates[leaderAsset].displayName} ({assetStates[leaderAsset].score.total} pts)
                         </span>
@@ -268,11 +269,14 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
                             </div>
 
                             {/* Score Big Display */}
-                            <div className="flex items-end gap-1 mb-2">
-                                <span className={`text-2xl font-black ${scoreColor} leading-none`}>
-                                    {score}
-                                </span>
-                                <span className="text-[9px] text-gray-500 font-mono mb-0.5">%</span>
+                            <div className="flex flex-col mb-1">
+                                <span className="text-[8px] text-gray-500 font-mono uppercase tracking-wider">Potencial</span>
+                                <div className="flex items-end gap-1">
+                                    <span className={`text-2xl font-black ${scoreColor} leading-none`}>
+                                        {score}
+                                    </span>
+                                    <span className="text-[9px] text-gray-500 font-mono mb-0.5">%</span>
+                                </div>
                             </div>
 
                             {/* Mini Bars */}
@@ -282,11 +286,11 @@ const FleetMonitor: React.FC<FleetMonitorProps> = ({
 
                             {/* Metrics Mini */}
                             <div className="grid grid-cols-3 gap-0.5 text-[8px] text-gray-500 font-mono opacity-80">
-                                <div className="text-center bg-white/5 rounded py-0.5" title="Entropía">
-                                    E:{asset.score.entropy}
-                                </div>
-                                <div className="text-center bg-white/5 rounded py-0.5" title="Volatilidad">
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Volatilidad (ATR)">
                                     V:{asset.score.volatility}
+                                </div>
+                                <div className="text-center bg-white/5 rounded py-0.5" title="Calma">
+                                    S:{asset.score.calm}
                                 </div>
                                 <div className="text-center bg-white/5 rounded py-0.5" title="Clusters">
                                     C:{asset.score.clusters}
@@ -539,17 +543,20 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 bg-[#0B0E14]/50 p-3 sm:p-4 rounded-2xl border border-white/5 backdrop-blur-md gap-3 sm:gap-0">
                     <div className="flex items-center gap-3 sm:gap-4">
                         <div className="relative group">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-[#00E5FF]/20 via-[#00E5FF]/10 to-transparent rounded-xl blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
-                            <div className="relative p-2 sm:p-3 bg-[#00E5FF]/10 rounded-xl border border-[#00E5FF]/20 shadow-[0_0_15px_rgba(0,229,255,0.2)]">
-                                <Bug className="text-[#00E5FF]" size={24} />
+                            <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 via-orange-500/10 to-transparent rounded-xl blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
+                            <div className="relative p-2 sm:p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                                <Atom className="text-amber-500" size={24} />
                             </div>
                         </div>
                         <div>
-                            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase">
+                            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase flex items-center gap-2">
                                 BUG DERIV SCANNER
+                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 font-mono tracking-widest">
+                                    2.2X
+                                </span>
                             </h1>
                             <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-[0.15em] sm:tracking-[0.2em] font-mono font-bold">
-                                Multi-Asset Opportunity Scanner v4.0
+                                Algoritmo de Apalancamiento Cuántico v5.0
                             </p>
                         </div>
                     </div>
@@ -580,7 +587,10 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
                                     <BrainCircuit size={16} className="text-amber-400" />
-                                    <span className="text-sm font-bold text-white font-mono">Selección Inteligente</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-white font-mono">Rastreo de Apalancamiento</span>
+                                        <span className="text-[8px] text-gray-500 font-mono">Busca distorsiones de precio para entrar con fuerza</span>
+                                    </div>
                                 </div>
                                 <div
                                     onClick={() => !isRunning && setAutoSwitch(!autoSwitch)}
@@ -596,7 +606,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     <Activity size={16} className={anomalyOnlyMode ? "text-purple-400" : "text-gray-500"} />
                                     <div className="flex flex-col">
                                         <span className={`text-xs font-bold font-mono ${anomalyOnlyMode ? 'text-purple-300' : 'text-gray-400'}`}>Solo Anomalía</span>
-                                        <span className="text-[8px] text-gray-500 font-mono">Solo opera con edge confirmado</span>
+                                        <span className="text-[8px] text-gray-500 font-mono">Opera solo con desequilibrios de volumen confirmados (Sniper Mode)</span>
                                     </div>
                                 </div>
                                 <div
@@ -633,9 +643,9 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     ))}
                                 </div>
                                 <span className="text-[9px] text-gray-600 font-mono">
-                                    {assertivityLevel === 'conservative' ? 'Score mínimo: 70% (Mayor precisión)' :
-                                        assertivityLevel === 'balanced' ? 'Score mínimo: 55% (Equilibrado)' :
-                                            'Score mínimo: 40% (Máximas señales)'}
+                                    {assertivityLevel === 'conservative' ? 'Recomendado: Filtra 90% del ruido (Solo entradas A+)' :
+                                        assertivityLevel === 'balanced' ? 'Equilibrio ideal entre frecuencia y precisión (Estándar)' :
+                                            'Modo Escáner: Detecta cualquier micro-oportunidad (Alto Volumen)'}
                                 </span>
                             </div>
                         </div>
@@ -1063,8 +1073,8 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                                 </div>
                                                 {/* Price */}
                                                 <div className={`text-sm font-medium ${tick.isUp ? 'text-[#2F80ED]' : 'text-red-500'} flex items-baseline gap-1`}>
-                                                    <span className="opacity-60 text-xs tracking-tighter">{tick.price.slice(0, -1)}</span>
-                                                    <span className={`text-base font-bold ${tick.isUp ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-red-400'}`}>{tick.price.slice(-1)}</span>
+                                                    <span className="opacity-60 text-xs tracking-tighter">{(tick.price || '0.00').slice(0, -1)}</span>
+                                                    <span className={`text-base font-bold ${tick.isUp ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-red-400'}`}>{(tick.price || '0.00').slice(-1)}</span>
                                                 </div>
                                                 {/* Signal/Status */}
                                                 <div className="text-center">
@@ -1197,7 +1207,15 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                     {/* Asset Quick Status */}
                                     <div className="grid grid-cols-5 gap-1 mt-2">
                                         {SCANNER_SYMBOLS.map(symbol => {
+
                                             const asset = assetStates[symbol];
+                                            if (!asset) {
+                                                return (
+                                                    <div key={symbol} className="text-center py-1.5 rounded-lg text-[9px] font-mono font-bold bg-white/5 text-gray-600 animate-pulse">
+                                                        ...
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <div
                                                     key={symbol}
@@ -1209,6 +1227,7 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
                                                     {SYMBOL_NAMES[symbol]}
                                                 </div>
                                             );
+
                                         })}
                                     </div>
                                 </div>
