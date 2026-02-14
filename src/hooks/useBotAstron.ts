@@ -15,6 +15,18 @@ import {
     SYMBOL_NAMES as NAMES,
 } from '../workers/scannerWorkerTypes';
 
+// ============================================
+// STRATEGY MAPPING (Frontend Name -> VPS Strategy Name)
+// ============================================
+const STRATEGY_MAPPING: Record<string, string> = {
+    "Quantum Shield V10": "strategy_1_bollinger_mean_reversion", // Placeholder
+    "V75 Flow Sniper": "strategy_2_v75_scalper",
+    "Asian Dragon AI": "strategy_3_asian_dragon",
+    "Digit Weaver Pro": "Fast RSI Bounce V2", // Found in DB
+    "Micro-Scalper Alpha": "Double Top Sniper V2", // Found in DB
+    // Add other mappings as needed
+};
+
 // Re-export types for AstronPanel
 export type { ScannerSymbol, AssetState };
 
@@ -177,6 +189,7 @@ export const useBotAstron = () => {
     const vaultAccumulatedRef = useRef(0);
     const vaultCountRef = useRef(0);
     const isRunningRef = useRef(false);
+    const lastSignalIdRef = useRef<number | null>(null); // Anti-duplicate lock
 
     // ============================================
     // ADD LOG
@@ -558,7 +571,34 @@ export const useBotAstron = () => {
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'active_signals' },
                     (payload) => {
-                        executeTrade(payload.new as SupabaseSignal);
+                        const newSignal = payload.new as SupabaseSignal;
+
+                        // 1. DUPLICATE CHECK (Anti-Repetition Lock)
+                        if (lastSignalIdRef.current === newSignal.id) {
+                            return; // Ignore duplicate
+                        }
+                        lastSignalIdRef.current = newSignal.id;
+
+                        // 2. STRATEGY FILTER
+                        const activeStrategyName = activeStrategyNameRef.current;
+
+                        if (!activeStrategyName) {
+                            console.log('Sinal ignorado: Nenhuma estratégia ativa');
+                            return;
+                        }
+
+                        // Get tech name from mapping, fallback to name itself if not mapped
+                        const techName = STRATEGY_MAPPING[activeStrategyName] || activeStrategyName;
+
+                        // Compare signal strategy with active strategy (tech name)
+                        // Note: Some signals might not have strategy field, or use different naming convention
+                        // If signal.strategy is present, we enforce the check.
+                        if (newSignal.strategy && newSignal.strategy !== techName) {
+                            console.log(`Sinal ignorado: Estratégia ${newSignal.strategy} !== Ativa ${techName}`);
+                            return;
+                        }
+
+                        executeTrade(newSignal);
                     }
                 )
                 .subscribe((status) => {
