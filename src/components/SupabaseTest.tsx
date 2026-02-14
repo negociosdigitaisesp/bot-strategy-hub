@@ -1,83 +1,47 @@
-import React, { useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { obterEstatisticasBots } from '../services/botStatsService';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+// COLOQUE SUAS CHAVES AQUI PARA TESTE RÁPIDO
+const SUPABASE_URL = 'https://xwclmxjeombwabfdvyij.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3Y2xteGplb21id2FiZmR2eWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1MjY0NTQsImV4cCI6MjA2ODEwMjQ1NH0.lB4EBPozpPUJS0oI5wpatJdo_HCTcuDRFmd42b_7i9U'; // NÃO USE A SERVICE ROLE AQUI
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export default function SupabaseTest() {
-  const [connectionStatus, setConnectionStatus] = useState('Testando...');
-  const [botData, setBotData] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [lastSignal, setLastSignal] = useState<any>(null);
+  const [status, setStatus] = useState('Desconectado');
 
   useEffect(() => {
-    async function testConnection() {
-      try {
-        // Verificar configuração
-        if (!isSupabaseConfigured()) {
-          setConnectionStatus('❌ Supabase não configurado');
-          setError('Variáveis de ambiente não encontradas');
-          return;
+    setStatus('Conectando...');
+
+    const channel = supabase
+      .channel('test-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'active_signals' },
+        (payload) => {
+          console.log("🔥 SINAL RECEBIDO:", payload.new);
+          setLastSignal(payload.new);
+
+          // Teste de Latência
+          const now = Date.now();
+          const signalTime = new Date(payload.new.created_at).getTime();
+          const latency = now - signalTime;
+          alert(`Sinal Recebido! Latência: ${latency}ms`);
         }
+      )
+      .subscribe((status) => setStatus(status));
 
-        setConnectionStatus('✅ Configuração OK');
-
-        // Testar conexão
-        const { data: session, error: authError } = await supabase.auth.getSession();
-        
-        if (authError) {
-          console.error('Erro de autenticação:', authError);
-        }
-
-        // Testar busca de dados
-        console.log('🔍 Testando busca de estatísticas...');
-        const stats = await obterEstatisticasBots();
-        setBotData(stats);
-        
-        if (stats.length > 0) {
-          setConnectionStatus('✅ Dados carregados com sucesso');
-        } else {
-          setConnectionStatus('⚠️ Nenhum dado encontrado');
-        }
-
-      } catch (err: any) {
-        console.error('Erro no teste:', err);
-        setError(err.message);
-        setConnectionStatus('❌ Erro na conexão');
-      }
-    }
-
-    testConnection();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return (
-    <div className="p-6 bg-card rounded-lg border">
-      <h3 className="text-lg font-semibold mb-4">Teste de Conexão Supabase</h3>
-      
-      <div className="space-y-2 mb-4">
-        <p><strong>Status:</strong> {connectionStatus}</p>
-        <p><strong>URL:</strong> {import.meta.env.VITE_SUPABASE_URL || 'Não configurado'}</p>
-        <p><strong>Bots encontrados:</strong> {botData.length}</p>
+    <div className="p-4 bg-gray-800 text-white border border-yellow-500 m-4 rounded">
+      <h2 className="font-bold text-yellow-500">TESTE DE RECEPÇÃO SUPABASE</h2>
+      <p>Status: {status}</p>
+      <div className="mt-2 bg-black p-2 font-mono text-xs">
+        {lastSignal ? JSON.stringify(lastSignal, null, 2) : "Aguardando sinal da VPS..."}
       </div>
-
-      {error && (
-        <div className="p-3 bg-red-100 border border-red-300 rounded text-red-700 mb-4">
-          <strong>Erro:</strong> {error}
-        </div>
-      )}
-
-      {botData.length > 0 && (
-        <div className="mt-4">
-          <h4 className="font-medium mb-2">Dados dos Bots:</h4>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {botData.map((bot, index) => (
-              <div key={index} className="p-2 bg-muted rounded text-sm">
-                <strong>{bot.nome_bot}</strong> - 
-                Lucro: ${bot.lucro_total?.toFixed(2)} - 
-                Taxa: {bot.taxa_vitoria?.toFixed(1)}% - 
-                Operações: {bot.total_operacoes}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

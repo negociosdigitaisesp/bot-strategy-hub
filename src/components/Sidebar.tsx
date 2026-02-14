@@ -31,7 +31,8 @@ import {
     LayoutDashboard,
     Bot,
     Crosshair,
-    Atom
+    Atom,
+    Search
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -195,13 +196,12 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
         },
 
         {
-            name: 'BUG DERIV',
-            icon: <Atom size={20} />,
+            name: 'REGISTROS DE AUDITORÍA',
+            icon: <Search size={20} />,
             path: '/bug-deriv',
-            isImportant: true,
+            isImportant: false,
             requiresUpgrade: true,
-            description: 'Estrategia de Apalancamiento',
-            badge: '2.2X'
+            description: 'Logs del sistema interno',
         },
 
 

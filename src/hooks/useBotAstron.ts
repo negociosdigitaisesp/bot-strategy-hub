@@ -1,16 +1,15 @@
 // ============================================
-// useBotAstron — React Hook for QUANT SHIELD v5.0
+// useBotAstron — React Hook for Cloud-Based Signal Reception v2.0
 // ============================================
-// Bridges the Web Worker (scannerWorker.ts) with AstronPanel UI.
+// Receives signals from VPS via Supabase Realtime.
 // Manages: Soros, Martingale, Bóveda Inteligente, Cooldown, TP/SL.
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useDeriv } from '../contexts/DerivContext';
 import { useTradingSession } from '../contexts/TradingSessionContext';
 import { toast } from 'sonner';
-import type {
-    WorkerEvent, ScannerConfig, ScannerSymbol, AssetState,
-} from '../workers/scannerWorkerTypes';
+import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+import type { ScannerSymbol, AssetState } from '../workers/scannerWorkerTypes';
 import {
     SCANNER_SYMBOLS as SYMBOLS,
     SYMBOL_NAMES as NAMES,
@@ -18,12 +17,31 @@ import {
 
 // Re-export types for AstronPanel
 export type { ScannerSymbol, AssetState };
-export type { LogEntry } from '../workers/scannerWorkerTypes';
+
+export interface StrategyPerformance {
+    id: number;
+    name: string;
+    wins: number;
+    losses: number;
+    winRate: number;
+    syncScore: number; // 0-100
+    status: 'OPTIMO' | 'FUERTE' | 'ESTABLE' | 'NEUTRO';
+    active: boolean;
+}
+
+// ============================================
+// LOG ENTRY INTERFACE
+// ============================================
+export interface LogEntry {
+    id: string;
+    time: string;
+    message: string;
+    type: 'info' | 'success' | 'error' | 'warning' | 'gold';
+}
 
 // ============================================
 // STATS INTERFACE (matches AstronPanel usage)
 // ============================================
-// Basic tick interface for UI
 export interface UITick {
     id: string;
     symbol: ScannerSymbol;
@@ -58,15 +76,33 @@ interface StartConfig {
     useMartingale: boolean;
     maxMartingaleLevel: number;
     martingaleFactor: number;
-    autoSwitchEnabled: boolean;
-    minScore: number;
     profitTarget: number;
     maxConsecutiveLosses: number;
-    anomalyOnlyMode: boolean;
     // Optional Soros
     useSoros?: boolean;
     maxSorosLevels?: number;
 }
+
+// ============================================
+// SUPABASE SIGNAL INTERFACE
+// ============================================
+interface SupabaseSignal {
+    id: number;
+    asset: string;
+    direction: 'CALL' | 'PUT';
+    expiry_seconds: number;
+    barrier_offset?: number;
+    strategy?: string;
+    created_at: string;
+}
+
+// ============================================
+// INITIALIZE SUPABASE CLIENT
+// ============================================
+const SUPABASE_URL = 'https://xwclmxjeombwabfdvyij.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3Y2xteGplb21id2FiZmR2eWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1MjY0NTQsImV4cCI6MjA2ODEwMjQ1NH0.lB4EBPozpPUJS0oI5wpatJdo_HCTcuDRFmd42b_7i9U';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================
 // HOOK
@@ -75,11 +111,26 @@ export const useBotAstron = () => {
     const { socket, isConnected, account, token } = useDeriv();
     const { updateStats: updateSessionStats, setActiveBot } = useTradingSession();
 
-    // Worker ref
-    const workerRef = useRef<Worker | null>(null);
+    // Supabase channel ref
+    const channelRef = useRef<RealtimeChannel | null>(null);
+    const activeContractRef = useRef<string | null>(null);
 
     // Bot state
     const [isRunning, setIsRunning] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'LISTENING' | 'EXECUTING'>('DISCONNECTED');
+    const [latency, setLatency] = useState<number>(0);
+
+    // STRATEGY STATE
+    const [strategies, setStrategies] = useState<StrategyPerformance[]>([
+        { id: 1, name: 'Quantum Shield V10', wins: 182, losses: 49, winRate: 79, syncScore: 94, status: 'OPTIMO', active: false },
+        { id: 2, name: 'V75 Flow Sniper', wins: 89, losses: 18, winRate: 83, syncScore: 86, status: 'FUERTE', active: false },
+        { id: 3, name: 'Asian Dragon AI', wins: 45, losses: 12, winRate: 79, syncScore: 72, status: 'ESTABLE', active: false },
+        { id: 4, name: 'Digit Weaver Pro', wins: 32, losses: 15, winRate: 68, syncScore: 68, status: 'NEUTRO', active: false },
+        { id: 5, name: 'Micro-Scalper Alpha', wins: 12, losses: 11, winRate: 52, syncScore: 58, status: 'NEUTRO', active: false },
+    ]);
+    const activeStrategyNameRef = useRef<string | null>(null);
+
+
     const [stats, setStats] = useState<BotStats>({
         wins: 0,
         losses: 0,
@@ -92,16 +143,16 @@ export const useBotAstron = () => {
         vaultAccumulated: 0,
         vaultCount: 0,
     });
-    const [logs, setLogs] = useState<WorkerEvent extends { type: 'LOG'; entry: infer E } ? E[] : never[]>([]);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
     const [recentTicks, setRecentTicks] = useState<UITick[]>([]);
 
-    // Multi-asset state
+    // Multi-asset state (for UI compatibility)
     const [assetStates, setAssetStates] = useState<Record<ScannerSymbol, AssetState>>({} as any);
     const [activeAsset, setActiveAsset] = useState<ScannerSymbol | null>(null);
     const [leaderAsset, setLeaderAsset] = useState<ScannerSymbol | null>(null);
     const [opportunityMessage, setOpportunityMessage] = useState<string>('');
 
-    // Warmup
+    // Warmup (simulated for UI)
     const [isWarmingUp, setIsWarmingUp] = useState(false);
     const [warmUpProgress, setWarmUpProgress] = useState(0);
 
@@ -111,7 +162,7 @@ export const useBotAstron = () => {
     const [cooldownReason, setCooldownReason] = useState<string>('');
     const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Anomaly (calm regime detection)
+    // Anomaly (for UI compatibility)
     const [isAnomalyDetected, setIsAnomalyDetected] = useState(false);
     const [currentAutocorr, setCurrentAutocorr] = useState(0);
 
@@ -140,17 +191,40 @@ export const useBotAstron = () => {
     }, []);
 
     // ============================================
+    // TOGGLE STRATEGY
+    // ============================================
+    const toggleStrategy = useCallback((id: number) => {
+        const strategy = strategies.find(s => s.id === id);
+        if (!strategy) return;
+
+        const willBeActive = !strategy.active;
+
+        // Sync Ref immediately
+        activeStrategyNameRef.current = willBeActive ? strategy.name : null;
+
+        // UI Update
+        setStrategies(prev => prev.map(s => {
+            if (s.id === id) return { ...s, active: willBeActive };
+            return { ...s, active: false };
+        }));
+
+        if (willBeActive) {
+            addLog(`⚡ Estrategia Seleccionada: ${strategy.name}`, 'gold');
+        } else {
+            addLog('⚪ Ninguna estrategia seleccionada', 'info');
+        }
+    }, [strategies, addLog]);
+
+    // ============================================
     // COOLDOWN SYSTEM
     // ============================================
     const startCooldown = useCallback((reason: string, durationMs: number = 60000) => {
-        if (!workerRef.current || !isRunningRef.current) return;
+        if (!isRunningRef.current) return;
 
         setIsCoolingDown(true);
         setCooldownReason(reason);
         setCooldownTime(Math.ceil(durationMs / 1000));
 
-        // Pause worker
-        workerRef.current.postMessage({ type: 'PAUSE' });
         addLog(`🧊 COOLDOWN: ${reason} — ${Math.ceil(durationMs / 1000)}s`, 'warning');
 
         // Countdown timer
@@ -167,15 +241,11 @@ export const useBotAstron = () => {
                 setCooldownReason('');
                 setCooldownTime(0);
 
-                // Resume worker
-                if (workerRef.current && isRunningRef.current) {
-                    workerRef.current.postMessage({ type: 'RESUME' });
-                    addLog('✅ Cooldown completado. Reiniciando...', 'success');
+                addLog('✅ Cooldown completado. Reiniciando...', 'success');
 
-                    // Reset consecutive losses
-                    consecutiveLossesRef.current = 0;
-                    sorosLevelRef.current = 0;
-                }
+                // Reset consecutive losses
+                consecutiveLossesRef.current = 0;
+                sorosLevelRef.current = 0;
             }
         }, 1000);
     }, [addLog]);
@@ -295,11 +365,6 @@ export const useBotAstron = () => {
             }));
         }
 
-        // Update worker stake
-        if (workerRef.current) {
-            workerRef.current.postMessage({ type: 'UPDATE_STAKE', stake: currentStakeRef.current });
-        }
-
         // === STOP LOSS / TAKE PROFIT (absolute) ===
         const currentTotalProfit = totalProfitRef.current;
         if (cfg.takeProfit > 0 && currentTotalProfit >= cfg.takeProfit) {
@@ -314,96 +379,121 @@ export const useBotAstron = () => {
     }, [addLog, updateSessionStats, startCooldown, processVault]);
 
     // ============================================
-    // WORKER MESSAGE HANDLER
+    // EXECUTE TRADE FROM SIGNAL
     // ============================================
-    const handleWorkerMessage = useCallback((event: MessageEvent<WorkerEvent>) => {
-        const msg = event.data;
-
-        switch (msg.type) {
-            case 'LOG':
-                setLogs(prev => [...prev.slice(-150), msg.entry]);
-                break;
-
-
-
-            // ... internal in useBotAstron
-            case 'TICK_UPDATE':
-                setAssetStates(msg.states);
-                if (msg.priorityOrder && msg.priorityOrder.length > 0) {
-                    setLeaderAsset(msg.priorityOrder[0]);
-                }
-
-                // Track recent prices from leader for chart
-                const leader = msg.priorityOrder?.[0];
-                if (leader && msg.states[leader]) {
-                    const currentPrice = msg.states[leader].lastPrice;
-                    const status = msg.states[leader].status.toUpperCase();
-
-                    if (currentPrice > 0) {
-                        setRecentTicks(prev => {
-                            const lastTick = prev[prev.length - 1];
-                            const lastPriceVal = lastTick ? parseFloat(lastTick.price) : currentPrice;
-                            const isUp = currentPrice >= lastPriceVal;
-                            const changeVal = (currentPrice - lastPriceVal).toFixed(2);
-                            const changeStr = (currentPrice >= lastPriceVal ? '+' : '') + changeVal;
-
-                            const newTick: UITick = {
-                                id: Date.now().toString() + Math.random().toString().slice(2, 6),
-                                symbol: leader,
-                                price: currentPrice.toFixed(2),
-                                isUp: isUp,
-                                change: changeStr,
-                                signal: status
-                            };
-
-                            return [...prev.slice(-49), newTick];
-                        });
-                    }
-                }
-                break;
-
-            case 'WARMUP_PROGRESS':
-                setIsWarmingUp(!msg.isReady);
-                setWarmUpProgress(msg.progress);
-                break;
-
-            case 'TRADE_OPENED':
-                setActiveAsset(msg.symbol);
-                setOpportunityMessage(`🛡️ ${msg.direction} ${NAMES[msg.symbol]} | Barrier: ${msg.barrierOffset}`);
-                break;
-
-            case 'TRADE_RESULT':
-                handleTradeResult(msg.profit, msg.isWin, msg.symbol);
-                setActiveAsset(null);
-                if (msg.isWin) {
-                    addLog(`💰 WIN +$${msg.profit.toFixed(2)} | ${NAMES[msg.symbol]}`, 'gold');
-                } else {
-                    addLog(`💥 LOSS -$${Math.abs(msg.profit).toFixed(2)} | ${NAMES[msg.symbol]}`, 'error');
-                }
-                break;
-
-            case 'ANOMALY_UPDATE':
-                setIsAnomalyDetected(msg.isDetected);
-                setCurrentAutocorr(msg.calmScore);
-                break;
-
-            case 'TRADE_LATENCY':
-                // Track for UI display if needed
-                break;
-
-            case 'WS_CONNECTED':
-                addLog('🔌 Worker WebSocket conectado', 'success');
-                break;
-
-            case 'WS_DISCONNECTED':
-                addLog('⚠️ Worker WebSocket desconectado', 'warning');
-                break;
-
-            case 'ERROR':
-                addLog(`⚠️ Error: ${msg.message}`, 'error');
-                break;
+    const executeTrade = useCallback(async (signal: SupabaseSignal) => {
+        if (!socket || !isConnected || isCoolingDown) {
+            addLog('⚠️ Cannot execute: Socket disconnected or in cooldown', 'warning');
+            return;
         }
-    }, [handleTradeResult, addLog]);
+
+        const cfg = configRef.current;
+        if (!cfg) return;
+
+
+
+        // Lag protection: Check signal age
+        const now = Date.now();
+        const signalTime = new Date(signal.created_at).getTime();
+        const lag = now - signalTime;
+        setLatency(lag);
+
+        if (lag > 4000) {
+            addLog(`⚠️ Sinal descartado: Latência de rede excessiva (${lag}ms)`, 'error');
+            return;
+        }
+
+        addLog(`📡 Sinal recebido: ${signal.direction} ${signal.asset} | Latência: ${lag}ms`, 'info');
+
+        // Log strategy if available
+        if (signal.strategy) {
+            addLog(`🎯 Estratégia detectada: ${signal.strategy}`, 'gold');
+        }
+
+        setConnectionStatus('EXECUTING');
+        setActiveAsset(signal.asset as ScannerSymbol);
+        setOpportunityMessage(`🛡️ ${signal.direction} ${signal.asset} | Barrier: ${signal.barrier_offset || 0}`);
+
+        try {
+            // Send buy order
+            const buyRequest = {
+                buy: 1,
+                price: currentStakeRef.current,
+                parameters: {
+                    contract_type: signal.direction === 'CALL' ? 'CALL' : 'PUT',
+                    symbol: signal.asset,
+                    duration: signal.expiry_seconds,
+                    duration_unit: 's',
+                    basis: 'stake',
+                    amount: currentStakeRef.current,
+                    currency: account?.currency || 'USD',
+                },
+            };
+
+            socket.send(JSON.stringify(buyRequest));
+            addLog(`🚀 Ordem enviada: ${signal.direction} ${signal.asset} @ $${currentStakeRef.current}`, 'info');
+
+            // Listen for buy response
+            const handleBuyResponse = (event: MessageEvent) => {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    // Handle Buy Confirmation
+                    if (data.msg_type === 'buy') {
+                        if (data.buy) {
+                            const contractId = data.buy.contract_id;
+                            activeContractRef.current = contractId;
+                            addLog(`✅ Contrato aberto: ${contractId}`, 'success');
+
+                            // Subscribe to contract updates
+                            socket.send(JSON.stringify({
+                                proposal_open_contract: 1,
+                                contract_id: contractId,
+                                subscribe: 1,
+                            }));
+                        } else if (data.error) {
+                            addLog(`❌ Erro na compra: ${data.error.message}`, 'error');
+                            setConnectionStatus('LISTENING');
+                            setActiveAsset(null);
+                            socket.removeEventListener('message', handleBuyResponse);
+                        }
+                    }
+
+                    // Handle Contract Updates (Result)
+                    if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
+                        const contract = data.proposal_open_contract;
+
+                        // Only process the contract we just opened
+                        if (contract.contract_id === activeContractRef.current && contract.is_sold) {
+                            const profit = parseFloat(contract.profit || '0');
+                            const isWin = profit > 0;
+
+                            handleTradeResult(profit, isWin, signal.asset as ScannerSymbol);
+                            setActiveAsset(null);
+                            setConnectionStatus('LISTENING');
+                            activeContractRef.current = null;
+
+                            // Unsubscribe & Cleanup
+                            socket.send(JSON.stringify({
+                                forget: contract.id,
+                            }));
+
+                            socket.removeEventListener('message', handleBuyResponse);
+                        }
+                    }
+                } catch (error) {
+                    addLog('❌ Error al procesar datos del servidor', 'error');
+                }
+            };
+
+            socket.addEventListener('message', handleBuyResponse);
+
+        } catch (error) {
+            addLog(`❌ Erro ao executar trade: ${error}`, 'error');
+            setConnectionStatus('LISTENING');
+            setActiveAsset(null);
+        }
+    }, [socket, isConnected, account, isCoolingDown, addLog, handleTradeResult]);
 
     // ============================================
     // START BOT
@@ -413,18 +503,6 @@ export const useBotAstron = () => {
             toast.error('Conecte ao Deriv primeiro');
             return false;
         }
-
-
-        // Get token from context (preferred) or localStorage (fallback)
-        const apiToken = token || localStorage.getItem('deriv_active_token');
-        if (!apiToken) {
-            toast.error('Token de autenticación no encontrado');
-            return false;
-        }
-
-        // Validate currency
-        const rawCurrency = account?.currency;
-        const validCurrency = (rawCurrency && rawCurrency !== '...' && rawCurrency !== '') ? rawCurrency : 'USD';
 
         // Store config
         configRef.current = startConfig;
@@ -437,22 +515,10 @@ export const useBotAstron = () => {
         vaultAccumulatedRef.current = 0;
         vaultCountRef.current = 0;
 
-        // Reset UI state
-        setStats({
-            wins: 0,
-            losses: 0,
-            totalProfit: 0,
-            currentStake: startConfig.stake,
-            consecutiveLosses: 0,
-            consecutiveWins: 0,
-            lastProfit: 0,
-            sorosLevel: 0,
-            vaultAccumulated: 0,
-            vaultCount: 0,
-        });
-        setLogs([]);
+        // Reset UI state (KEEP LOGS if strategy was selected recently)
+        // setLogs([]); // <--- REMOVED TO PRESERVE STRATEGY LOG
         setRecentTicks([]);
-        setIsWarmingUp(true);
+        setIsWarmingUp(false);
         setWarmUpProgress(0);
         setIsCoolingDown(false);
         setCooldownTime(0);
@@ -461,52 +527,56 @@ export const useBotAstron = () => {
         setLeaderAsset(null);
         setOpportunityMessage('');
 
+        // Initialize asset states for UI
+        const initialStates: Record<ScannerSymbol, AssetState> = {} as any;
+        SYMBOLS.forEach(symbol => {
+            initialStates[symbol] = {
+                symbol,
+                displayName: NAMES[symbol],
+                lastPrice: 0,
+                score: { volatility: 0, calm: 0, clusters: 0, total: 0 },
+                status: 'scanning',
+            };
+        });
+        setAssetStates(initialStates);
+
+        // Verification Log
+        addLog('=================================', 'info');
+        addLog('⚛️ BUG DERIV SCANNER v2.2 — STARTING', 'info');
+        if (activeStrategyNameRef.current) {
+            addLog(`⚔️ MODE: ${activeStrategyNameRef.current}`, 'gold');
+        } else {
+            addLog('⚠️ MODO: Sin Estrategia (Esperando selección)', 'warning');
+        }
+        addLog(`💰 Stake: $${startConfig.stake} | SL: $${startConfig.stopLoss} | TP: $${startConfig.takeProfit}`, 'info');
+
         try {
-            // Create worker
-            if (workerRef.current) {
-                workerRef.current.terminate();
-            }
-            const worker = new Worker(
-                new URL('../workers/scannerWorker.ts', import.meta.url),
-                { type: 'module' }
-            );
-            workerRef.current = worker;
-            worker.onmessage = handleWorkerMessage;
-            worker.onerror = (e) => {
-                console.error('Worker Error:', e);
-                addLog(`⚠️ Critical Worker Error: ${e.message}`, 'error');
-                toast.error('Error crítico en el motor de trading');
-                stopBot();
-            };
+            // Create Supabase channel
+            const channel = supabase
+                .channel('bot-signals')
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'active_signals' },
+                    (payload) => {
+                        executeTrade(payload.new as SupabaseSignal);
+                    }
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        setConnectionStatus('LISTENING');
+                        addLog('📡 Conectado ao Servidor Cloud VPS', 'success');
+                        addLog('🔎 Escaneando mercado por oportunidades...', 'info');
+                    } else if (status === 'CHANNEL_ERROR') {
+                        addLog('❌ Erro ao conectar com Supabase', 'error');
+                        setConnectionStatus('DISCONNECTED');
+                    }
+                });
 
-            // Map config to worker format
-            const workerConfig: ScannerConfig = {
-                stake: startConfig.stake,
-                stopLoss: startConfig.stopLoss,
-                takeProfit: startConfig.takeProfit,
-                useMartingale: startConfig.useMartingale,
-                maxMartingaleLevel: startConfig.maxMartingaleLevel,
-                martingaleFactor: startConfig.martingaleFactor,
-                autoSwitch: startConfig.autoSwitchEnabled,
-                minScore: startConfig.minScore,
-                profitTarget: startConfig.profitTarget,
-                maxConsecutiveLosses: startConfig.maxConsecutiveLosses,
-                anomalyOnlyMode: startConfig.anomalyOnlyMode,
-                useSoros: startConfig.useSoros,
-                maxSorosLevels: startConfig.maxSorosLevels,
-            };
+            channelRef.current = channel;
 
-            // Start worker
-            worker.postMessage({
-                type: 'START',
-                config: workerConfig,
-                authToken: apiToken,
-                currency: validCurrency,
-                wsUrl: `wss://ws.derivws.com/websockets/v3?app_id=1089`,
-            });
         } catch (error) {
-            console.error('Failed to start worker:', error);
-            toast.error('Falha ao iniciar o motor de trading');
+            addLog('❌ Falha ao conectar com servidor cloud', 'error');
+            toast.error('Falha ao conectar com servidor cloud');
             setIsRunning(false);
             isRunningRef.current = false;
             return false;
@@ -514,29 +584,18 @@ export const useBotAstron = () => {
 
         setIsRunning(true);
         isRunningRef.current = true;
-        setActiveBot('Quant Shield');
-
-        addLog('🛡️ QUANT SHIELD v5.0 — Higher/Lower Barrier Strategy', 'gold');
-        addLog(`💰 Stake: $${startConfig.stake} | SL: $${startConfig.stopLoss} | TP: $${startConfig.takeProfit}`, 'info');
-        if (startConfig.useMartingale) {
-            addLog(`📈 Martingale: ON (Max: ${startConfig.maxMartingaleLevel}, Factor: ${startConfig.martingaleFactor}x)`, 'info');
-        }
-        if (startConfig.useSoros) {
-            addLog(`🔥 Soros: ON (Max: ${startConfig.maxSorosLevels || 3} levels)`, 'info');
-        }
-        addLog('⏳ Calibrando volatilidad...', 'info');
+        setActiveBot('Bug Deriv Scanner');
 
         return true;
-    }, [isConnected, account, handleWorkerMessage, addLog, setActiveBot]);
+    }, [isConnected, account, addLog, setActiveBot, executeTrade]);
 
     // ============================================
     // STOP BOT
     // ============================================
     const stopBot = useCallback(() => {
-        if (workerRef.current) {
-            workerRef.current.postMessage({ type: 'STOP' });
-            workerRef.current.terminate();
-            workerRef.current = null;
+        if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
         }
 
         if (cooldownTimerRef.current) {
@@ -551,19 +610,25 @@ export const useBotAstron = () => {
         setIsWarmingUp(false);
         setActiveAsset(null);
         setActiveBot(null);
+        setConnectionStatus('DISCONNECTED');
+
+        // Deactivate all strategies visually when stopping
+        setStrategies(prev => prev.map(s => ({ ...s, active: false })));
+        // activeStrategyNameRef.current = null; // Don't clear ref immediately if we want to remember selection on restart? 
+        // No, UI clears active state, so logic should too.
+        activeStrategyNameRef.current = null;
 
         if (vaultAccumulatedRef.current > 0) {
             addLog(`🏦 BÓVEDA FINAL: $${vaultAccumulatedRef.current.toFixed(2)} protegidos en ${vaultCountRef.current} depósitos`, 'gold');
         }
-        addLog('🛑 Quant Shield detenido', 'warning');
+        addLog('🛑 Bug Deriv Scanner detenido', 'warning');
     }, [addLog, setActiveBot]);
 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (workerRef.current) {
-                workerRef.current.postMessage({ type: 'STOP' });
-                workerRef.current.terminate();
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
             }
             if (cooldownTimerRef.current) {
                 clearInterval(cooldownTimerRef.current);
@@ -600,5 +665,13 @@ export const useBotAstron = () => {
         // Anomaly / Calm regime
         isAnomalyDetected,
         currentAutocorr,
+
+        // Cloud-specific
+        connectionStatus,
+        latency,
+
+        // Strategy
+        strategies,
+        toggleStrategy,
     };
 };

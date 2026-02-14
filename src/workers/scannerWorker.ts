@@ -5,16 +5,29 @@ import {
 } from './scannerWorkerTypes';
 
 // ============================================
-// CONFIGURATION Constants
+// QUANTUM INERTIA STRATEGY v1.0
 // ============================================
-const VOLATILITY_WINDOW = 20;
-const BARRIER_FACTOR = 2.2; // Quant Shield Safety Factor
-const MIN_RANGE = 0.05;     // Minimum range floor to avoid 0 barrier
-const REGIME_MULTIPLIER = 1.7; // ⚡ Stricter regime filter (was 2.0, tested 1.5 was too strict)
-const TICK_SPEED_MIN = 0.5;  // Min ticks/second (relaxed: was 0.8)
-const TICK_SPEED_MAX = 2.0;  // Max ticks/second (relaxed: was 1.3)
-const TREND_STRENGTH_FACTOR = 0.8; // Trend must be > 0.8x median range (relaxed: was 1.2)
-const LATENCY_THRESHOLD = 400; // ⚡ Balanced latency (was 500, tested 200 was too strict)
+// Logic: "Trends in motion stay in motion" (Newton's 1st Law for Markets)
+// 1. Velocity: Price moved > 2.0x ATR in 1 sec (Force)
+// 2. Acceleration: Current move > Previous move (Gaining power)
+// 3. Execution: FOLLOW the force (Call if UP, Put if DOWN)
+// 4. Duration: 5 ticks (Surfing the 200ms delay wave)
+
+// ============================================
+// CONFIGURATION
+// ============================================
+const WARMUP_TICKS = 25;
+const ATR_PERIOD = 20;
+
+// Quantum Vector Pressure Constants (v2.1)
+const EMA_PERIOD = 9;               // Micro-trend baseline
+const PRESSURE_THRESHOLD = 0.70;    // 70% directional dominance required (High Conviction)
+const PRESSURE_WINDOW = 10;         // Look at last 10 ticks for pressure (More data)
+const VECTOR_DURATION = 7;          // 7 ticks duration (Survival Logic)
+const MAX_SIMULTANEOUS_TRADES = 2;
+const COOLDOWN_PER_ASSET = 30000;   // 30s cooldown per asset
+const LATENCY_THRESHOLD = 500;
+const MIN_TRADE_INTERVAL = 5000;    // 5s between trades
 
 // Tick Interface
 interface Tick {
@@ -29,12 +42,16 @@ let ws: WebSocket | null = null;
 let isScanActive = false;
 let isPaused = false;
 let currentStake = 0;
-let tradeCurrency = 'USD';  // Dynamic currency from account
-let isTrading = false;       // Concurrency lock — only 1 trade at a time
-let warmupReady = false;     // Track warmup completion
-let lastTradeTime = 0;       // Timestamp of last trade — enforce minimum interval
-let activeContractId: string | null = null; // Track active contract for lock release
-const MIN_TRADE_INTERVAL = 10000; // 10 seconds minimum between trades
+let tradeCurrency = 'USD';
+let activeTradeCount = 0;
+let warmupReady = false;
+let lastTradeTime = 0;
+let activeContractId: string | null = null;
+
+// Cooldown tracking per asset
+const assetCooldowns: Record<ScannerSymbol, number> = {
+    'R_10': 0, 'R_25': 0, 'R_50': 0, 'R_75': 0, 'R_100': 0
+};
 
 // Data Buffers
 const tickHistory: Record<ScannerSymbol, Tick[]> = {
@@ -50,87 +67,91 @@ const assetStates: Record<ScannerSymbol, AssetState> = {
     'R_100': { symbol: 'R_100', displayName: SYMBOL_NAMES['R_100'], lastPrice: 0, score: { volatility: 0, calm: 0, clusters: 0, total: 0 }, status: 'scanning' },
 };
 
-// NTP / Jitter
+// NTP
 let timeOffset = 0;
 
-// HELPER: Send Event to Main Thread
 const reply = (event: WorkerEvent) => {
     self.postMessage(event);
 };
 
 // ============================================
-// MATH HELPERS (Dependency Free)
+// MATH HELPERS
 // ============================================
-const getMedianRange = (ticks: Tick[], period: number): number => {
-    if (ticks.length < 2) return 0;
-    const relevant = ticks.slice(-period - 1);
-    const ranges: number[] = [];
-    for (let i = 1; i < relevant.length; i++) {
-        ranges.push(Math.abs(relevant[i].quote - relevant[i - 1].quote));
+
+const calculateATR = (ticks: Tick[], period: number): number => {
+    if (ticks.length < period + 1) return 0;
+    const recent = ticks.slice(-(period + 1));
+    let sum = 0;
+    for (let i = 1; i < recent.length; i++) {
+        sum += Math.abs(recent[i].quote - recent[i - 1].quote);
     }
-    if (ranges.length === 0) return 0;
-    ranges.sort((a, b) => a - b);
-    const mid = Math.floor(ranges.length / 2);
-    return ranges.length % 2 ? ranges[mid] : (ranges[mid - 1] + ranges[mid]) / 2;
+    return sum / period;
 };
 
-// Volatility Regime Filter: block if last 3 ranges > 1.5x median (stricter)
-const isVolatilityRegimeBlocked = (ticks: Tick[], medianRange: number): boolean => {
-    if (ticks.length < 4 || medianRange <= 0) return false;
-    for (let i = ticks.length - 1; i >= ticks.length - 3; i--) {
-        const range = Math.abs(ticks[i].quote - ticks[i - 1].quote);
-        if (range <= medianRange * REGIME_MULTIPLIER) {
-            return false; // At least one tick is within normal range
+// Exponential Moving Average (EMA)
+const calculateEMA = (ticks: Tick[], period: number): number => {
+    if (ticks.length < period) return 0;
+
+    // Simple MA for the first point
+    let k = 2 / (period + 1);
+    let ema = ticks[0].quote;
+
+    // Calculate EMA step by step
+    for (let i = 1; i < ticks.length; i++) {
+        ema = (ticks[i].quote * k) + (ema * (1 - k));
+    }
+    return ema;
+};
+
+// Vector Pressure: Frequency of up/down ticks in window
+const calculatePressure = (ticks: Tick[], window: number): { pressure: number; direction: 'UP' | 'DOWN'; persistence: number } => {
+    if (ticks.length < window) return { pressure: 0, direction: 'UP', persistence: 0 };
+
+    const recent = ticks.slice(-window);
+    let upCount = 0;
+    let downCount = 0;
+
+    // Count directional moves
+    for (let i = 1; i < recent.length; i++) {
+        const diff = recent[i].quote - recent[i - 1].quote;
+        if (diff > 0) upCount++;
+        if (diff < 0) downCount++;
+    }
+
+    const totalMoves = upCount + downCount;
+    if (totalMoves === 0) return { pressure: 0, direction: 'UP', persistence: 0 };
+
+    const upRatio = upCount / totalMoves;
+    const downRatio = downCount / totalMoves;
+
+    // Persistence Check: Last 4 ticks
+    const last4 = ticks.slice(-4);
+    let persistenceCount = 0;
+    const lastTick = last4[last4.length - 1];
+    const trendDir = upRatio > downRatio ? 1 : -1;
+
+    for (let i = 1; i < last4.length; i++) {
+        const diff = last4[i].quote - last4[i - 1].quote;
+        if ((trendDir === 1 && diff > 0) || (trendDir === -1 && diff < 0)) {
+            persistenceCount++;
         }
     }
-    return true; // All 3 exceeded 1.5x median → BLOCK (stricter filter)
+
+    return {
+        pressure: Math.max(upRatio, downRatio),
+        direction: upRatio > downRatio ? 'UP' : 'DOWN',
+        persistence: persistenceCount // Max 3 (since 4 ticks have 3 moves)
+    };
 };
 
-// ⚡ QUANT IMPROVEMENT #3: Tick Speed Filter (regime change detection)
-const getTickSpeed = (ticks: Tick[]): number => {
-    if (ticks.length < 5) return 1.0;
-    const timeDiff = ticks[ticks.length - 1].epoch - ticks[ticks.length - 5].epoch;
-    return 4000 / timeDiff; // Expected: 4s for 4 intervals = 1.0 ticks/sec
-};
-
-const isTickSpeedAbnormal = (tickSpeed: number): boolean => {
-    return tickSpeed > TICK_SPEED_MAX || tickSpeed < TICK_SPEED_MIN;
-};
-
-// ⚡ QUANT IMPROVEMENT #5: Real Autocorrelation for Solo Anomalía
-// IMPORTANT: Compute on RETURNS (price changes), NOT raw prices!
-// Raw prices are always positively correlated (if price goes up, next is high).
-// Returns capture the actual directional change pattern.
-const calculateAutocorr = (ticks: Tick[]): number => {
-    if (ticks.length < 12) return 0;
-
-    // Calculate returns (price changes) from last 20 ticks
-    const recent = ticks.slice(-20);
-    const returns: number[] = [];
-    for (let i = 1; i < recent.length; i++) {
-        returns.push(recent[i].quote - recent[i - 1].quote);
-    }
-
-    if (returns.length < 5) return 0;
-
-    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-    let num = 0, den = 0;
-
-    // Lag-1 autocorrelation on returns
-    for (let i = 0; i < returns.length - 1; i++) {
-        num += (returns[i] - mean) * (returns[i + 1] - mean);
-    }
-    for (let i = 0; i < returns.length; i++) {
-        den += (returns[i] - mean) ** 2;
-    }
-
-    return den === 0 ? 0 : num / den;
-};
-
-const isAnomaly = (autocorr: number): boolean => {
-    // Negative autocorrelation of RETURNS = alternating direction (mean reversion)
-    // Threshold -0.05: mild mean reversion already gives edge
-    return autocorr < -0.05;
+// Calm Score for UI (Inverted Volatility basically)
+const calculateCalmScore = (atr: number, symbol: ScannerSymbol): number => {
+    const normalizers: Record<ScannerSymbol, number> = {
+        'R_10': 0.02, 'R_25': 0.05, 'R_50': 0.10, 'R_75': 0.15, 'R_100': 0.20
+    };
+    const norm = normalizers[symbol] || 0.10;
+    const ratio = atr / norm;
+    return Math.max(0, Math.min(100, 100 - (ratio * 80)));
 };
 
 // ============================================
@@ -148,105 +169,69 @@ const connectWS = (url: string) => {
 
     ws.onclose = () => {
         reply({ type: 'WS_DISCONNECTED' });
-        // Auto-reconnect after 2s
         setTimeout(() => {
             if (isScanActive) connectWS(url);
         }, 2000);
     };
 
-    ws.onerror = (err) => {
+    ws.onerror = () => {
         reply({ type: 'ERROR', message: 'WebSocket Error' });
     };
 
     ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
 
-        // Authorization Response
         if (data.msg_type === 'authorize') {
             reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: '✅ Worker Autorizado', type: 'success' } });
-            // Subscribe to ticks
-            ws?.send(JSON.stringify({
-                ticks: SCANNER_SYMBOLS,
-                subscribe: 1
-            }));
-            // Initial Time Sync
+            ws?.send(JSON.stringify({ ticks: SCANNER_SYMBOLS, subscribe: 1 }));
             ws?.send(JSON.stringify({ time: 1 }));
         }
 
-        // Time Sync Logic
         if (data.msg_type === 'time') {
             const serverTime = data.time * 1000;
-            const localTime = Date.now();
-            timeOffset = serverTime - localTime;
+            timeOffset = serverTime - Date.now();
         }
 
-        // Tick Handling
         if (data.msg_type === 'tick') {
             processTick(data.tick);
         }
 
-        // Proposal (Trade Response)
         if (data.msg_type === 'proposal') {
             if (data.error) {
-                const errMsg = data.error.message || JSON.stringify(data.error);
-                reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: `⚠️ Proposal Error: ${errMsg}`, type: 'error' } });
-                // Release lock on failed proposal
-                isTrading = false;
+                reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: `⚠️ Proposal Error: ${data.error.message || JSON.stringify(data.error)}`, type: 'error' } });
+                activeTradeCount = Math.max(0, activeTradeCount - 1);
                 activeContractId = null;
                 return;
             }
-            // Execute Buy
-            ws?.send(JSON.stringify({
-                buy: data.proposal.id,
-                price: data.proposal.ask_price
-            }));
+            ws?.send(JSON.stringify({ buy: data.proposal.id, price: data.proposal.ask_price }));
         }
 
-        // Buy Response (Trade Opened)
         if (data.msg_type === 'buy') {
             if (data.error) {
-                const errMsg = data.error?.message || JSON.stringify(data.error);
-                reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: `⚠️ Buy Error: ${errMsg}`, type: 'error' } });
-                // Release lock on failed buy
-                isTrading = false;
+                reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: `⚠️ Buy Error: ${data.error?.message || JSON.stringify(data.error)}`, type: 'error' } });
+                activeTradeCount = Math.max(0, activeTradeCount - 1);
                 activeContractId = null;
                 return;
             }
             if (data.buy) {
                 activeContractId = data.buy.contract_id;
-                // Subscribe to open contract to track result
-                ws?.send(JSON.stringify({
-                    proposal_open_contract: 1,
-                    contract_id: data.buy.contract_id,
-                    subscribe: 1
-                }));
+                ws?.send(JSON.stringify({ proposal_open_contract: 1, contract_id: data.buy.contract_id, subscribe: 1 }));
             }
         }
 
-        // Open Contract Update (Trade Result)
         if (data.msg_type === 'proposal_open_contract') {
             const contract = data.proposal_open_contract;
             if (contract.is_sold) {
                 const profit = parseFloat(contract.profit);
-                const isWin = profit > 0;
-
                 const symbol = contract.underlying as ScannerSymbol;
-
-                // Only release lock if this is OUR active contract
+                activeTradeCount = Math.max(0, activeTradeCount - 1);
                 if (activeContractId === null || contract.contract_id == activeContractId) {
-                    isTrading = false;
                     activeContractId = null;
                 }
                 if (assetStates[symbol]) {
                     assetStates[symbol].status = 'scanning';
                 }
-
-                reply({
-                    type: 'TRADE_RESULT',
-                    profit: profit,
-                    isWin: isWin,
-                    symbol: symbol
-                });
+                reply({ type: 'TRADE_RESULT', profit, isWin: profit > 0, symbol });
             }
         }
     };
@@ -259,39 +244,39 @@ const processTick = (tickData: any) => {
     if (isPaused) return;
 
     const symbol = tickData.symbol as ScannerSymbol;
-    const epoch = tickData.epoch * 1000; // ms
+    const epoch = tickData.epoch * 1000;
     const quote = tickData.quote;
 
-    // 1. ⚡ IMPROVED Jitter Filter (Lag Proofing) - 200ms threshold
+    // Latency filter
     const now = Date.now();
-    const tickTime = epoch - timeOffset;
-    const latency = now - tickTime;
+    const latency = now - (epoch - timeOffset);
+    if (latency > LATENCY_THRESHOLD) return;
 
-    if (latency > LATENCY_THRESHOLD) {
-        return; // Ignore stale tick (stricter: was 500ms, now 200ms)
-    }
-
-    // 2. Update History
+    // Update history
     const history = tickHistory[symbol];
     history.push({ epoch, quote });
-    if (history.length > 50) history.shift(); // Keep 50 ticks
+    if (history.length > 60) history.shift();
 
-    // 3. Calculate Median Range + Calm Score
-    const medianRange = getMedianRange(history, VOLATILITY_WINDOW);
-    const calmScore = Math.max(0, Math.min(100, 100 - (medianRange * 50)));
+    // Calculate scores
+    const atr = calculateATR(history, ATR_PERIOD);
+    const calmScore = calculateCalmScore(atr, symbol);
 
-    // Update State
+    // Calculate new metrics
+    const ema = calculateEMA(history, EMA_PERIOD);
+    const { pressure, direction } = calculatePressure(history, PRESSURE_WINDOW);
+
+    // Update state for UI
     assetStates[symbol].lastPrice = quote;
     assetStates[symbol].score = {
-        volatility: parseFloat(medianRange.toFixed(4)),
+        volatility: parseFloat(atr.toFixed(6)),
         calm: parseFloat(calmScore.toFixed(2)),
-        clusters: 0,
+        clusters: Math.round(pressure * 100), // Show pressure % in clusters field for debug
         total: parseFloat(calmScore.toFixed(2))
     };
 
-    // 4. Warmup Progress — emit until all 5 assets have >= VOLATILITY_WINDOW ticks
+    // Warmup
     if (!warmupReady) {
-        const readyCount = SCANNER_SYMBOLS.filter(s => tickHistory[s].length >= VOLATILITY_WINDOW).length;
+        const readyCount = SCANNER_SYMBOLS.filter(s => tickHistory[s].length >= WARMUP_TICKS).length;
         const progress = Math.floor((readyCount / SCANNER_SYMBOLS.length) * 100);
         reply({ type: 'WARMUP_PROGRESS', progress, isReady: readyCount >= SCANNER_SYMBOLS.length });
         if (readyCount >= SCANNER_SYMBOLS.length) {
@@ -300,110 +285,119 @@ const processTick = (tickData: any) => {
         }
     }
 
-    // 5. Broadcast State Update
+    // Broadcast state
     reply({
         type: 'TICK_UPDATE',
         states: assetStates,
-        priorityOrder: Object.keys(assetStates).sort((a, b) => assetStates[b as ScannerSymbol].score.total - assetStates[a as ScannerSymbol].score.total) as ScannerSymbol[]
+        priorityOrder: Object.keys(assetStates).sort((a, b) =>
+            assetStates[b as ScannerSymbol].score.total - assetStates[a as ScannerSymbol].score.total
+        ) as ScannerSymbol[]
     });
 
-    // 6. Trade Logic (Quant Shield with Improvements)
-    if (config && warmupReady && history.length >= VOLATILITY_WINDOW && calmScore >= (config.minScore || 50)) {
-        // ⚡ IMPROVEMENT #1: Volatility Regime Filter (stricter than original)
-        if (isVolatilityRegimeBlocked(history, medianRange)) {
-            return; // Market too volatile — skip
-        }
-
-        // ⚡ IMPROVEMENT #3: Tick Speed Filter (regime change detection)
-        const tickSpeed = getTickSpeed(history);
-        if (isTickSpeedAbnormal(tickSpeed)) {
-            return; // Abnormal tick speed → regime change, skip
-        }
-
-        // ⚡ IMPROVEMENT #5: Solo Anomalía Check (if enabled)
-        if (config.anomalyOnlyMode) {
-            const autocorr = calculateAutocorr(history);
-            // Broadcast autocorr value for UI display (silent, no log spam)
-            reply({ type: 'ANOMALY_UPDATE', isDetected: isAnomaly(autocorr), calmScore: autocorr });
-            if (!isAnomaly(autocorr)) {
-                return; // Not an anomaly pattern, skip silently
-            }
-        }
-
-        checkTradeOpportunity(symbol, history, medianRange);
+    // Strategy Logic: VECTOR PRESSURE
+    if (config && warmupReady && history.length >= WARMUP_TICKS) {
+        scanForVectorPressure(symbol, history, atr, ema);
     }
 };
 
-const checkTradeOpportunity = (symbol: ScannerSymbol, ticks: Tick[], medianRange: number) => {
-    if (assetStates[symbol].status !== 'scanning') return;
-    if (isTrading) return; // Concurrency lock — only 1 trade at a time
+// ============================================
+// VECTOR PRESSURE SIGNAL (v2)
+// ============================================
+const scanForVectorPressure = (symbol: ScannerSymbol, ticks: Tick[], atr: number, ema: number) => {
+    if (!canTrade(symbol)) return;
+    if (atr <= 0) return;
+    if (ticks.length < PRESSURE_WINDOW) return;
 
-    // Minimum interval between trades (prevents excessive frequency)
-    const now = Date.now();
-    if (now - lastTradeTime < MIN_TRADE_INTERVAL) return;
+    const currentPrice = ticks[ticks.length - 1].quote;
+    const { pressure, direction, persistence } = calculatePressure(ticks, PRESSURE_WINDOW);
 
-    // Need at least 3 ticks for pattern
-    if (ticks.length < 3) return;
+    // 1. FILTER: Micro-Trend Alignment (EMA)
+    // CALL only if Price > EMA
+    // PUT only if Price < EMA
+    if (direction === 'UP' && currentPrice <= ema) return;
+    if (direction === 'DOWN' && currentPrice >= ema) return;
 
-    const t0 = ticks[ticks.length - 1].quote;
-    const t1 = ticks[ticks.length - 2].quote;
-    const t2 = ticks[ticks.length - 3].quote;
+    // 2. TRIGGER: Pressure Threshold
+    // Need > 60% of recent ticks to be in the trade direction
+    if (pressure < PRESSURE_THRESHOLD) return;
 
-    // Direction Detection (3-tick trend)
-    const isUp = t0 > t1 && t1 > t2;
-    const isDown = t0 < t1 && t1 < t2;
+    // 3. CONFIRMATION: Persistence (Anti-Latency Guard)
+    // Need at least 2 of the last 3 moves to be in direction
+    // This avoids "twitch" moves of 1 tick
+    if (persistence < 2) return;
 
-    // ⚡ IMPROVEMENT #4: Trend Strength Filter
-    const trendRange = Math.abs(t0 - t2);
-    if (trendRange < medianRange * TREND_STRENGTH_FACTOR) {
-        return; // Trend too weak, skip (must be > 1.2x median)
-    }
-
-    // Barrier = median_range × safety_factor (spec: 2.2)
-    const barrierOffset = Math.max(MIN_RANGE, medianRange * BARRIER_FACTOR);
-    const barrierStr = barrierOffset.toFixed(2);
-
-    if (isDown) {
-        // Mean Reversion -> CALL (Higher)
-        placeTrade(symbol, 'CALL', `-${barrierStr}`, barrierOffset);
-    } else if (isUp) {
-        // Mean Reversion -> PUT (Lower)
-        placeTrade(symbol, 'PUT', `+${barrierStr}`, barrierOffset);
-    }
-};
-
-const placeTrade = (symbol: ScannerSymbol, type: 'CALL' | 'PUT', barrier: string, rawOffset: number) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    if (isTrading) return; // Double-check concurrency lock
-
-    isTrading = true; // Lock
-    lastTradeTime = Date.now(); // Record trade time for interval enforcement
-    assetStates[symbol].status = 'firing';
-
-    // Auto-unlock after 5s (safety net)
-    setTimeout(() => {
-        assetStates[symbol].status = 'scanning';
-        isTrading = false;
-    }, 5000);
+    // EXECUTION: VECTOR FOLLOW
+    const tradeDir: 'CALL' | 'PUT' = direction === 'UP' ? 'CALL' : 'PUT';
 
     reply({
-        type: 'TRADE_OPENED',
-        symbol,
-        direction: type,
-        barrierOffset: rawOffset
+        type: 'LOG', entry: {
+            id: Date.now().toString(),
+            time: new Date().toLocaleTimeString(),
+            message: `🚀 ${symbol}: VECTOR ${tradeDir} (Pressão: ${(pressure * 100).toFixed(0)}%, Persist: ${persistence}/3)`,
+            type: 'info'
+        }
     });
 
-    // Send Proposal with dynamic currency
+    placeTrade(symbol, tradeDir, VECTOR_DURATION, `VECTOR_${(pressure * 100).toFixed(0)}%`);
+};
+
+// ============================================
+// TRADE GUARDS
+// ============================================
+const canTrade = (symbol: ScannerSymbol): boolean => {
+    if (assetStates[symbol].status !== 'scanning') return false;
+    if (activeTradeCount >= MAX_SIMULTANEOUS_TRADES) return false;
+    const now = Date.now();
+    if (now - lastTradeTime < MIN_TRADE_INTERVAL) return false;
+    if (now - assetCooldowns[symbol] < COOLDOWN_PER_ASSET) return false;
+    return true;
+};
+
+// ============================================
+// TRADE EXECUTION — Rise/Fall
+// ============================================
+const placeTrade = (
+    symbol: ScannerSymbol,
+    type: 'CALL' | 'PUT',
+    duration: number,
+    reason: string
+) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (activeTradeCount >= MAX_SIMULTANEOUS_TRADES) return;
+
+    activeTradeCount++;
+    lastTradeTime = Date.now();
+    assetCooldowns[symbol] = Date.now();
+    assetStates[symbol].status = 'firing';
+
+    // Auto-unlock safety net
+    setTimeout(() => {
+        assetStates[symbol].status = 'scanning';
+        activeTradeCount = Math.max(0, activeTradeCount - 1);
+    }, 15000);
+
+    const dirLabel = type === 'CALL' ? 'RISE ↑' : 'FALL ↓';
+
+    reply({ type: 'TRADE_OPENED', symbol, direction: type, barrierOffset: 0 });
+
+    reply({
+        type: 'LOG', entry: {
+            id: Date.now().toString(),
+            time: new Date().toLocaleTimeString(),
+            message: `🎯 ${symbol}: ${dirLabel} | ${duration}t | ${reason}`,
+            type: 'gold'
+        }
+    });
+
     ws.send(JSON.stringify({
         proposal: 1,
         amount: currentStake,
         basis: 'stake',
         contract_type: type,
         currency: tradeCurrency,
-        duration: 5,
+        duration: duration,
         duration_unit: 't',
-        symbol: symbol,
-        barrier: barrier
+        symbol: symbol
     }));
 };
 
@@ -421,22 +415,22 @@ self.onmessage = (event: MessageEvent<WorkerCommand>) => {
             tradeCurrency = cmd.currency || 'USD';
             isScanActive = true;
             isPaused = false;
-            isTrading = false;
+            activeTradeCount = 0;
             warmupReady = false;
             lastTradeTime = 0;
             activeContractId = null;
-            // Clear tick history for fresh start
-            SCANNER_SYMBOLS.forEach(s => { tickHistory[s] = []; });
+            SCANNER_SYMBOLS.forEach(s => {
+                tickHistory[s] = [];
+                assetCooldowns[s] = 0;
+            });
             connectWS(cmd.wsUrl);
             reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: `🚀 Worker Iniciado | Moeda: ${tradeCurrency}`, type: 'info' } });
+            reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: `⚛️ QUANTUM INERTIA ATIVADO`, type: 'gold' } });
             break;
 
         case 'STOP':
             isScanActive = false;
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
+            if (ws) { ws.close(); ws = null; }
             reply({ type: 'LOG', entry: { id: Date.now().toString(), time: new Date().toLocaleTimeString(), message: '🛑 Worker Parado', type: 'warning' } });
             break;
 

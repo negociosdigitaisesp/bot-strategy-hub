@@ -406,20 +406,7 @@ const App = () => {
                           <>
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <div className="min-h-screen flex items-center justify-center p-6">
-                                <div className="max-w-lg w-full text-center space-y-6">
-                                  <div className="text-6xl animate-pulse">🛠️</div>
-                                  <h1 className="text-3xl font-bold text-white">Bot en Mantenimiento</h1>
-                                  <p className="text-zinc-400 text-lg leading-relaxed">
-                                    Estamos realizando mejoras importantes en el <span className="text-emerald-400 font-semibold">Bug Deriv</span> para ofrecerte una experiencia aún mejor.
-                                  </p>
-                                  <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6 space-y-3">
-                                    <p className="text-zinc-300 text-sm">⏱️ Tiempo estimado: <span className="text-amber-400 font-semibold">Algunas horas</span></p>
-                                    <p className="text-zinc-300 text-sm">📧 Para más información, contacte soporte.</p>
-                                  </div>
-                                  <p className="text-zinc-500 text-xs">Disculpe las molestias. Volveremos pronto con nuevas funcionalidades. 🚀</p>
-                                </div>
-                              </div>
+                              <AstronBot />
                             </main>
                           </>
                         } />

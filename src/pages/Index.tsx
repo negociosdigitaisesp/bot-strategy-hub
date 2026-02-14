@@ -8,6 +8,7 @@ import PerformanceChart from '../components/PerformanceChart';
 import { bots, dashboardStats, performanceData, filterOptions } from '../lib/mockData';
 import { atualizarRankingBots, verificarAtualizacoesPendentes } from '../services/botRankingService';
 import LiveBotFeed from '../components/LiveBotFeed';
+import SupabaseTest from '../components/SupabaseTest';
 
 const BotFinderRadar = () => {
   const [isSearching, setIsSearching] = useState(false);
@@ -344,6 +345,8 @@ const Index = () => {
           <SearchInput onChange={handleSearch} />
         </div>
       </section>
+
+      <SupabaseTest />
 
       {/* Top Bots Activity Feed - Gamified */}
       <section className="px-6 py-4">

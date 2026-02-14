@@ -17,11 +17,8 @@ export interface ScannerConfig {
     useMartingale: boolean;
     maxMartingaleLevel: number;
     martingaleFactor: number;
-    autoSwitch: boolean;
-    minScore: number;
     profitTarget: number;
     maxConsecutiveLosses: number;
-    anomalyOnlyMode: boolean;
     useSoros?: boolean;
     maxSorosLevels?: number;
 }
