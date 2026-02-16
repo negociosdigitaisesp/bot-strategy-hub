@@ -414,17 +414,87 @@
     animation: float 3s ease-in-out infinite;
   }
 
-  /* Astron Bot Animations */
+  /* ========== ASTRON BOT — GPU-ACCELERATED MOTIONS ========== */
+
+  /* Card hover — translateY only (GPU composited) */
+  .astron-card {
+    transition: transform 0.3s cubic-bezier(0.33, 1, 0.68, 1),
+      box-shadow 0.3s ease;
+    will-change: transform;
+  }
+
+  .astron-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px -10px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Status dot pulse — opacity only */
+  .astron-dot-pulse {
+    animation: astron-dot 2s ease-in-out infinite;
+    will-change: opacity;
+  }
+
+  /* Shimmer badge — translateX only */
+  .astron-shimmer-badge {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .astron-shimmer-badge::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+    animation: astron-shimmer 3s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  /* Log entry — translateY + opacity */
+  .astron-log-enter {
+    animation: astron-log-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  /* Toast slide in */
+  .astron-slide-in {
+    animation: astron-slide 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  /* Legacy compat — keep existing class names */
   .animate-enter-row {
     animation: enter-row 0.3s ease-out;
   }
 
   .animate-enter-log {
-    animation: enter-log 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: astron-log-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+    animation: astron-dot 2s ease-in-out infinite;
+  }
+
+  /* ── Reduced Motion ── */
+  @media (prefers-reduced-motion: reduce) {
+
+    .astron-card,
+    .astron-dot-pulse,
+    .astron-shimmer-badge::after,
+    .astron-log-enter,
+    .astron-slide-in,
+    .animate-enter-row,
+    .animate-enter-log,
+    .animate-pulse-glow {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    .astron-card:hover {
+      transform: none;
+    }
   }
 
   /* ========== PREMIUM MOTION EFFECTS ========== */
@@ -1205,5 +1275,53 @@ html {
 
   100% {
     left: 0;
+  }
+}
+
+/* ========== ASTRON BOT — KEYFRAMES (GPU-ONLY) ========== */
+
+@keyframes astron-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes astron-shimmer {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes astron-log-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes astron-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
