@@ -23,7 +23,7 @@ interface ProposalLog {
 }
 
 // ── Constantes ─────────────────────────────────────────────────────────────
-const VPS_URL = "ws://191.252.182.208:8000";
+const VPS_URL = "wss://ws.appmillionbots.com";
 const MAX_LOGS = 60;
 
 // ── Helpers ────────────────────────────────────────────────────────────────

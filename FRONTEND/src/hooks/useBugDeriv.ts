@@ -37,7 +37,7 @@ export interface BugDerivSignal {
 export interface BugDerivConfig {
     /** Valor do stake em USD */
     stake: number;
-    /** URL WebSocket do VPS, ex: "ws://191.252.182.208:8000" */
+    /** URL WebSocket do VPS, ex: "wss://ws.appmillionbots.com" */
     vpsUrl: string;
     /**
      * Controla se o bot deve executar operações reais.
