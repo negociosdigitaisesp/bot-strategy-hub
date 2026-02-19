@@ -78,3 +78,5 @@ bot_logs/
 trading_data/
 *.csv
 *.json
+.vercel
+.env*.local

@@ -92,3 +92,5 @@ tests/**/*.pyc
 tests/**/__pycache__/
 .env.qa
 *.test.log
+.vercel
+.env*.local

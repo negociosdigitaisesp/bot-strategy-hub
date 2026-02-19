@@ -89,9 +89,25 @@ export function useBugDeriv(derivAPI: any, config: BugDerivConfig): void {
         if (wsRef.current?.readyState === WebSocket.OPEN) return;
         if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
-        const url = configRef.current.vpsUrl;
+        // Auto-upgrade to wss:// when served over HTTPS to avoid Mixed Content block
+        const rawUrl = configRef.current.vpsUrl;
+        const url = (typeof window !== "undefined" && window.location.protocol === "https:")
+            ? rawUrl.replace(/^ws:\/\//, "wss://")
+            : rawUrl;
+
         console.log("[BugDeriv] Conectando ao VPS:", url);
-        const socket = new WebSocket(url);
+
+        let socket: WebSocket;
+        try {
+            socket = new WebSocket(url);
+        } catch (err: any) {
+            const msg = `Não foi possível conectar ao VPS (${url}): ${err?.message ?? err}. O servidor VPS precisa de SSL (wss://) para funcionar em HTTPS.`;
+            console.error("[BugDeriv] ❌ Erro ao criar WebSocket:", err);
+            configRef.current.onErro?.(msg);
+            // Retry after 10s to avoid spamming
+            timeoutRef.current = setTimeout(conectar, 10000);
+            return;
+        }
         wsRef.current = socket;
 
         socket.onopen = () => {
