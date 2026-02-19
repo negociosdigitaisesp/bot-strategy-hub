@@ -78,3 +78,17 @@ bot_logs/
 trading_data/
 *.csv
 *.json
+
+# Project specific
+million_bots_vps/bot_output_v3.txt
+million_bots_vps/startup.log
+million_bots_vps/deployment_test.log
+million_bots_vps/output.txt
+million_bots_vps/*.log
+
+# QA Reports and Test Artifacts
+qa_reports/
+tests/**/*.pyc
+tests/**/__pycache__/
+.env.qa
+*.test.log

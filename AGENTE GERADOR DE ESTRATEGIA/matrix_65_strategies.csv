@@ -1,0 +1,83 @@
+# Nova Matrix: 65 Estratégias Otimizadas para VPS 2GB/2vCPUs
+
+ID,Nome,Categoria,Freq/h,WR Est.,Tier,Regime,Asset,Group
+# ========== TIER 1 - CONSERVATIVE (20 estratégias) ==========
+1,Bollinger Mean Reversion,Mean Reversion,3,72,1,Ranging,V75,A
+2,RSI Extreme Reversal,Reversal,3,70,1,Universal,V100,A
+3,EMA Trend Ride,Trend Following,2,68,1,Trending,Crash1000,A
+4,Double Top Sniper,Reversal,2,71,1,Universal,Boom1000,A
+5,Keltner Channel Breakout,Volatility,4,69,1,Volatile,V75,A
+6,MACD Zero Cross,Trend Following,3,68,1,Trending,Step Index,A
+7,Stochastic Oversold Scalp,Mean Reversion,4,70,1,Ranging,V25,A
+8,SAR Momentum Scalp,Scalping,6,66,1,Trending,V75,B
+9,Fast RSI Bounce,Scalping,7,65,1,Ranging,V100,B
+10,EMA Micro Trend,Scalping,6,67,1,Trending,V50,B
+11,Bollinger Squeeze Scalp,Scalping,8,64,1,Volatile,V75,B
+12,Stoch Fast Cross,Scalping,7,65,1,Universal,Crash1000,B
+13,RSI-ADX Rapid Fire,Scalping,5,68,1,Trending,Boom1000,B
+14,Keltner Scalp Pro,Scalping,6,66,1,Volatile,V25,B
+15,MACD Histogram Flash,Scalping,8,64,1,Universal,Step Index,C
+16,Ichimoku Cloud Ride,Trend Following,3,69,1,Trending,V100,C
+17,Aroon Trend Catcher,Trend Following,2,70,1,Trending,V75,C
+18,CCI Reversal Master,Reversal,3,68,1,Universal,Crash1000,C
+19,Williams R%, Mean Reversion,4,69,1,Ranging,Boom1000,C
+20,Chaikin Flow Momentum,Momentum,3,68,1,Volatile,V50,C
+
+# ========== TIER 2 - BALANCED (25 estratégias) ==========
+21,Turbo RSI Scalper,High Frequency,9,63,2,Universal,V75,A
+22,Bollinger Speed Runner,High Frequency,10,62,2,Volatile,V100,A
+23,CCI Rapid Momentum,High Frequency,9,63,2,Universal,V50,A
+24,Williams Turbo R,High Frequency,10,61,2,Ranging,Crash1000,A
+25,MFI Speed Flow,High Frequency,11,60,2,Universal,Boom1000,A
+26,Donchian Fast Break,High Frequency,9,62,2,Breakout,V25,B
+27,Vortex Speed Trend,High Frequency,10,61,2,Trending,Step Index,B
+28,Trix Turbo,High Frequency,12,60,2,Universal,V10,B
+29,Elder Rapid Fire,High Frequency,11,61,2,Volatile,V75,B
+30,ATR Speed Trail,High Frequency,10,62,2,Trending,V100,B
+31,Ultra Engulfing Sniper,Ultra Frequency,14,59,2,Universal,V75,B
+32,Inside Bar Burst,Ultra Frequency,13,60,2,Breakout,V100,C
+33,Momentum Blitz,Ultra Frequency,15,58,2,Universal,V50,C
+34,StochRSI Turbo,Ultra Frequency,14,59,2,Ranging,Crash1000,C
+35,Force Spike Hunter,Ultra Frequency,16,57,2,Volatile,Boom1000,C
+36,Gator Speed Run,Ultra Frequency,13,60,2,Trending,V25,C
+37,DeMarker Flash,Ultra Frequency,15,58,2,Universal,Step Index,C
+38,Coppock Rapid Fire,Ultra Frequency,14,59,2,Trending,V10,C
+39,Awesome Oscillator Burst,Momentum,12,61,2,Volatile,V75,A
+40,Commodity Channel Scalp,Mean Reversion,10,62,2,Ranging,V100,A
+41,Envelope Breakout Pro,Breakout,9,63,2,Volatile,V50,A
+42,Fisher Transform Sniper,Reversal,11,60,2,Universal,Crash1000,B
+43,Klinger Volume Flow,Volume,10,61,2,Universal,Boom1000,B
+44,Price Rate Change Rapid,Momentum,13,59,2,Volatile,V25,B
+45,Ultimate Oscillator Scalp,Hybrid,12,60,2,Universal,Step Index,C
+
+# ========== TIER 3 - AGGRESSIVE (20 estratégias) ==========
+46,Hyper Scalper V1,Turbo,18,57,3,Universal,V75,A
+47,Tick Blaster,Turbo,20,56,3,Volatile,V100,A
+48,RSI Machine Gun,Turbo,22,55,3,Universal,V10,A
+49,Breakout Blitz Pro,Turbo,19,57,3,Volatile,V50,A
+50,Micro Cycle Turbo,Turbo,20,56,3,Trending,Crash1000,B
+51,Reversal Gatling,Turbo,22,55,3,Universal,Boom1000,B
+52,MACD Turbo Impulse,Turbo,18,57,3,Trending,V25,B
+53,Fast Stoch Blaster,Turbo,24,55,3,Ranging,V75,B
+54,Momentum Machine,Turbo,20,56,3,Universal,V100,C
+55,Wick Fill Turbo,Turbo,18,57,3,Universal,Step Index,C
+56,Gap Scalp Extreme,Turbo,22,55,3,Volatile,V50,C
+57,Noisefader Turbo,Turbo,25,55,3,Ranging,V10,C
+58,Mass Index Rapid Fire,Volatility,20,56,3,Volatile,V75,C
+59,Know Sure Thing Turbo,Momentum,19,57,3,Trending,V100,A
+60,Schaff Trend Blitz,Trend Following,21,56,3,Trending,V50,A
+61,True Strength Index Rush,Momentum,18,57,3,Universal,Crash1000,A
+62,Balance Power Scalp,Volume,22,55,3,Volatile,Boom1000,B
+63,Detrended Price Burst,Oscillator,20,56,3,Universal,V25,B
+64,Ease Movement Rapid,Momentum,19,57,3,Volatile,Step Index,B
+65,Rate Change Turbo,High Frequency,24,55,3,Universal,V10,C
+
+# Distribuição por Grupo (Staggered Execution):
+# Grupo A: IDs 1-7,16-20,21-25,39-41,46-49,59-61 (22 estratégias, offset 0s)
+# Grupo B: IDs 8-14,26-31,42-45,50-53,62-64 (22 estratégias, offset 20s)  
+# Grupo C: IDs 15,32-38,54-58,65 (21 estratégias, offset 40s)
+
+# Validação:
+# TIER 1: 20 estratégias, freq total 80-120/h
+# TIER 2: 25 estratégias, freq total 250-375/h
+# TIER 3: 20 estratégias, freq total 360-480/h

@@ -1,0 +1,15 @@
+[Unit]
+Description=Adaptive Engine (Volatility Barrier)
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/adaptive_engine
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/root
+
+[Install]
+WantedBy=multi-user.target
