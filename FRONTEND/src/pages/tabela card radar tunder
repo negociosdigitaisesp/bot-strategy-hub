@@ -1,0 +1,424 @@
+# 🚀 PROMPT PARA REFATORAÇÃO DO FRONTEND - MÉTRICAS CONSOLIDADAS
+
+## 📋 CONTEXTO
+Foi criada uma nova tabela `bot_metrics_consolidated` no Supabase que centraliza todas as métricas dos bots do projeto. O frontend precisa ser refatorado para consumir dados desta nova tabela ao invés das múltiplas tabelas anteriores.
+
+## 🎯 OBJETIVO
+Refatorar o frontend para utilizar a nova tabela consolidada de métricas, criando dashboards mais eficientes e organizados.
+
+## 📊 ESTRUTURA DA NOVA TABELA
+
+### Tabela: `bot_metrics_consolidated`
+
+#### Campos Principais:
+```sql
+- id (BIGSERIAL PRIMARY KEY)
+- bot_name (VARCHAR(100) UNIQUE) -- Chave para identificar cada bot
+- created_at (TIMESTAMP)
+- last_update (TIMESTAMP) -- Atualizado automaticamente
+
+-- Métricas Básicas
+- total_operaciones (INTEGER)
+- wins (INTEGER)
+- losses (INTEGER)
+- porcentaje_wins (DECIMAL(5,2))
+- porcentaje_losses (DECIMAL(5,2))
+
+-- Métricas de Martingale
+- secuencias_martingale (INTEGER)
+- intensidad_martingale (DECIMAL(5,2))
+- max_loss_consecutivos (INTEGER)
+- martingale_frequency (DECIMAL(5,2))
+- recovery_rate (DECIMAL(5,2))
+
+-- Análise de Mercado
+- condicion_mercado (VARCHAR(50))
+- descripcion (TEXT)
+- confianza (DECIMAL(5,2))
+- recomendacion (TEXT)
+
+-- Estratégias
+- strategy_used (VARCHAR(100))
+- strategy_confidence (DECIMAL(5,2))
+- pattern_found_at (TIMESTAMP)
+
+-- Estado Operacional
+- is_safe_to_operate (BOOLEAN)
+- reason (TEXT)
+
+-- Dados JSON
+- last_10_operations (JSONB) -- Últimas 10 operações detalhadas
+- hit_statistics (JSONB) -- Estatísticas de acertos
+- loss_sequences (JSONB) -- Sequências de perdas
+- strategy_results (JSONB) -- Resultados de estratégias
+- execution_logs (JSONB) -- Logs de execução
+- momentum_analysis (JSONB) -- Análise de momentum
+- market_conditions (JSONB) -- Condições de mercado
+
+-- Performance
+- profit_total (DECIMAL(10,2))
+- profit_percentage (DECIMAL(5,2))
+- stake_value (DECIMAL(10,2))
+
+-- Martingale Detalhado
+- martingale_level (INTEGER)
+- consecutive_losses (INTEGER)
+- martingale_progression (JSONB)
+- martingale_sequence_id (VARCHAR(50))
+
+-- Controle
+- risk_level (VARCHAR(20)) -- LOW, MEDIUM, HIGH
+- version (VARCHAR(10))
+- cycle_number (INTEGER)
+```
+
+## 🔧 TAREFAS DE REFATORAÇÃO
+
+### 1. **DASHBOARD PRINCIPAL**
+```javascript
+// Substituir múltiplas consultas por uma única
+// ANTES:
+const signals = await supabase.from('radar_de_apalancamiento_signals').select('*')
+const logs = await supabase.from('tunder_bot_logs').select('*')
+const tracking = await supabase.from('strategy_results_tracking').select('*')
+
+// DEPOIS:
+const metrics = await supabase
+  .from('bot_metrics_consolidated')
+  .select('*')
+  .order('last_update', { ascending: false })
+```
+
+### 2. **COMPONENTES A CRIAR/REFATORAR**
+
+#### A. **MetricsDashboard.jsx**
+```jsx
+// Dashboard principal com todas as métricas consolidadas
+- Visão geral de todos os bots
+- Métricas em tempo real
+- Gráficos de performance
+- Status operacional
+```
+
+#### B. **BotMetricsCard.jsx**
+```jsx
+// Card individual para cada bot
+- Nome do bot e versão
+- Status operacional (is_safe_to_operate)
+- Métricas principais (wins, losses, porcentaje_wins)
+- Última atualização
+- Indicador de risco (risk_level)
+```
+
+#### C. **MartingaleAnalysis.jsx**
+```jsx
+// Análise específica de Martingale
+- Intensidade de Martingale
+- Sequências detectadas
+- Máximo de perdas consecutivas
+- Taxa de recuperação
+- Progressão do Martingale (JSON)
+```
+
+#### D. **MarketConditions.jsx**
+```jsx
+// Condições de mercado
+- Condição atual (condicion_mercado)
+- Descrição e recomendações
+- Nível de confiança
+- Análise de momentum (JSON)
+```
+
+#### E. **OperationsHistory.jsx**
+```jsx
+// Histórico das últimas operações
+- Últimas 10 operações (last_10_operations JSON)
+- Gráfico de resultados
+- Análise de padrões
+- Performance por período
+```
+
+#### F. **StrategyPerformance.jsx**
+```jsx
+// Performance das estratégias
+- Estratégia utilizada
+- Confiança da estratégia
+- Resultados históricos (strategy_results JSON)
+- Logs de execução (execution_logs JSON)
+```
+
+### 3. **HOOKS PERSONALIZADOS**
+
+#### A. **useMetricsData.js**
+```javascript
+// Hook para buscar dados da tabela consolidada
+export const useMetricsData = (botName = null, realTime = true) => {
+  // Implementar:
+  // - Busca de dados com filtros
+  // - Atualização em tempo real (se realTime = true)
+  // - Cache local
+  // - Estados de loading/error
+}
+```
+
+#### B. **useMartingaleAnalysis.js**
+```javascript
+// Hook específico para análise de Martingale
+export const useMartingaleAnalysis = (botName) => {
+  // Implementar:
+  // - Cálculos de Martingale
+  // - Análise de risco
+  // - Tendências
+}
+```
+
+#### C. **useMarketConditions.js**
+```javascript
+// Hook para condições de mercado
+export const useMarketConditions = () => {
+  // Implementar:
+  // - Estado atual do mercado
+  // - Recomendações
+  // - Histórico de condições
+}
+```
+
+### 4. **VIEWS DO SUPABASE DISPONÍVEIS**
+
+#### A. **bot_metrics_summary**
+```sql
+-- Visão resumida das métricas
+SELECT 
+  bot_name,
+  total_operaciones,
+  porcentaje_wins,
+  intensidad_martingale,
+  condicion_mercado,
+  is_safe_to_operate,
+  last_update,
+  performance_rating -- EXCELENTE, BUENO, REGULAR, MALO
+FROM bot_metrics_summary
+```
+
+#### B. **martingale_analysis_view**
+```sql
+-- Análise específica de Martingale
+SELECT 
+  bot_name,
+  secuencias_martingale,
+  intensidad_martingale,
+  max_loss_consecutivos,
+  martingale_frequency,
+  recovery_rate,
+  risk_level,
+  consecutive_losses,
+  martingale_level
+FROM martingale_analysis_view
+```
+
+#### C. **recent_operations_view**
+```sql
+-- Operações recentes
+SELECT 
+  bot_name,
+  total_operaciones,
+  wins,
+  losses,
+  porcentaje_wins,
+  last_10_operations
+FROM recent_operations_view
+```
+
+### 5. **FUNCIONALIDADES ESPECÍFICAS**
+
+#### A. **Filtros e Busca**
+```javascript
+// Implementar filtros por:
+- Bot específico
+- Período de tempo
+- Nível de risco
+- Condição de mercado
+- Status operacional
+```
+
+#### B. **Alertas e Notificações**
+```javascript
+// Criar sistema de alertas para:
+- Risco alto de Martingale
+- Mudanças nas condições de mercado
+- Bots inativos
+- Performance baixa
+```
+
+#### C. **Exportação de Dados**
+```javascript
+// Funcionalidades de export:
+- CSV das métricas
+- Relatórios PDF
+- Dados JSON para análise externa
+```
+
+### 6. **GRÁFICOS E VISUALIZAÇÕES**
+
+#### A. **Gráficos Recomendados**
+```javascript
+// Usar bibliotecas como Chart.js, Recharts ou D3.js
+
+1. Gráfico de linha: Performance ao longo do tempo
+2. Gráfico de barras: Comparação entre bots
+3. Gráfico de pizza: Distribuição de wins/losses
+4. Heatmap: Intensidade de Martingale por período
+5. Gauge: Nível de risco atual
+6. Timeline: Histórico de operações
+```
+
+### 7. **ESTRUTURA DE PASTAS SUGERIDA**
+```
+src/
+├── components/
+│   ├── metrics/
+│   │   ├── MetricsDashboard.jsx
+│   │   ├── BotMetricsCard.jsx
+│   │   ├── MartingaleAnalysis.jsx
+│   │   ├── MarketConditions.jsx
+│   │   ├── OperationsHistory.jsx
+│   │   └── StrategyPerformance.jsx
+│   ├── charts/
+│   │   ├── PerformanceChart.jsx
+│   │   ├── MartingaleChart.jsx
+│   │   └── RiskGauge.jsx
+│   └── common/
+│       ├── LoadingSpinner.jsx
+│       ├── ErrorBoundary.jsx
+│       └── AlertSystem.jsx
+├── hooks/
+│   ├── useMetricsData.js
+│   ├── useMartingaleAnalysis.js
+│   ├── useMarketConditions.js
+│   └── useRealTimeUpdates.js
+├── services/
+│   ├── supabaseClient.js
+│   ├── metricsService.js
+│   └── alertsService.js
+└── utils/
+    ├── formatters.js
+    ├── calculations.js
+    └── constants.js
+```
+
+### 8. **EXEMPLO DE IMPLEMENTAÇÃO**
+
+#### MetricsDashboard.jsx
+```jsx
+import React from 'react';
+import { useMetricsData } from '../hooks/useMetricsData';
+import BotMetricsCard from './BotMetricsCard';
+import MartingaleAnalysis from './MartingaleAnalysis';
+import MarketConditions from './MarketConditions';
+
+const MetricsDashboard = () => {
+  const { data: metrics, loading, error } = useMetricsData(null, true);
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+
+  return (
+    <div className="metrics-dashboard">
+      <h1>Dashboard de Métricas Consolidadas</h1>
+      
+      {/* Visão Geral */}
+      <div className="overview-section">
+        <div className="metrics-grid">
+          {metrics.map(bot => (
+            <BotMetricsCard key={bot.bot_name} bot={bot} />
+          ))}
+        </div>
+      </div>
+
+      {/* Análise de Martingale */}
+      <MartingaleAnalysis metrics={metrics} />
+
+      {/* Condições de Mercado */}
+      <MarketConditions />
+    </div>
+  );
+};
+
+export default MetricsDashboard;
+```
+
+### 9. **QUERIES OTIMIZADAS**
+
+#### Busca de Métricas em Tempo Real
+```javascript
+// Implementar subscription para updates em tempo real
+const subscription = supabase
+  .channel('metrics-updates')
+  .on('postgres_changes', 
+    { 
+      event: '*', 
+      schema: 'public', 
+      table: 'bot_metrics_consolidated' 
+    }, 
+    (payload) => {
+      // Atualizar estado local
+      updateMetrics(payload.new);
+    }
+  )
+  .subscribe();
+```
+
+### 10. **PERFORMANCE E OTIMIZAÇÃO**
+
+#### A. **Caching**
+```javascript
+// Implementar cache local para reduzir consultas
+- React Query ou SWR para cache de dados
+- LocalStorage para preferências do usuário
+- Memoização de componentes pesados
+```
+
+#### B. **Lazy Loading**
+```javascript
+// Carregar componentes sob demanda
+- Lazy loading de gráficos complexos
+- Paginação para histórico de operações
+- Virtualização para listas grandes
+```
+
+## 🎨 DESIGN E UX
+
+### Paleta de Cores Sugerida:
+- **Verde**: #10B981 (Wins, Status Seguro)
+- **Vermelho**: #EF4444 (Losses, Risco Alto)
+- **Amarelo**: #F59E0B (Atenção, Risco Médio)
+- **Azul**: #3B82F6 (Informações, Neutro)
+- **Cinza**: #6B7280 (Texto secundário)
+
+### Indicadores Visuais:
+- **Status Dots**: Verde (Ativo), Vermelho (Inativo), Amarelo (Atenção)
+- **Progress Bars**: Para porcentagem de wins
+- **Badges**: Para níveis de risco
+- **Icons**: Para diferentes tipos de métricas
+
+## 🚀 PRÓXIMOS PASSOS
+
+1. **Executar o SQL** para criar a tabela e views
+2. **Implementar os hooks** básicos de dados
+3. **Criar componentes** um por vez, começando pelo dashboard principal
+4. **Adicionar gráficos** e visualizações
+5. **Implementar tempo real** com subscriptions
+6. **Testes** e otimizações
+7. **Deploy** e monitoramento
+
+## 📝 NOTAS IMPORTANTES
+
+- A tabela usa `upsert` com `bot_name` como chave única
+- Todos os dados JSON são indexáveis e pesquisáveis
+- As views estão otimizadas para consultas frequentes
+- O sistema suporta múltiplos bots simultaneamente
+- Timestamps são automáticos com triggers
+
+---
+
+**Este prompt fornece uma base completa para refatorar o frontend e aproveitar ao máximo a nova estrutura de métricas consolidadas.**

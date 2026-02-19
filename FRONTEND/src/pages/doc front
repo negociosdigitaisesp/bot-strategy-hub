@@ -1,0 +1,373 @@
+# 📊 Documentação: Como Referenciar Logs no Frontend
+
+## 🎯 Visão Geral
+
+Todos os logs do bot **Radar Tunder 3.5** são agora enviados para a tabela `radar_de_apalancamiento_signals` no Supabase. Esta documentação explica como acessar e utilizar esses dados no frontend.
+
+## 📋 Estrutura da Tabela
+
+### Tabela: `radar_de_apalancamiento_signals`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | INTEGER | ID único do registro |
+| `bot_name` | VARCHAR | Nome do bot + tipo de log + timestamp único |
+| `is_safe_to_operate` | BOOLEAN | Indica se é seguro operar (false para logs de erro) |
+| `reason` | TEXT | Mensagem do log com nível e contexto |
+| `strategy_used` | VARCHAR | Tipo de log (Log-CICLO, Log-ANALISIS, etc.) |
+| `strategy_confidence` | INTEGER | Confiança (100=INFO, 50=WARNING, 0=ERROR) |
+| `pattern_found_at` | TIMESTAMP | Timestamp de quando o log foi gerado |
+| `last_update` | TIMESTAMP | Timestamp da última atualização |
+| `last_operations` | JSONB | Dados adicionais do contexto (JSON) |
+
+## 🔍 Tipos de Logs Disponíveis
+
+### 1. **INICIALIZACAO** - Logs de Inicialização
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-INICIALIZACAO'
+ORDER BY pattern_found_at DESC;
+```
+
+### 2. **CICLO** - Logs de Início de Ciclo
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-CICLO'
+ORDER BY pattern_found_at DESC;
+```
+
+### 3. **OPERACIONES** - Logs de Operações Carregadas
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-OPERACIONES'
+ORDER BY pattern_found_at DESC;
+```
+
+### 4. **OPERACAO_INDIVIDUAL** - Logs de Operações Individuais
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-OPERACAO_INDIVIDUAL'
+ORDER BY pattern_found_at DESC;
+```
+
+### 5. **ANALISIS** - Logs de Análise de Mercado
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-ANALISIS'
+ORDER BY pattern_found_at DESC;
+```
+
+### 6. **METRICAS** - Logs de Métricas Detalhadas
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-METRICAS'
+ORDER BY pattern_found_at DESC;
+```
+
+### 7. **RECOMENDACION** - Logs de Recomendações
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-RECOMENDACION'
+ORDER BY pattern_found_at DESC;
+```
+
+### 8. **ENVIO** - Logs de Envio para Base de Dados
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-ENVIO'
+ORDER BY pattern_found_at DESC;
+```
+
+### 9. **ERROR_CICLO** - Logs de Erros em Ciclos
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-ERROR_CICLO'
+ORDER BY pattern_found_at DESC;
+```
+
+### 10. **FINALIZACION** - Logs de Finalização
+```sql
+SELECT * FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-FINALIZACION'
+ORDER BY pattern_found_at DESC;
+```
+
+## 🚀 Exemplos de Uso no Frontend
+
+### 1. **Dashboard em Tempo Real**
+```javascript
+// Supabase Client
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+// Buscar logs em tempo real
+const { data, error } = await supabase
+  .from('radar_de_apalancamiento_signals')
+  .select('*')
+  .gte('pattern_found_at', new Date(Date.now() - 24*60*60*1000).toISOString()) // Últimas 24h
+  .order('pattern_found_at', { ascending: false })
+
+// Subscription para updates em tempo real
+const subscription = supabase
+  .channel('logs-realtime')
+  .on('postgres_changes', 
+    { event: 'INSERT', schema: 'public', table: 'radar_de_apalancamiento_signals' },
+    (payload) => {
+      console.log('Novo log:', payload.new)
+      // Atualizar UI
+    }
+  )
+  .subscribe()
+```
+
+### 2. **Filtrar por Tipo de Log**
+```javascript
+// Buscar apenas logs de análise
+const { data: analysisLogs } = await supabase
+  .from('radar_de_apalancamiento_signals')
+  .select('*')
+  .eq('strategy_used', 'Log-ANALISIS')
+  .order('pattern_found_at', { ascending: false })
+  .limit(10)
+
+// Buscar apenas erros
+const { data: errorLogs } = await supabase
+  .from('radar_de_apalancamiento_signals')
+  .select('*')
+  .in('strategy_used', ['Log-ERROR_CICLO', 'Log-ERROR_CRITICO'])
+  .order('pattern_found_at', { ascending: false })
+```
+
+### 3. **Extrair Dados JSON**
+```javascript
+// Buscar métricas com dados JSON
+const { data: metricsLogs } = await supabase
+  .from('radar_de_apalancamiento_signals')
+  .select('reason, last_operations, pattern_found_at')
+  .eq('strategy_used', 'Log-METRICAS')
+  .order('pattern_found_at', { ascending: false })
+  .limit(1)
+
+if (metricsLogs.length > 0) {
+  const metrics = JSON.parse(metricsLogs[0].last_operations)
+  console.log('Total operações:', metrics.total_operaciones)
+  console.log('Win rate:', metrics.porcentaje_wins)
+  console.log('Intensidade Martingale:', metrics.intensidad_martingale)
+}
+```
+
+### 4. **Componente React para Logs**
+```jsx
+import React, { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const LogsComponent = () => {
+  const [logs, setLogs] = useState([])
+  const [filter, setFilter] = useState('all')
+  
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  
+  useEffect(() => {
+    fetchLogs()
+    
+    // Subscription para updates em tempo real
+    const subscription = supabase
+      .channel('logs-realtime')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'radar_de_apalancamiento_signals' },
+        (payload) => {
+          setLogs(prev => [payload.new, ...prev])
+        }
+      )
+      .subscribe()
+      
+    return () => subscription.unsubscribe()
+  }, [filter])
+  
+  const fetchLogs = async () => {
+    let query = supabase
+      .from('radar_de_apalancamiento_signals')
+      .select('*')
+      .order('pattern_found_at', { ascending: false })
+      .limit(50)
+    
+    if (filter !== 'all') {
+      query = query.eq('strategy_used', `Log-${filter}`)
+    }
+    
+    const { data, error } = await query
+    if (!error) setLogs(data)
+  }
+  
+  return (
+    <div>
+      <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+        <option value="all">Todos os Logs</option>
+        <option value="CICLO">Ciclos</option>
+        <option value="ANALISIS">Análises</option>
+        <option value="METRICAS">Métricas</option>
+        <option value="ERROR_CICLO">Erros</option>
+      </select>
+      
+      <div>
+        {logs.map(log => (
+          <div key={log.id} className={`log-item ${log.strategy_confidence === 0 ? 'error' : ''}`}>
+            <span className="timestamp">{new Date(log.pattern_found_at).toLocaleString()}</span>
+            <span className="type">{log.strategy_used}</span>
+            <span className="message">{log.reason}</span>
+            {log.last_operations !== '{}' && (
+              <details>
+                <summary>Dados Adicionais</summary>
+                <pre>{JSON.stringify(JSON.parse(log.last_operations), null, 2)}</pre>
+              </details>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+## 📈 Queries Úteis para Analytics
+
+### 1. **Estatísticas de Performance**
+```sql
+-- Contagem de logs por tipo nas últimas 24h
+SELECT 
+  strategy_used,
+  COUNT(*) as total,
+  AVG(strategy_confidence) as avg_confidence
+FROM radar_de_apalancamiento_signals 
+WHERE pattern_found_at >= NOW() - INTERVAL '24 hours'
+GROUP BY strategy_used
+ORDER BY total DESC;
+```
+
+### 2. **Logs de Erro**
+```sql
+-- Todos os erros nas últimas 24h
+SELECT 
+  pattern_found_at,
+  reason,
+  last_operations
+FROM radar_de_apalancamiento_signals 
+WHERE strategy_confidence = 0 
+  AND pattern_found_at >= NOW() - INTERVAL '24 hours'
+ORDER BY pattern_found_at DESC;
+```
+
+### 3. **Análises de Mercado Recentes**
+```sql
+-- Últimas 10 análises de mercado
+SELECT 
+  pattern_found_at,
+  reason,
+  last_operations
+FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-ANALISIS'
+ORDER BY pattern_found_at DESC
+LIMIT 10;
+```
+
+### 4. **Métricas de Operações**
+```sql
+-- Extrair métricas das operações
+SELECT 
+  pattern_found_at,
+  last_operations::json->>'total_operaciones' as total_ops,
+  last_operations::json->>'porcentaje_wins' as win_rate,
+  last_operations::json->>'intensidad_martingale' as martingale_intensity
+FROM radar_de_apalancamiento_signals 
+WHERE strategy_used = 'Log-METRICAS'
+ORDER BY pattern_found_at DESC;
+```
+
+## 🔧 Configuração do Supabase
+
+### 1. **RLS (Row Level Security)**
+```sql
+-- Habilitar RLS na tabela
+ALTER TABLE radar_de_apalancamiento_signals ENABLE ROW LEVEL SECURITY;
+
+-- Política para leitura (ajustar conforme necessário)
+CREATE POLICY "Allow read access" ON radar_de_apalancamiento_signals
+FOR SELECT USING (true);
+```
+
+### 2. **Índices para Performance**
+```sql
+-- Índice para consultas por tipo de log
+CREATE INDEX idx_strategy_used ON radar_de_apalancamiento_signals(strategy_used);
+
+-- Índice para consultas por timestamp
+CREATE INDEX idx_pattern_found_at ON radar_de_apalancamiento_signals(pattern_found_at);
+
+-- Índice composto para consultas filtradas
+CREATE INDEX idx_strategy_timestamp ON radar_de_apalancamiento_signals(strategy_used, pattern_found_at);
+```
+
+## 🎨 Sugestões de UI/UX
+
+### 1. **Dashboard Principal**
+- **Cards de Resumo**: Total de logs, erros, análises nas últimas 24h
+- **Gráfico de Timeline**: Logs ao longo do tempo
+- **Status em Tempo Real**: Último ciclo, última análise
+
+### 2. **Página de Logs Detalhados**
+- **Filtros**: Por tipo, data, nível de confiança
+- **Busca**: Por texto na mensagem
+- **Exportação**: CSV, JSON
+
+### 3. **Alertas e Notificações**
+- **Erros Críticos**: Notificação push/email
+- **Mudanças de Mercado**: Alertas quando condição muda
+- **Performance**: Alertas de baixa performance
+
+## 🔄 Monitoramento em Tempo Real
+
+### WebSocket/Realtime Subscription
+```javascript
+// Monitorar apenas logs críticos
+const criticalLogsSubscription = supabase
+  .channel('critical-logs')
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'radar_de_apalancamiento_signals',
+    filter: 'strategy_confidence=eq.0'
+  }, (payload) => {
+    // Mostrar notificação de erro crítico
+    showCriticalAlert(payload.new)
+  })
+  .subscribe()
+
+// Monitorar mudanças de análise de mercado
+const marketAnalysisSubscription = supabase
+  .channel('market-analysis')
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'radar_de_apalancamiento_signals',
+    filter: 'strategy_used=eq.Log-ANALISIS'
+  }, (payload) => {
+    // Atualizar dashboard com nova análise
+    updateMarketAnalysis(payload.new)
+  })
+  .subscribe()
+```
+
+---
+
+## ✅ Resumo
+
+Agora todos os logs do **Radar Tunder 3.5** são enviados para `radar_de_apalancamiento_signals` com:
+
+- ✅ **Logs de Ciclos**: Início e progresso de cada ciclo
+- ✅ **Logs de Operações**: Carregamento e operações individuais  
+- ✅ **Logs de Análise**: Condições de mercado e métricas
+- ✅ **Logs de Erros**: Erros de ciclo e críticos
+- ✅ **Logs de Sistema**: Inicialização e finalização
+
+Use as queries e exemplos acima para criar um frontend completo e em tempo real! 🚀

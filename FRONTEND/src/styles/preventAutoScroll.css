@@ -1,0 +1,101 @@
+<!-- ❌ ANTES (Problemático) -->
+<a href="https://drive.google.com/file/d/1234567890/view" class="btn">
+  Descargar Bot
+</a>
+
+<!-- ✅ DEPOIS (Correto) -->
+<button 
+  type="button" 
+  class="btn descargar-btn no-auto-scroll"
+  data-download-url="https://drive.google.com/file/d/1234567890/view"
+  onclick="handleDownload(this)"
+>
+  <span>Descargar Bot</span>
+  <svg class="download-icon"><!-- ícone --></svg>
+</button>
+
+/* Prevenção de Scroll Automático - CSS */<!-- ❌ ANTES (Problemático) -->
+<a href="https://drive.google.com/file/d/1234567890/view" class="btn">
+  Descargar Bot
+</a>
+
+<!-- ✅ DEPOIS (Correto) -->
+<button 
+  type="button" 
+  class="btn descargar-btn no-auto-scroll"
+  data-download-url="https://drive.google.com/file/d/1234567890/view"
+  onclick="handleDownload(this)"
+>
+  <span>Descargar Bot</span>
+  <svg class="download-icon"><!-- ícone --></svg>
+</button><!-- ❌ ANTES (Problemático) -->
+<a href="https://drive.google.com/file/d/1234567890/view" class="btn">
+  Descargar Bot
+</a>
+
+<!-- ✅ DEPOIS (Correto) -->
+<button 
+  type="button" 
+  class="btn descargar-btn no-auto-scroll"
+  data-download-url="https://drive.google.com/file/d/1234567890/view"
+  onclick="handleDownload(this)"
+>
+  <span>Descargar Bot</span>
+  <svg class="download-icon"><!-- ícone --></svg>
+</button>function handleDownload(button) {
+  const downloadUrl = button.getAttribute('data-download-url');
+  if (downloadUrl) {
+    // Abrir em nova aba
+    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+  }
+}function handleDownload(button) {
+  const downloadUrl = button.getAttribute('data-download-url');
+  if (downloadUrl) {
+    // Abrir em nova aba
+    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
+/* Remover scroll-behavior smooth global se existir */
+* {
+  scroll-behavior: auto !important;
+}
+
+/* Classe utilitária para botões sem scroll */
+.no-auto-scroll {
+  scroll-behavior: auto !important;
+}
+
+/* Botões de download específicos */
+.download-btn,
+.descargar-btn {
+  scroll-behavior: auto !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.download-btn:hover,
+.descargar-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Links problemáticos */
+a[href="#"],
+a[href="javascript:void(0)"] {
+  scroll-behavior: auto !important;
+  cursor: pointer;
+}
+
+/* Prevenir seleção de texto em botões */
+.no-auto-scroll {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Transições suaves apenas quando necessário */
+.smooth-scroll-controlled {
+  scroll-behavior: smooth;
+}

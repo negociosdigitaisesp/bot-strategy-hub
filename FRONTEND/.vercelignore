@@ -1,0 +1,33 @@
+# Ignorar todos os arquivos .py
+*.py
+
+# Ignorar arquivos de configuração Python
+requirements.txt
+Pipfile
+Pipfile.lock
+runtime.txt
+
+# Ignorar ambiente virtual Python
+.venv/
+venv/
+env/
+.env/
+
+# Ignorar arquivos de teste Python
+test_*.py
+*_test.py
+
+# Ignorar relatórios de teste Python
+*test*report*.json
+
+# Ignorar configurações alternativas Python
+vercel-*-distutils.json
+vercel-test-*.json
+
+# Ignorar documentação Python específica
+*DISTUTILS*.md
+*PYTHON*.md
+*CONFIGURACAO*.md
+node_modules
+.env
+.env.local
