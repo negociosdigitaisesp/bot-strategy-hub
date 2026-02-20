@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useBugDeriv } from "../hooks/useBugDeriv";
+import { useBugDeriv, MartingaleState } from "../hooks/useBugDeriv";
 import { useDeriv } from "../contexts/DerivContext";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -153,6 +153,14 @@ export default function OracleAI() {
     const [useSoros, setUseSoros] = useState(false);
     const [sorosLevels, setSorosLevels] = useState(2);
 
+    // ── Estado do Martingale (vindo do hook) ──────────────────────────────
+    const [galeState, setGaleState] = useState<MartingaleState>({
+        level: 0,
+        currentStake: 1,
+        consecutiveLosses: 0,
+        isPaused: false,
+    });
+
     // ── Animação de métricas ───────────────────────────────────────────────
     useEffect(() => {
         const interval = setInterval(() => {
@@ -208,6 +216,15 @@ export default function OracleAI() {
         stake,
         vpsUrl: VPS_URL,
         enabled: isActive,
+        // ── Martingale + Soros Config ──────────────────────────────────────
+        useMartingale,
+        maxGale: parseInt(maxGale) || 3,
+        martingaleFactor: parseFloat(martingaleFactor) || 2.0,
+        useSoros,
+        sorosLevels,
+        stopWin: parseFloat(stopWin) || 0,
+        stopLoss: parseFloat(stopLoss) || 0,
+        // ── Callbacks ─────────────────────────────────────────────────────
         onSinal: handleSinal,
         onConectado: () => setConnected(true),
         onDesconectado: () => setConnected(false),
@@ -233,7 +250,19 @@ export default function OracleAI() {
 
             setWinFlash(isWin ? "win" : "loss");
             setTimeout(() => setWinFlash(null), 1200);
-        }
+        },
+        onMartingaleChange: (state) => {
+            setGaleState(state);
+            if (state.level > 0) {
+                addLog(
+                    `[🎰 GALE ${state.level}] Stake: $${state.currentStake.toFixed(2)}`,
+                    "info"
+                );
+            }
+            if (state.isPaused) {
+                addLog(`[⚠️ STREAK PAUSE] Proteção ativada — aguardando 60s`, "discard");
+            }
+        },
     });
 
     // ── Cooldown timer ─────────────────────────────────────────────────────
@@ -490,6 +519,49 @@ export default function OracleAI() {
                                     <div className="text-lg font-black mono text-red-400">{stats.losses}</div>
                                 </div>
                             </div>
+
+                            {/* Martingale Level Indicator */}
+                            {useMartingale && (
+                                <div
+                                    className="rounded-lg p-2.5 mb-2 transition-all duration-300"
+                                    style={{
+                                        background: galeState.level > 0
+                                            ? "rgba(34,211,238,0.08)"
+                                            : "rgba(255,255,255,0.02)",
+                                        border: `1px solid ${galeState.level > 0 ? "rgba(34,211,238,0.2)" : "rgba(255,255,255,0.06)"}`,
+                                    }}
+                                >
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-[9px] text-slate-400 mono uppercase tracking-wider">Nivel Gale</span>
+                                        <span className="text-xs mono font-bold" style={{ color: galeState.level > 0 ? "#22d3ee" : "#10b981" }}>
+                                            {galeState.level > 0 ? `G${galeState.level}` : "BASE"}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        {Array.from({ length: parseInt(maxGale) || 3 }, (_, i) => (
+                                            <div
+                                                key={i}
+                                                className="flex-1 h-1.5 rounded-full transition-all duration-300"
+                                                style={{
+                                                    background: i < galeState.level
+                                                        ? i === 0 ? "#22d3ee" : i === 1 ? "#fbbf24" : "#ef4444"
+                                                        : "rgba(255,255,255,0.06)",
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center justify-between mt-1.5">
+                                        <span className="text-[8px] text-slate-500 mono">
+                                            Stake: ${galeState.currentStake.toFixed(2)}
+                                        </span>
+                                        {galeState.isPaused && (
+                                            <span className="text-[8px] mono" style={{ color: "#fbbf24" }}>
+                                                ⏸ PAUSA
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Profit Display */}
                             <div

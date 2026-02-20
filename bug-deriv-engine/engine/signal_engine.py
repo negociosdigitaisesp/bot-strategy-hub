@@ -111,6 +111,84 @@ class SignalEngine:
         
         return digito_frio, freq_minima
 
+    def _calcular_confidence(self, ativo: str, digito_alvo: int, freq_minima: float, p_estabilidade: float) -> float:
+        """
+        Calcula confidence_score (0.0 — 1.0) usando 4 fatores independentes.
+        
+        Fatores:
+          1. Estabilidade χ² (30%): p-valor alto = distribuição uniforme = bom
+          2. Frequência do dígito (30%): dígito com freq muito baixa = mais seguro para DIFFERS
+          3. Consenso multi-janela (25%): mesmo dígito frio em janelas 20/50/100
+          4. Dispersão (15%): desvio padrão baixo das frequências = mercado previsível
+        """
+        digitos = list(self._qual.digitos[ativo])
+        n = len(digitos)
+        
+        # ── Fator 1: Estabilidade (0-1) ──
+        # p-valor > 0.80 = excelente, 0.20 = mínimo aceitável
+        score_estabilidade = min(1.0, max(0.0, (p_estabilidade - 0.20) / 0.60))
+        
+        # ── Fator 2: Frequência do dígito alvo (0-1) ──
+        # freq_minima 0% = perfeito (dígito nunca apareceu), 10% = neutro
+        # Para DIFFERS: quanto MENOR a freq do dígito apostado, MAIOR a chance de ser diferente
+        score_frequencia = min(1.0, max(0.0, (0.10 - freq_minima) / 0.10))
+        
+        # ── Fator 3: Consenso multi-janela (0-1) ──
+        score_consenso = 0.0
+        if n >= 100:
+            janelas = [20, 50, 100]
+            digitos_frios = []
+            for w in janelas:
+                sub = digitos[-w:]
+                contagem_sub = Counter(sub)
+                freqs_sub = {d: contagem_sub.get(d, 0) / w for d in range(10)}
+                frio_sub = min(freqs_sub, key=freqs_sub.get)
+                digitos_frios.append(frio_sub)
+            
+            # Se o dígito mais frio é o mesmo em 2/3 ou 3/3 janelas
+            consenso_count = digitos_frios.count(digito_alvo)
+            score_consenso = consenso_count / len(janelas)
+        elif n >= 50:
+            # Apenas 2 janelas disponíveis
+            janelas = [20, 50]
+            digitos_frios = []
+            for w in janelas:
+                sub = digitos[-w:]
+                contagem_sub = Counter(sub)
+                freqs_sub = {d: contagem_sub.get(d, 0) / w for d in range(10)}
+                frio_sub = min(freqs_sub, key=freqs_sub.get)
+                digitos_frios.append(frio_sub)
+            consenso_count = digitos_frios.count(digito_alvo)
+            score_consenso = consenso_count / len(janelas)
+        
+        # ── Fator 4: Dispersão (0-1) ──
+        # Desvio padrão das frequências dos 10 dígitos
+        janela_disp = digitos[-50:] if n >= 50 else digitos
+        contagem_disp = Counter(janela_disp)
+        freqs_list = [contagem_disp.get(d, 0) / len(janela_disp) for d in range(10)]
+        media = sum(freqs_list) / 10  # deveria ser ~0.10
+        variancia = sum((f - media) ** 2 for f in freqs_list) / 10
+        desvio = variancia ** 0.5
+        # desvio baixo (< 0.02) = distribuição uniforme = bom
+        # desvio alto (> 0.06) = distribuição enviesada = ruim
+        score_dispersao = min(1.0, max(0.0, (0.06 - desvio) / 0.04))
+        
+        # ── Score final ponderado ──
+        confidence = (
+            score_estabilidade * 0.30 +
+            score_frequencia   * 0.30 +
+            score_consenso     * 0.25 +
+            score_dispersao    * 0.15
+        )
+        
+        logger.debug(
+            f"[{ativo}] Confidence: {confidence:.3f} "
+            f"(estab={score_estabilidade:.2f}, freq={score_frequencia:.2f}, "
+            f"consenso={score_consenso:.2f}, disp={score_dispersao:.2f})"
+        )
+        
+        return round(confidence, 3)
+
 
     # ── API principal ─────────────────────────────────────────────────────────
 
@@ -183,11 +261,19 @@ class SignalEngine:
                 melhor_ativo = candidato
 
         if melhor_ativo is None:
-            # logger.debug("Gate 5 FAIL: nenhum ativo em estado estável.")
             return None
 
         # ── Gate 6: Encontrar dígito de menor risco ───────────────────────
         digito_alvo, freq_minima = self._digito_menor_risco(melhor_ativo)
+
+        # ── Gate 7: Confidence Score — filtra sinais fracos ───────────────
+        confidence = self._calcular_confidence(melhor_ativo, digito_alvo, freq_minima, melhor_p)
+        
+        if confidence < 0.70:
+            logger.debug(
+                f"Gate 7 FAIL: confidence={confidence:.3f} < 0.70 — sinal descartado."
+            )
+            return None
 
         # ── Emitir sinal ──────────────────────────────────────────────────
         self.total_trades += 1
@@ -202,17 +288,19 @@ class SignalEngine:
             "ativo":          melhor_ativo,
             "digito":         digito_alvo,
             "ev":             ev,
-            "percentil":      round(melhor_p, 2),  # p-valor do chi-square
+            "percentil":      round(melhor_p, 2),
             "rtt":            round(rtt_ms),
             "ts":             time.time(),
             "freq_digito":    round(freq_minima, 3),
             "estabilidade":   round(melhor_p, 3),
+            "confidence":     confidence,
         }
 
         logger.info(
             f"SINAL #{self.total_trades} | "
             f"ativo={melhor_ativo} | "
             f"digito_alvo={digito_alvo} (freq={freq_minima:.1%}) | "
+            f"confidence={confidence:.3f} | "
             f"estabilidade_p={melhor_p:.3f} | "
             f"rtt={rtt_ms:.0f}ms"
         )
