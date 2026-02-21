@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBugDeriv, MartingaleState } from "../hooks/useBugDeriv";
 import { useDeriv } from "../contexts/DerivContext";
+import { useFreemiumLimiter } from "../hooks/useFreemiumLimiter";
+import { toast } from "sonner";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 interface Signal {
@@ -117,6 +119,9 @@ function ToggleSwitch({ enabled, onChange, color, disabled }: {
 // ══════════════════════════════════════════════════════════════════════════
 export default function OracleAI() {
     const { api } = useDeriv();
+
+    // 🔒 Freemium limiter
+    const { isFree, isLoading } = useFreemiumLimiter();
 
     // ── Estado de conexão ──────────────────────────────────────────────────
     const [connected, setConnected] = useState(false);
@@ -605,9 +610,24 @@ export default function OracleAI() {
                         initial={{ x: -30, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
                         transition={{ delay: 0.1 }}
-                        className="bento-border rounded-xl overflow-hidden"
+                        className="bento-border rounded-xl overflow-hidden relative"
                         style={{ background: "rgba(15,23,42,0.7)" }}
                     >
+                        {/* 🔒 FREE USER OVERLAY */}
+                        {!isLoading && isFree && (
+                            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center text-center p-6 rounded-xl" style={{ background: "rgba(2,6,23,0.85)", backdropFilter: "blur(10px)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                                <div className="p-4 rounded-full mb-4" style={{ background: "rgba(16,185,129,0.1)", boxShadow: "0 0 20px rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)" }}>
+                                    <span style={{ fontSize: 28 }}>🔒</span>
+                                </div>
+                                <div className="text-xs font-black tracking-widest mb-2 uppercase" style={{ color: "#10b981" }}>ORACLE AI · PREMIUM</div>
+                                <p className="text-xs leading-relaxed" style={{ color: "#64748b", maxWidth: 220 }}>Configuración avanzada disponible solo para miembros Premium.</p>
+                                <div className="mt-4 flex items-center gap-2 text-[10px] font-mono" style={{ color: "#475569" }}>
+                                    <span style={{ color: "#10b981" }}>●</span>
+                                    <span>MODE: PREMIUM_ONLY</span>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Header */}
                         <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                             <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "linear-gradient(135deg,#10b981,#06b6d4)" }}>
@@ -915,19 +935,31 @@ export default function OracleAI() {
                             <motion.button
                                 whileHover={{ scale: 1.04 }}
                                 whileTap={{ scale: 0.97 }}
-                                onClick={() => setIsActive(v => !v)}
+                                onClick={() => {
+                                    // 🚦 TRAFFIC MANAGEMENT — bloqueia usuários gratuitos
+                                    if (!isActive && !isLoading && isFree) {
+                                        toast.warning('🔒 Oracle AI es exclusivo para miembros Premium. Actualiza tu plan para operar.');
+                                        return;
+                                    }
+                                    setIsActive(v => !v);
+                                }}
                                 className="px-10 py-3.5 rounded-xl font-black text-sm tracking-wider transition-all"
                                 style={{
                                     background: isActive
                                         ? "linear-gradient(135deg,#ef4444,#dc2626)"
-                                        : "linear-gradient(135deg,#10b981,#059669)",
+                                        : (!isLoading && isFree)
+                                            ? "linear-gradient(135deg,#475569,#334155)"
+                                            : "linear-gradient(135deg,#10b981,#059669)",
                                     color: "white",
                                     boxShadow: isActive
                                         ? "0 0 30px rgba(239,68,68,0.4)"
-                                        : "0 0 30px rgba(16,185,129,0.4)",
+                                        : (!isLoading && isFree)
+                                            ? "0 0 20px rgba(100,116,139,0.3)"
+                                            : "0 0 30px rgba(16,185,129,0.4)",
+                                    cursor: (!isActive && !isLoading && isFree) ? "not-allowed" : "pointer",
                                 }}
                             >
-                                {isActive ? "⏹ DETENER" : "▶ ACTIVAR"}
+                                {isActive ? "⏹ DETENER" : (!isLoading && isFree) ? "🔒 PREMIUM" : "▶ ACTIVAR"}
                             </motion.button>
 
                             {/* Cooldown trigger */}
