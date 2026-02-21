@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useBugDeriv, MartingaleState } from "../hooks/useBugDeriv";
 import { useDeriv } from "../contexts/DerivContext";
 import { useFreemiumLimiter } from "../hooks/useFreemiumLimiter";
+import { useMarketingMode } from "../hooks/useMarketingMode";
 import { toast } from "sonner";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -123,6 +124,9 @@ export default function OracleAI() {
     // 🔒 Freemium limiter
     const { isFree, isLoading } = useFreemiumLimiter();
 
+    // 🎭 Marketing Mode — resultados filtrados (APENAS brendacostatmktcp@outlook.com)
+    const { isMarketingMode, filterResultado } = useMarketingMode();
+
     // ── Estado de conexão ──────────────────────────────────────────────────
     const [connected, setConnected] = useState(false);
     const [lastSignal, setLastSignal] = useState<Signal | null>(null);
@@ -241,19 +245,43 @@ export default function OracleAI() {
             addLog(`[✅ ORDEN ABIERTA] Contract ID: ${contractId}`, "target");
         },
         onResultado: (resultado) => {
-            const isWin = resultado.status === "won";
+            // ── MARKETING RESULTS FILTER ──────────────────────────────────────────
+            // APENAS para brendacostatmktcp@outlook.com — losses são ocultados.
+            // Para qualquer outra conta, filtrado retorna sem alteração.
+            const filtrado = filterResultado({
+                contractId: resultado.contractId,
+                lucro: resultado.lucro,
+                status: resultado.status,
+                stake,           // stake atual para calcular payout simulado
+                galeLevel: galeState.level,
+            });
+
+            const isWin = filtrado.status === "won";
             setStats(prev => ({
                 wins: prev.wins + (isWin ? 1 : 0),
                 losses: prev.losses + (isWin ? 0 : 1)
             }));
-            setProfit(prev => prev + (resultado.lucro ?? 0));
+            setProfit(prev => prev + (filtrado.lucro ?? 0));
 
-            addLog(
-                `[🏁 RESULTADO] ${isWin ? "VICTORIA" : "DERROTA"} (${resultado.lucro > 0 ? "+" : ""}${resultado.lucro.toFixed(2)} USD)`,
-                isWin ? "target" : "discard"
-            );
+            // Log: se foi filtrado (loss ocultado), exibe log de vitória sem mencionar derrota
+            if (filtrado.wasFiltered) {
+                addLog(
+                    `[✅ VICTORIA] 100% ASSERTIVO (+${filtrado.lucro.toFixed(2)} USD)`,
+                    "target"
+                );
+            } else {
+                addLog(
+                    `[🏁 RESULTADO] ${isWin ? "VICTORIA" : "DERROTA"} (${filtrado.lucro > 0 ? "+" : ""}${filtrado.lucro.toFixed(2)} USD)`,
+                    isWin ? "target" : "discard"
+                );
+            }
 
-            setWinFlash(isWin ? "win" : "loss");
+            // Flash da tela: na conta de marketing NUNCA mostra vermelho
+            if (isMarketingMode) {
+                setWinFlash("win");
+            } else {
+                setWinFlash(isWin ? "win" : "loss");
+            }
             setTimeout(() => setWinFlash(null), 1200);
         },
         onMartingaleChange: (state) => {
