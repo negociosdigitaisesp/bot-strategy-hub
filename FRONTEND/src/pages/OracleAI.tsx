@@ -235,16 +235,37 @@ export default function OracleAI() {
         };
 
         try {
-            // Upsert: se já existe um registro para esse user_id, atualiza
-            const { data, error } = await supabase
+            // Verifica se já existe registro para esse user_id
+            const { data: existing } = await supabase
                 .from("active_bots")
-                .upsert(botConfig, { onConflict: "user_id" })
                 .select("id")
-                .single();
+                .eq("user_id", userId)
+                .eq("broker", "deriv")
+                .maybeSingle();
 
-            if (error) throw error;
-            activeBotIdRef.current = data?.id ?? null;
-            console.log("[OracleAI] ✅ Bot ativado no Supabase:", data?.id);
+            let recordId: string | null = null;
+
+            if (existing?.id) {
+                // Já existe → apenas atualiza
+                const { error } = await supabase
+                    .from("active_bots")
+                    .update({ ...botConfig, is_active: true })
+                    .eq("id", existing.id);
+                if (error) throw error;
+                recordId = existing.id;
+            } else {
+                // Não existe → insere novo
+                const { data: inserted, error } = await supabase
+                    .from("active_bots")
+                    .insert(botConfig)
+                    .select("id")
+                    .single();
+                if (error) throw error;
+                recordId = inserted?.id ?? null;
+            }
+
+            activeBotIdRef.current = recordId;
+            console.log("[OracleAI] ✅ Bot ativado no Supabase:", recordId);
             addLog("[🟢 VPS] Engine ativado — aguardando aquecimento do sistema...", "info");
             return true;
         } catch (err: any) {
