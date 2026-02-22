@@ -1,0 +1,137 @@
+/* =====================================================
+   IQ BOT — Animações CSS (prefixo: iq-)
+   Copy Trading Pro — Million Bots
+   ===================================================== */
+
+/* Tokens de design — paleta IQ */
+:root {
+  --iq-bg-deep:       #070B12;
+  --iq-bg-card:       #0D1420;
+  --iq-bg-elevated:   #111B2E;
+  --iq-green:         #00FF88;
+  --iq-green-dim:     rgba(0, 255, 136, 0.10);
+  --iq-red:           #FF3B5C;
+  --iq-red-dim:       rgba(255, 59, 92, 0.10);
+  --iq-blue:          #00B4FF;
+  --iq-blue-dim:      rgba(0, 180, 255, 0.10);
+  --iq-gold:          #FFB800;
+  --iq-purple:        #7B61FF;
+  --iq-text-primary:  #E8EDF5;
+  --iq-text-muted:    #4A6080;
+  --iq-border:        rgba(255, 255, 255, 0.06);
+  --iq-radius:        16px;
+  --iq-radius-sm:     10px;
+}
+
+/* Pulso suave — indicador de status vivo */
+@keyframes iqPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(0.97); }
+}
+
+/* Brilho de glow — borda de operação ativa */
+@keyframes iqGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 180, 255, 0.4); }
+  50%      { box-shadow: 0 0 20px 4px rgba(0, 180, 255, 0.2); }
+}
+
+/* Entrada suave de cima para baixo — novos cards do feed */
+@keyframes iqSlideIn {
+  from { transform: translateY(-16px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* Rolar dígitos — P&L ao atualizar */
+@keyframes iqDigitRoll {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Explosão de vitória — card WIN no feed */
+@keyframes iqWinBurst {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/* Countdown pulsante — últimos 10 segundos */
+@keyframes iqCountdown {
+  0%, 100% { color: var(--iq-text-primary); }
+  50%      { color: var(--iq-gold); }
+}
+
+/* Ponto live — indicador de operação em andamento */
+@keyframes iqLiveDot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.2; }
+}
+
+/* Entrada de modal — scale + fade */
+@keyframes iqModalIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* Spinner de loading */
+@keyframes iqSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Expansão do widget flutuante */
+@keyframes iqExpandWidget {
+  from { transform: scale(0.8); opacity: 0; transform-origin: bottom right; }
+  to   { transform: scale(1);   opacity: 1; transform-origin: bottom right; }
+}
+
+/* Classes utilitárias de animação */
+.iq-pulse        { animation: iqPulse 2s ease-in-out infinite; }
+.iq-glow         { animation: iqGlow 2s ease-in-out infinite; }
+.iq-slide-in     { animation: iqSlideIn 300ms ease-out forwards; }
+.iq-digit-roll   { animation: iqDigitRoll 200ms ease-out forwards; }
+.iq-win-burst    { animation: iqWinBurst 400ms ease-out forwards; }
+.iq-countdown    { animation: iqCountdown 1s ease-in-out infinite; }
+.iq-live-dot     { animation: iqLiveDot 1.4s ease-in-out infinite; }
+.iq-modal-in     { animation: iqModalIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.iq-spin         { animation: iqSpin 1s linear infinite; }
+.iq-expand       { animation: iqExpandWidget 250ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* Layout base da página IQ Bot */
+.iq-page {
+  min-height: 100vh;
+  background-color: var(--iq-bg-deep);
+  color: var(--iq-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Card base */
+.iq-card {
+  background: var(--iq-bg-card);
+  border: 1px solid var(--iq-border);
+  border-radius: var(--iq-radius);
+  overflow: hidden;
+}
+
+/* Card elevado */
+.iq-card-elevated {
+  background: var(--iq-bg-elevated);
+  border: 1px solid var(--iq-border);
+  border-radius: var(--iq-radius);
+}
+
+/* Skeleton loading */
+.iq-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--iq-bg-card) 25%,
+    var(--iq-bg-elevated) 50%,
+    var(--iq-bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: iqSkeleton 1.5s ease-in-out infinite;
+  border-radius: var(--iq-radius-sm);
+}
+
+@keyframes iqSkeleton {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

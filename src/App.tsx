@@ -55,6 +55,8 @@ import BotQuantum from "./pages/BotQuantum";
 import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
 import AstronBot from "./pages/AstronBot";
+import IQBotMarketplace from "./pages/IQBotMarketplace";
+import IQBotPanel from "./components/iq-bot/IQBotPanel";
 
 
 
@@ -401,6 +403,26 @@ const App = () => {
                             </main>
                           </>
                         } />
+
+                        {/* IQ Option Copy Trading Pro */}
+                        <Route path="/iq-bot" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <IQBotMarketplace />
+                            </main>
+                          </>
+                        } />
+                        {/* IQ Option Copy Trading Pro — painel do trader */}
+                        <Route path="/iq-bot/panel" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <IQBotPanel onVoltar={() => window.history.back()} />
+                            </main>
+                          </>
+                        } />
+
 
                         <Route path="/bug-deriv" element={
                           <>
