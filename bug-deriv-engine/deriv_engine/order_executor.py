@@ -133,11 +133,10 @@ class OrderExecutor:
             await ws.send(json.dumps(buy_payload))
 
             # Consome mensagens até receber a resposta de compra
-            # (pode vir outras mensagens intermediárias como proposal_open_contract)
+            resp = {}
             for _ in range(5):
                 resp_raw = await asyncio.wait_for(ws.recv(), timeout=8.0)
                 resp = json.loads(resp_raw)
-
                 if resp.get("msg_type") == "buy" or "buy" in resp or "error" in resp:
                     break
 
@@ -158,15 +157,62 @@ class OrderExecutor:
             buy_data = resp.get("buy", {})
             contract_id = buy_data.get("contract_id")
 
+            logger.info(
+                f"[ORDER] Ordem aberta para {user_id} | "
+                f"contract={contract_id} | stake={stake}"
+            )
+
+            # ── 3. Aguardar resultado (settlement) ────────────────────────
+            # Subscreve ao contrato para receber o resultado
+            if contract_id:
+                await ws.send(json.dumps({
+                    "proposal_open_contract": 1,
+                    "contract_id": contract_id,
+                    "subscribe": 1,
+                }))
+
+                # Aguarda o contrato fechar (is_sold=1 ou is_expired=1)
+                final_profit = 0.0
+                final_status = "opened"
+                try:
+                    for _ in range(20):  # máximo ~15s
+                        msg_raw = await asyncio.wait_for(ws.recv(), timeout=15.0)
+                        msg = json.loads(msg_raw)
+                        poc = msg.get("proposal_open_contract", {})
+                        if poc.get("is_sold") or poc.get("is_expired"):
+                            final_profit = float(poc.get("profit", 0))
+                            final_status = "won" if final_profit > 0 else "lost"
+                            logger.info(
+                                f"[ORDER] Resultado {user_id}: {final_status} | "
+                                f"profit={final_profit:+.2f} USD"
+                            )
+                            break
+                except asyncio.TimeoutError:
+                    logger.warning(f"[ORDER] Timeout aguardando resultado para {user_id}")
+                    final_status = "timeout"
+
+                return {
+                    "user_id": user_id,
+                    "broker": "deriv",
+                    "strategy_id": strategy_id,
+                    "contract_type": "DIGITDIFF",
+                    "stake": stake,
+                    "status": final_status,
+                    "profit": final_profit,
+                    "contract_id": str(contract_id),
+                    "raw_response": resp,
+                    "executed_at": now_iso,
+                }
+
             return {
                 "user_id": user_id,
                 "broker": "deriv",
                 "strategy_id": strategy_id,
                 "contract_type": "DIGITDIFF",
                 "stake": stake,
-                "status": "opened",
+                "status": "no_contract",
                 "profit": 0,
-                "contract_id": str(contract_id) if contract_id else None,
+                "contract_id": None,
                 "raw_response": resp,
                 "executed_at": now_iso,
             }

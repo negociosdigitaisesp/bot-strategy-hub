@@ -171,6 +171,64 @@ export default function OracleAI() {
     // ── ID do bot ativo no Supabase ────────────────────────────────────────
     const activeBotIdRef = useRef<string | null>(null);
 
+    // ── Supabase Realtime: escutar trade_history para resultados ─────────
+    useEffect(() => {
+        const userId = account?.loginid;
+        if (!userId || !isActive) return;
+
+        const channel = supabase
+            .channel("trade_results")
+            .on(
+                "postgres_changes" as any,
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "trade_history",
+                    filter: `user_id=eq.${userId}`,
+                },
+                (payload: any) => {
+                    const row = payload.new;
+                    if (!row) return;
+
+                    const status = row.status as string;
+                    const profit = parseFloat(row.profit) || 0;
+                    const contractId = row.contract_id || "?";
+
+                    // Log de ordem aberta
+                    if (status === "opened" || status === "won" || status === "lost") {
+                        addLog(`[✅ ORDEN] Contract: ${contractId} | Stake: ${row.stake}`, "target");
+                    }
+
+                    // Atualizar stats se for resultado final
+                    if (status === "won" || status === "lost") {
+                        const isWin = status === "won";
+                        setStats(prev => ({
+                            wins: prev.wins + (isWin ? 1 : 0),
+                            losses: prev.losses + (isWin ? 0 : 1)
+                        }));
+                        setProfit(prev => prev + profit);
+
+                        addLog(
+                            `[🏁 RESULTADO] ${isWin ? "✅ VICTORIA" : "❌ DERROTA"} (${profit > 0 ? "+" : ""}${profit.toFixed(2)} USD)`,
+                            isWin ? "target" : "discard"
+                        );
+
+                        setWinFlash(isWin ? "win" : "loss");
+                        setTimeout(() => setWinFlash(null), 1200);
+                    }
+
+                    if (status === "auth_error" || status === "order_error" || status === "exception") {
+                        addLog(`[⚠️ ERROR] ${status}: contract ${contractId}`, "discard");
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [account?.loginid, isActive, addLog]);
+
     // ── Animação de métricas ───────────────────────────────────────────────
     useEffect(() => {
         const interval = setInterval(() => {
