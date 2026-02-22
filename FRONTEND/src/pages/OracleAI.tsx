@@ -171,6 +171,25 @@ export default function OracleAI() {
     // ── ID do bot ativo no Supabase ────────────────────────────────────────
     const activeBotIdRef = useRef<string | null>(null);
 
+
+    // ── Animação de métricas ───────────────────────────────────────────────
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setServerLoad(v => Math.max(20, Math.min(95, v + randomBetween(-3, 3))));
+            setProposalsCount(v => v + Math.floor(randomBetween(3, 12)));
+            setEntropy(prev => [...prev.slice(1), randomBetween(0.2, 1.0)]);
+            setZScore(prev => [...prev.slice(1), randomBetween(-2.5, 2.5)]);
+            setArbDelta(prev => [...prev.slice(1), randomBetween(-0.8, 0.8)]);
+        }, 800);
+        return () => clearInterval(interval);
+    }, []);
+
+    // ── Proposal stream simulado ───────────────────────────────────────────
+    const addLog = useCallback((text: string, type: ProposalLog["type"]) => {
+        const entry: ProposalLog = { id: logCounter.current++, text, type, ts: Date.now() };
+        setLogs(prev => [entry, ...prev].slice(0, MAX_LOGS));
+    }, []);
+
     // ── Supabase Realtime: escutar trade_history para resultados ─────────
     useEffect(() => {
         const userId = account?.loginid;
@@ -228,24 +247,6 @@ export default function OracleAI() {
             supabase.removeChannel(channel);
         };
     }, [account?.loginid, isActive, addLog]);
-
-    // ── Animação de métricas ───────────────────────────────────────────────
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setServerLoad(v => Math.max(20, Math.min(95, v + randomBetween(-3, 3))));
-            setProposalsCount(v => v + Math.floor(randomBetween(3, 12)));
-            setEntropy(prev => [...prev.slice(1), randomBetween(0.2, 1.0)]);
-            setZScore(prev => [...prev.slice(1), randomBetween(-2.5, 2.5)]);
-            setArbDelta(prev => [...prev.slice(1), randomBetween(-0.8, 0.8)]);
-        }, 800);
-        return () => clearInterval(interval);
-    }, []);
-
-    // ── Proposal stream simulado ───────────────────────────────────────────
-    const addLog = useCallback((text: string, type: ProposalLog["type"]) => {
-        const entry: ProposalLog = { id: logCounter.current++, text, type, ts: Date.now() };
-        setLogs(prev => [entry, ...prev].slice(0, MAX_LOGS));
-    }, []);
 
     useEffect(() => {
         if (!isActive) return;
