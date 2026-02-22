@@ -1,0 +1,54 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   IQ BOT — Design Tokens
+   Herda o design system global do Million Bots e adiciona variáveis
+   específicas do módulo IQ Option. Prefixo "--iq-" em tudo.
+───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── IQ Accent Colors ──────────────────────────────────────────────── */
+  --iq-green:       #00FF88;
+  --iq-red:         #FF3B5C;
+  --iq-blue:        #00B4FF;
+  --iq-yellow:      #FFB800;
+  --iq-purple:      #A855F7;
+
+  /* ── Semantic aliases (com alpha) ──────────────────────────────────── */
+  --iq-green-muted:  rgba(0, 255, 136, 0.12);
+  --iq-red-muted:    rgba(255, 59, 92, 0.12);
+  --iq-blue-muted:   rgba(0, 180, 255, 0.12);
+  --iq-yellow-muted: rgba(255, 184, 0, 0.12);
+
+  --iq-green-border:  rgba(0, 255, 136, 0.25);
+  --iq-red-border:    rgba(255, 59, 92, 0.25);
+  --iq-blue-border:   rgba(0, 180, 255, 0.25);
+  --iq-yellow-border: rgba(255, 184, 0, 0.25);
+
+  /* ── Surfaces (inherit from global dark theme) ──────────────────────── */
+  --iq-surface:        rgba(15, 23, 42, 0.70);
+  --iq-surface-raised: rgba(15, 23, 42, 0.90);
+  --iq-surface-card:   rgba(17, 24, 39, 0.80);
+  --iq-border:         rgba(255, 255, 255, 0.05);
+  --iq-border-strong:  rgba(255, 255, 255, 0.10);
+
+  /* ── Status ─────────────────────────────────────────────────────────── */
+  --iq-status-connected:    #00FF88;
+  --iq-status-connecting:   #FFB800;
+  --iq-status-disconnected: #FF3B5C;
+
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  --iq-font-primary: 'Inter', sans-serif;
+  --iq-font-mono:    'JetBrains Mono', monospace;
+
+  /* ── Shape ──────────────────────────────────────────────────────────── */
+  --iq-radius:       12px;
+  --iq-radius-sm:    8px;
+  --iq-radius-lg:    16px;
+  --iq-transition:   all 0.3s ease-out;
+  --iq-transition-fast: all 0.15s ease-out;
+
+  /* ── Shadows (glows) ────────────────────────────────────────────────── */
+  --iq-shadow-green:  0 0 20px rgba(0, 255, 136, 0.25);
+  --iq-shadow-red:    0 0 20px rgba(255, 59, 92, 0.25);
+  --iq-shadow-blue:   0 0 20px rgba(0, 180, 255, 0.25);
+  --iq-shadow-yellow: 0 0 20px rgba(255, 184, 0, 0.25);
+}

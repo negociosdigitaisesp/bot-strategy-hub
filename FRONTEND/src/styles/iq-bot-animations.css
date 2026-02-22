@@ -1,0 +1,126 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   IQ BOT — Animations
+   Todos os @keyframes prefixados com "iq" para não colidir com
+   animações existentes do Million Bots.
+───────────────────────────────────────────────────────────────────────── */
+
+/* Pulso da borda azul — indica que o bot está conectado e ativo */
+@keyframes iqBorderPulse {
+
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 0 rgba(0, 180, 255, 0),
+            inset 0 0 0 1px rgba(0, 180, 255, 0.25);
+    }
+
+    50% {
+        box-shadow:
+            0 0 18px 4px rgba(0, 180, 255, 0.35),
+            inset 0 0 0 1px rgba(0, 180, 255, 0.60);
+    }
+}
+
+/* Rolo de dígito — efeito slot machine nos números */
+@keyframes iqDigitRoll {
+    0% {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    60% {
+        transform: translateY(8%);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Entrada de card deslizando de cima para baixo */
+@keyframes iqSlideDown {
+    0% {
+        transform: translateY(-16px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Flash verde de vitória / vermelho de derrota */
+@keyframes iqWinFlash {
+    0% {
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    80% {
+        opacity: 0.8;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Respirar — botão ligado "pulsa" suavemente */
+@keyframes iqBreathe {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+/* Alerta de countdown — amarelo pulsando urgência */
+@keyframes iqCountdownAlert {
+
+    0%,
+    100% {
+        color: var(--iq-yellow);
+        opacity: 1;
+    }
+
+    50% {
+        color: #fff;
+        opacity: 0.7;
+    }
+}
+
+/* ── Classes utilitárias que aplicam as animações ───────────────────────── */
+
+.iq-border-pulse {
+    animation: iqBorderPulse 2s ease-in-out infinite;
+}
+
+.iq-digit-roll {
+    animation: iqDigitRoll 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.iq-slide-down {
+    animation: iqSlideDown 0.3s ease-out forwards;
+}
+
+.iq-win-flash {
+    animation: iqWinFlash 0.6s ease-out forwards;
+}
+
+.iq-breathe {
+    animation: iqBreathe 2s ease-in-out infinite;
+}
+
+.iq-countdown-alert {
+    animation: iqCountdownAlert 1s ease-in-out infinite;
+}

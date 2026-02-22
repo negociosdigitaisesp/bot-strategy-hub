@@ -56,6 +56,7 @@ import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
 import AstronBot from "./pages/AstronBot";
 import OracleAI from "./pages/OracleAI";
+import IQBotPage from "./pages/IQBotPage";
 
 
 
@@ -408,6 +409,15 @@ const App = () => {
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                               <OracleAI />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/iq-option" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <IQBotPage />
                             </main>
                           </>
                         } />

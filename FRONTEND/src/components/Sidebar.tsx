@@ -223,6 +223,16 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             description: 'Shadow Mode - Digit Differs'
         },
 
+        {
+            name: 'IQ Option',
+            icon: <TrendingUp size={20} />,
+            path: '/iq-option',
+            isImportant: false,
+            requiresUpgrade: true,
+            description: 'Copy Trading Pro',
+            badge: 'NOVO'
+        },
+
 
 
         {
