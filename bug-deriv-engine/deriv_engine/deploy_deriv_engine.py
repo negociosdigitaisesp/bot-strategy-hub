@@ -28,6 +28,7 @@ FILES_TO_UPLOAD = [
     "config.py",
     "supabase_client.py",
     "signal_core.py",
+    "risk_manager.py",
     "order_executor.py",
     "market_analyzer.py",
     "engine.py",

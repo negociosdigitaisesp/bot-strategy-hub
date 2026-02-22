@@ -320,6 +320,8 @@ export default function OracleAI() {
             martingale_factor: parseFloat(martingaleFactor) || 2.5,
             stop_win: parseFloat(stopWin) || 50,
             stop_loss: parseFloat(stopLoss) || 25,
+            use_soros: useSoros,
+            soros_levels: sorosLevels,
         };
 
         try {

@@ -25,6 +25,7 @@ from config import (
 )
 from market_analyzer import MarketAnalyzer
 from order_executor import OrderExecutor
+from risk_manager import RiskManager
 from supabase_client import get_supabase
 
 logger = logging.getLogger("DERIV_ENGINE")
@@ -37,6 +38,7 @@ class DerivEngine:
         self._supabase       = get_supabase()
         self._market_analyzer = MarketAnalyzer()
         self._order_executor  = OrderExecutor()
+        self._risk_manager    = RiskManager()
 
         # Cache em RAM: user_id → { token, stake, strategy_id, symbol, ... }
         self.active_clients: dict[str, dict[str, Any]] = {}
@@ -47,7 +49,7 @@ class DerivEngine:
         self._total_errors             = 0
         self._started_at               = time.time()
 
-        logger.info("🟢 DerivEngine instanciado.")
+        logger.info("🟢 DerivEngine instanciado (com RiskManager).")
 
     # ── Ciclo principal ────────────────────────────────────────────────────
 
@@ -76,6 +78,9 @@ class DerivEngine:
             )
             for row in resp.data:
                 self.active_clients[row["user_id"]] = self._row_to_client(row)
+
+            # Inicializa estado de risco para clientes carregados
+            self._risk_manager.sync_clients(self.active_clients)
 
             logger.info(f"Clientes Deriv ativos carregados: {len(self.active_clients)}")
         except Exception as e:
@@ -133,6 +138,9 @@ class DerivEngine:
         # Substitui o dict inteiro (atômico para o event loop)
         self.active_clients = new_active
 
+        # Sincroniza estado de risco com os clientes ativos
+        self._risk_manager.sync_clients(self.active_clients)
+
     @staticmethod
     def _row_to_client(row: dict) -> dict[str, Any]:
         """Converte uma row do Supabase no formato usado pelo engine."""
@@ -142,12 +150,15 @@ class DerivEngine:
             "strategy_id": row["strategy_id"],
             "symbol":      row.get("symbol", "R_75"),  # ativo default
             "record_id":   row["id"],
-            # Configurações de risco (para lógica futura de martingale no engine)
+            # ── Gestão de Risco ──────────────────────────────────────────
             "use_martingale":    row.get("use_martingale", False),
             "max_gale":          row.get("max_gale", 3),
             "martingale_factor": float(row.get("martingale_factor", 2.5)),
             "stop_win":          float(row.get("stop_win", 50.0)),
             "stop_loss":         float(row.get("stop_loss", 25.0)),
+            # ── Soros ────────────────────────────────────────────────────
+            "use_soros":         row.get("use_soros", False),
+            "soros_levels":      row.get("soros_levels", 2),
         }
 
     # ── Handler de sinal ──────────────────────────────────────────────────
@@ -156,8 +167,11 @@ class DerivEngine:
         """
         Chamado pelo MarketAnalyzer quando há sinal de trading.
 
-        Dispara ordens para TODOS os clientes ativos do ativo do sinal,
-        de forma assíncrona e em paralelo.
+        Dispara ordens para clientes ativos com gestão de risco:
+          - Verifica se o cliente pode operar (stop win/loss, streak pause)
+          - Calcula stake via RiskManager (martingale, soros)
+          - Executa ordens em paralelo
+          - Processa resultados no RiskManager
         """
         if not self.active_clients:
             return
@@ -167,37 +181,48 @@ class DerivEngine:
         confidence = sinal.get("confidence", 0.0)
 
         self._total_signals_dispatched += 1
+
+        # Filtra clientes que podem operar (stop/streak protection)
+        eligible = {
+            uid: info
+            for uid, info in self.active_clients.items()
+            if self._risk_manager.should_trade(uid)
+        }
+
+        if not eligible:
+            return
+
         logger.info(
             f"🔫 Sinal #{self._total_signals_dispatched} | "
             f"ativo={ativo} | "
             f"digito_alvo={digito} | "
             f"confidence={confidence:.3f} | "
-            f"clientes={len(self.active_clients)}"
+            f"elegíveis={len(eligible)}/{len(self.active_clients)}"
         )
 
-        # Cria coroutines para todos os clientes em paralelo
+        # Cria coroutines com stake calculado pelo RiskManager
         tasks = [
             self._order_executor.execute_order(
                 user_id=uid,
                 token=info["token"],
-                stake=info["stake"],
+                stake=self._risk_manager.get_stake(uid),
                 strategy_id=info["strategy_id"],
                 symbol=ativo,
                 digito_alvo=digito,
             )
-            for uid, info in self.active_clients.items()
+            for uid, info in eligible.items()
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
         self._total_orders_sent += len(tasks)
 
-        # Salva resultados em batch
+        # Salva resultados e processa gestão de risco
         await self._save_results(results)
 
     # ── Persistência de resultados ─────────────────────────────────────────
 
     async def _save_results(self, results: list) -> None:
-        """Batch insert dos resultados na tabela trade_history."""
+        """Batch insert dos resultados + atualiza RiskManager por cliente."""
         rows_to_insert = []
         for res in results:
             if isinstance(res, Exception):
@@ -206,6 +231,13 @@ class DerivEngine:
                 continue
             if isinstance(res, dict):
                 rows_to_insert.append(res)
+
+                # ── Processa resultado no RiskManager ──────────────────
+                uid    = res.get("user_id", "")
+                status = res.get("status", "")
+                profit = float(res.get("profit", 0))
+                if status in ("won", "lost"):
+                    self._risk_manager.process_result(uid, status, profit)
 
         if not rows_to_insert:
             return
