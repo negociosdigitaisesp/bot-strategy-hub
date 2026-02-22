@@ -1,11 +1,8 @@
 """
 deriv_engine/market_analyzer.py — Analisador de mercado em tempo real.
 
-Reutiliza a lógica já existente no bug-deriv-engine:
-  - SignalEngine (chi-square, confidence score, DIGITDIFF)
-  - Qualificador (buffer de dígitos)
-  - HealthGuard (circuit breaker, RTT)
-  - PayoutMonitor (monitoramento de payouts)
+Usa o módulo autocontido signal_core.py (SignalEngine, Qualificador,
+HealthGuard, PayoutMonitor) — tudo inline, sem dependências externas.
 
 1 conexão WebSocket por símbolo — compartilhada por TODOS os clientes.
 Nunca abre conexão por cliente. Máximo de 5 WS simultâneos (um por ativo).
@@ -13,31 +10,24 @@ Nunca abre conexão por cliente. Máximo de 5 WS simultâneos (um por ativo).
 import asyncio
 import json
 import logging
-import sys
 import time
 from typing import TYPE_CHECKING
 
 import websockets
-
-# Adiciona o diretório pai (bug-deriv-engine) ao path para importar módulos existentes
-sys.path.insert(0, "/home/ubuntu/bug_deriv_engine")
 
 from config import (
     ATIVOS,
     DERIV_WSS_PRIMARY,
     DERIV_WSS_FALLBACK,
     LGN_MIN_TRADES,
-    RTT_MAX_MS,
-    RTT_INTERVAL_S,
-    DIGIT_WINDOW,
-    PAYOUT_WINDOW,
-    PAYOUT_AMOSTRAS_MIN,
-    CHISQUARE_P_MIN,
-    DIGIT_AMOSTRAS_MIN,
-    PAYOUT_PERCENTIL_MIN,
-    PAYOUT_CV_MAX,
-    DIGITO_DIFFERS,
     RECONNECT_BACKOFF_S,
+)
+
+from signal_core import (
+    SignalEngine,
+    Qualificador,
+    HealthGuard,
+    PayoutMonitor,
 )
 
 if TYPE_CHECKING:
@@ -45,54 +35,27 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("MARKET_ANALYZER")
 
-# ── Importações dos módulos existentes (bug-deriv-engine) ───────────────
-try:
-    from engine.signal_engine import SignalEngine
-    from engine.qualificador import Qualificador
-    from engine.health_guard import HealthGuard
-    from engine.payout_monitor import PayoutMonitor
-    _MODULES_LOADED = True
-except ImportError as e:
-    logger.warning(f"Módulos do bug-deriv-engine não encontrados: {e}. Usando stub.")
-    _MODULES_LOADED = False
-
-
-class _StubSignalEngine:
-    """Stub usado em desenvolvimento local quando os módulos do engine não estão no path."""
-    total_trades = 0
-
-    def processar_tick(self, ativo, digito, quote, epoch, rtt_ms):
-        return None  # Nunca emite sinal (apenas para rodar sem os módulos reais)
-
 
 class MarketAnalyzer:
     """
     Conecta em 1 WebSocket por ativo e analisa o mercado em tempo real.
-
-    Ciclo de vida:
-      1. Para cada ativo em ATIVOS, cria uma task asyncio de tick listener
-      2. Cada task faz subscribe de ticks e chama SignalEngine.processar_tick()
-      3. Quando SignalEngine emite sinal → chama engine.on_signal()
-      4. Se a conexão cair, reconecta após RECONNECT_BACKOFF_S segundos
     """
 
     def __init__(self) -> None:
-        if _MODULES_LOADED:
-            self._payout_monitor = PayoutMonitor()
-            self._qualificador   = Qualificador()
-            self._health_guard   = HealthGuard()
-            self._signal_engine  = SignalEngine(
-                payout_monitor=self._payout_monitor,
-                qualificador=self._qualificador,
-                health_guard=self._health_guard,
-                lgn_min=LGN_MIN_TRADES,
-                total_trades_inicial=0,
-            )
-        else:
-            self._signal_engine = _StubSignalEngine()
+        self._payout_monitor = PayoutMonitor()
+        self._qualificador   = Qualificador()
+        self._health_guard   = HealthGuard()
+        self._signal_engine  = SignalEngine(
+            payout_monitor=self._payout_monitor,
+            qualificador=self._qualificador,
+            health_guard=self._health_guard,
+            lgn_min=LGN_MIN_TRADES,
+            total_trades_inicial=0,
+        )
 
         self._rtt_ms: float = 0.0
-        logger.info("MarketAnalyzer inicializado.")
+        logger.info("MarketAnalyzer inicializado com SignalEngine real.")
+
 
     async def run(self, engine: "DerivEngine") -> None:
         """
