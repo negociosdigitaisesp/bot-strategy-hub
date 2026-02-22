@@ -159,7 +159,7 @@ class SignalEngine:
         self._lgn_min = lgn_min
         self.total_trades = total_trades_inicial
         self._ultimo_sinal_ts: float = 0.0
-        self._cooldown_segundos: float = 30.0
+        self._cooldown_segundos: float = 45.0
         self._wins = 0
         self._total_validations = 0
         self._pending_validation: dict[str, int] = {}
@@ -175,12 +175,68 @@ class SignalEngine:
         return p_valor > 0.20, round(p_valor, 4)
 
     def _digito_menor_risco(self, ativo: str) -> tuple[int, float]:
+        """Seleciona o dígito com menor risco para DIGITDIFF.
+
+        Melhorias v2:
+          1. Janela expandida: 50 ticks (era 20) — mais estabilidade
+          2. Blacklist de recência: ignora dígitos que apareceram nos últimos 5 ticks
+          3. Consenso multi-janela: o dígito frio deve ser frio em 2+ janelas
+          4. Frequência máxima: rejeita dígitos com freq > 8% (não são frios o bastante)
+        """
         digitos = list(self._qual.digitos[ativo])
-        janela = digitos[-20:]
-        contagem = Counter(janela)
-        frequencias = {d: contagem.get(d, 0) / 20 for d in range(10)}
-        digito_frio = min(frequencias, key=frequencias.get)
-        return digito_frio, frequencias[digito_frio]
+        n = len(digitos)
+
+        # Blacklist: dígitos que apareceram nos últimos 5 ticks ("quentes")
+        recentes = set(digitos[-5:]) if n >= 5 else set()
+
+        # Janela primária: 50 ticks
+        janela_50 = digitos[-50:] if n >= 50 else digitos
+        contagem_50 = Counter(janela_50)
+        freq_50 = {d: contagem_50.get(d, 0) / len(janela_50) for d in range(10)}
+
+        # Janela secundária: 30 ticks (para consenso)
+        janela_30 = digitos[-30:] if n >= 30 else digitos
+        contagem_30 = Counter(janela_30)
+        freq_30 = {d: contagem_30.get(d, 0) / len(janela_30) for d in range(10)}
+
+        # Filtra candidatos:
+        #   - Não pode ter aparecido nos últimos 5 ticks
+        #   - Frequência <= 8% na janela de 50
+        candidatos = {
+            d: freq_50[d]
+            for d in range(10)
+            if d not in recentes and freq_50[d] <= 0.08
+        }
+
+        # Se não há candidatos seguros, relaxa filtro (remove recência)
+        if not candidatos:
+            candidatos = {
+                d: freq_50[d]
+                for d in range(10)
+                if freq_50[d] <= 0.08
+            }
+
+        # Se ainda não há, usa o menos frequente sem filtros
+        if not candidatos:
+            candidatos = freq_50
+
+        # Seleciona o mais frio entre candidatos
+        digito_frio = min(candidatos, key=candidatos.get)
+
+        # Verificação de consenso: o dígito frio na janela 50
+        # também deve ser frio na janela 30
+        frio_30 = min(freq_30, key=freq_30.get)
+        if digito_frio != frio_30 and freq_30.get(digito_frio, 1.0) > 0.10:
+            # Sem consenso — penaliza o confidence score
+            # Retorna freq mais alta para que o confidence gate rejeite
+            logger.debug(
+                f"[SIGNAL] Sem consenso de dígito frio para {ativo}: "
+                f"50t={digito_frio}({freq_50[digito_frio]:.1%}) vs "
+                f"30t={frio_30}({freq_30[frio_30]:.1%})"
+            )
+            return digito_frio, max(freq_50[digito_frio], 0.12)
+
+        return digito_frio, freq_50[digito_frio]
 
     def _calcular_confidence(self, ativo: str, digito_alvo: int, freq_minima: float, p_estabilidade: float) -> float:
         digitos = list(self._qual.digitos[ativo])
@@ -275,7 +331,7 @@ class SignalEngine:
 
         # Gate 7: Confidence Score
         confidence = self._calcular_confidence(melhor_ativo, digito_alvo, freq_minima, melhor_p)
-        if confidence < 0.70:
+        if confidence < 0.80:
             return None
 
         # Emitir sinal
