@@ -190,62 +190,75 @@ export default function OracleAI() {
         setLogs(prev => [entry, ...prev].slice(0, MAX_LOGS));
     }, []);
 
-    // ── Supabase Realtime: escutar trade_history para resultados ─────────
+    // ── Polling: verificar trade_history a cada 5s para resultados ───────
+    const lastTradeCheckRef = useRef<string>(new Date().toISOString());
+    const processedTradesRef = useRef<Set<string>>(new Set());
+
     useEffect(() => {
         const userId = account?.loginid;
         if (!userId || !isActive) return;
 
-        const channel = supabase
-            .channel("trade_results")
-            .on(
-                "postgres_changes" as any,
-                {
-                    event: "INSERT",
-                    schema: "public",
-                    table: "trade_history",
-                    filter: `user_id=eq.${userId}`,
-                },
-                (payload: any) => {
-                    const row = payload.new;
-                    if (!row) return;
+        // Reset on activation
+        lastTradeCheckRef.current = new Date().toISOString();
+        processedTradesRef.current = new Set();
+
+        const pollInterval = setInterval(async () => {
+            try {
+                const { data: trades, error } = await supabase
+                    .from("trade_history")
+                    .select("*")
+                    .eq("user_id", userId)
+                    .gte("executed_at", lastTradeCheckRef.current)
+                    .order("executed_at", { ascending: true });
+
+                if (error) {
+                    console.error("[OracleAI] Polling error:", error.message);
+                    return;
+                }
+
+                if (!trades || trades.length === 0) return;
+
+                for (const row of trades) {
+                    // Evita processar o mesmo trade 2x
+                    if (processedTradesRef.current.has(row.id)) continue;
+                    processedTradesRef.current.add(row.id);
 
                     const status = row.status as string;
-                    const profit = parseFloat(row.profit) || 0;
+                    const tradeProfit = parseFloat(row.profit) || 0;
                     const contractId = row.contract_id || "?";
 
-                    // Log de ordem aberta
-                    if (status === "opened" || status === "won" || status === "lost") {
-                        addLog(`[✅ ORDEN] Contract: ${contractId} | Stake: ${row.stake}`, "target");
-                    }
-
-                    // Atualizar stats se for resultado final
+                    // Log de trade
                     if (status === "won" || status === "lost") {
                         const isWin = status === "won";
                         setStats(prev => ({
                             wins: prev.wins + (isWin ? 1 : 0),
                             losses: prev.losses + (isWin ? 0 : 1)
                         }));
-                        setProfit(prev => prev + profit);
+                        setProfit(prev => prev + tradeProfit);
 
                         addLog(
-                            `[🏁 RESULTADO] ${isWin ? "✅ VICTORIA" : "❌ DERROTA"} (${profit > 0 ? "+" : ""}${profit.toFixed(2)} USD)`,
+                            `[🏁 RESULTADO] ${isWin ? "✅ VICTORIA" : "❌ DERROTA"} | ${row.contract_type} ${row.strategy_id} | ${tradeProfit > 0 ? "+" : ""}${tradeProfit.toFixed(2)} USD`,
                             isWin ? "target" : "discard"
                         );
 
                         setWinFlash(isWin ? "win" : "loss");
                         setTimeout(() => setWinFlash(null), 1200);
-                    }
-
-                    if (status === "auth_error" || status === "order_error" || status === "exception") {
-                        addLog(`[⚠️ ERROR] ${status}: contract ${contractId}`, "discard");
+                    } else if (status === "auth_error" || status === "order_error" || status === "exception") {
+                        addLog(`[⚠️ ERROR] ${status}: ${contractId}`, "discard");
+                    } else {
+                        addLog(`[📤 ORDEM] ${status} | Contract: ${contractId} | Stake: ${row.stake}`, "info");
                     }
                 }
-            )
-            .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+                // Atualiza checkpoint para próximo poll
+                const lastTrade = trades[trades.length - 1];
+                lastTradeCheckRef.current = lastTrade.executed_at;
+            } catch (err) {
+                console.error("[OracleAI] Poll exception:", err);
+            }
+        }, 5000);
+
+        return () => clearInterval(pollInterval);
     }, [account?.loginid, isActive, addLog]);
 
     useEffect(() => {
