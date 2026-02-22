@@ -48,8 +48,8 @@ export default function IQBotPanel({ trader: traderProp, onVoltar }) {
     /* ─── Hook de trades específicos do bot ─── */
     const { trades, newTradeId, loadMore, hasMore, carregando: carregandoTrades } = useIQTrades(bot?.id);
 
-    /* Para o modal de confirmação de modo, o stake vem das configurações do bot */
-    const stakeAtual = parseFloat(bot?.stake) || 10;
+    /* Para o modal de confirmação — stake vem de stake_amount (nome real da coluna) */
+    const stakeAtual = parseFloat(bot?.stake_amount) || 10;
 
     /* ─── Guarda de segurança: sem trader → não renderiza ─── */
     if (!trader) return null;
