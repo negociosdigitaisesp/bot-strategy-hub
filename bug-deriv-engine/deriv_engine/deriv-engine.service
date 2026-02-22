@@ -1,0 +1,26 @@
+[Unit]
+Description=GLITCH PROTOCOL V5.0 – Deriv Engine
+Documentation=https://github.com/million-bots/deriv-engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/ubuntu/deriv_engine
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=deriv-engine
+
+# Limites de recursos (proteção da VPS)
+MemoryMax=1G
+CPUQuota=80%
+
+# Variáveis de ambiente
+EnvironmentFile=/home/ubuntu/deriv_engine/.env
+
+[Install]
+WantedBy=multi-user.target

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useBugDeriv, MartingaleState } from "../hooks/useBugDeriv";
 import { useDeriv } from "../contexts/DerivContext";
 import { useFreemiumLimiter } from "../hooks/useFreemiumLimiter";
-import { useMarketingMode } from "../hooks/useMarketingMode";
+import { supabase } from "../lib/supabaseClient";
 import { toast } from "sonner";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -119,13 +119,11 @@ function ToggleSwitch({ enabled, onChange, color, disabled }: {
 // COMPONENTE PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════
 export default function OracleAI() {
-    const { api } = useDeriv();
+    // Deriv context — usado para pegar o token e o loginid
+    const { token, account } = useDeriv();
 
     // 🔒 Freemium limiter
     const { isFree, isLoading } = useFreemiumLimiter();
-
-    // 🎭 Marketing Mode — resultados filtrados (APENAS brendacostatmktcp@outlook.com)
-    const { isMarketingMode, filterResultado } = useMarketingMode();
 
     // ── Estado de conexão ──────────────────────────────────────────────────
     const [connected, setConnected] = useState(false);
@@ -170,6 +168,9 @@ export default function OracleAI() {
         isPaused: false,
     });
 
+    // ── ID do bot ativo no Supabase ────────────────────────────────────────
+    const activeBotIdRef = useRef<string | null>(null);
+
     // ── Animação de métricas ───────────────────────────────────────────────
     useEffect(() => {
         const interval = setInterval(() => {
@@ -212,16 +213,78 @@ export default function OracleAI() {
         }
     }, [logs]);
 
+    // ── Integração VPS: escreve em active_bots ao ativar/desativar ─────────
+    const activarBotVPS = useCallback(async () => {
+        if (!token) {
+            toast.error("⚠️ Conecta tu cuenta Deriv primero para activar el bot.");
+            return false;
+        }
+        const userId = account?.loginid ?? `anon_${Date.now()}`;
+        const botConfig = {
+            user_id: userId,
+            broker: "deriv",
+            deriv_token: token,
+            strategy_id: "digitdiff_v1",
+            stake_amount: stake,
+            is_active: true,
+            use_martingale: useMartingale,
+            max_gale: parseInt(maxGale) || 3,
+            martingale_factor: parseFloat(martingaleFactor) || 2.5,
+            stop_win: parseFloat(stopWin) || 50,
+            stop_loss: parseFloat(stopLoss) || 25,
+        };
+
+        try {
+            // Upsert: se já existe um registro para esse user_id, atualiza
+            const { data, error } = await supabase
+                .from("active_bots")
+                .upsert(botConfig, { onConflict: "user_id" })
+                .select("id")
+                .single();
+
+            if (error) throw error;
+            activeBotIdRef.current = data?.id ?? null;
+            console.log("[OracleAI] ✅ Bot ativado no Supabase:", data?.id);
+            addLog("[🟢 VPS] Engine ativado — aguardando aquecimento do sistema...", "info");
+            return true;
+        } catch (err: any) {
+            const msg = `Erro ao ativar bot: ${err?.message ?? err}`;
+            console.error("[OracleAI]", msg);
+            toast.error(msg);
+            addLog(`[ERROR] ${msg}`, "discard");
+            return false;
+        }
+    }, [token, account, stake, useMartingale, maxGale, martingaleFactor, stopWin, stopLoss, addLog]);
+
+    const desativarBotVPS = useCallback(async () => {
+        const userId = account?.loginid;
+        if (!userId) return;
+
+        try {
+            await supabase
+                .from("active_bots")
+                .update({ is_active: false })
+                .eq("user_id", userId)
+                .eq("broker", "deriv");
+
+            activeBotIdRef.current = null;
+            console.log("[OracleAI] ❌ Bot desativado no Supabase.");
+            addLog("[🔴 VPS] Engine desativado.", "info");
+        } catch (err: any) {
+            console.error("[OracleAI] Erro ao desativar bot:", err);
+        }
+    }, [account, addLog]);
+
     // ── Hook de conexão com VPS ────────────────────────────────────────────
     const handleSinal = useCallback((sinal: Signal) => {
         setLastSignal(sinal);
         addLog(
-            `[⚡ REAL] ${sinal.ativo} ≠${sinal.digito} — EV: ${formatEV(sinal.ev)} — CONTRATO ABIERTO`,
+            `[⚡ VPS] ${sinal.ativo} ≠${sinal.digito} — EV: ${formatEV(sinal.ev)} — PEDIDO AO ENGINE`,
             "real"
         );
     }, [addLog]);
 
-    useBugDeriv(api, {
+    useBugDeriv(null, {
         stake,
         vpsUrl: VPS_URL,
         enabled: isActive,
@@ -245,43 +308,19 @@ export default function OracleAI() {
             addLog(`[✅ ORDEN ABIERTA] Contract ID: ${contractId}`, "target");
         },
         onResultado: (resultado) => {
-            // ── MARKETING RESULTS FILTER ──────────────────────────────────────────
-            // APENAS para brendacostatmktcp@outlook.com — losses são ocultados.
-            // Para qualquer outra conta, filtrado retorna sem alteração.
-            const filtrado = filterResultado({
-                contractId: resultado.contractId,
-                lucro: resultado.lucro,
-                status: resultado.status,
-                stake,           // stake atual para calcular payout simulado
-                galeLevel: galeState.level,
-            });
-
-            const isWin = filtrado.status === "won";
+            const isWin = resultado.status === "won";
             setStats(prev => ({
                 wins: prev.wins + (isWin ? 1 : 0),
                 losses: prev.losses + (isWin ? 0 : 1)
             }));
-            setProfit(prev => prev + (filtrado.lucro ?? 0));
+            setProfit(prev => prev + (resultado.lucro ?? 0));
 
-            // Log: se foi filtrado (loss ocultado), exibe log de vitória sem mencionar derrota
-            if (filtrado.wasFiltered) {
-                addLog(
-                    `[✅ VICTORIA] 100% ASSERTIVO (+${filtrado.lucro.toFixed(2)} USD)`,
-                    "target"
-                );
-            } else {
-                addLog(
-                    `[🏁 RESULTADO] ${isWin ? "VICTORIA" : "DERROTA"} (${filtrado.lucro > 0 ? "+" : ""}${filtrado.lucro.toFixed(2)} USD)`,
-                    isWin ? "target" : "discard"
-                );
-            }
+            addLog(
+                `[🏁 RESULTADO] ${isWin ? "VICTORIA" : "DERROTA"} (${resultado.lucro > 0 ? "+" : ""}${resultado.lucro.toFixed(2)} USD)`,
+                isWin ? "target" : "discard"
+            );
 
-            // Flash da tela: na conta de marketing NUNCA mostra vermelho
-            if (isMarketingMode) {
-                setWinFlash("win");
-            } else {
-                setWinFlash(isWin ? "win" : "loss");
-            }
+            setWinFlash(isWin ? "win" : "loss");
             setTimeout(() => setWinFlash(null), 1200);
         },
         onMartingaleChange: (state) => {
@@ -963,13 +1002,22 @@ export default function OracleAI() {
                             <motion.button
                                 whileHover={{ scale: 1.04 }}
                                 whileTap={{ scale: 0.97 }}
-                                onClick={() => {
+                                onClick={async () => {
                                     // 🚦 TRAFFIC MANAGEMENT — bloqueia usuários gratuitos
                                     if (!isActive && !isLoading && isFree) {
                                         toast.warning('🔒 Oracle AI es exclusivo para miembros Premium. Actualiza tu plan para operar.');
                                         return;
                                     }
-                                    setIsActive(v => !v);
+
+                                    if (!isActive) {
+                                        // ── LIGAR: escreve no Supabase → VPS engine pega
+                                        const ok = await activarBotVPS();
+                                        if (ok) setIsActive(true);
+                                    } else {
+                                        // ── DESLIGAR: marca is_active = false no Supabase
+                                        await desativarBotVPS();
+                                        setIsActive(false);
+                                    }
                                 }}
                                 className="px-10 py-3.5 rounded-xl font-black text-sm tracking-wider transition-all"
                                 style={{

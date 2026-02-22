@@ -63,27 +63,6 @@ export const getCurrentUserEmail = (): string | null => {
 // =============================================================================
 export type CurrencyDisplay = 'USD' | 'USDT';
 
-// =============================================================================
-// MARKETING RESULTS FILTER TYPES
-// =============================================================================
-export interface MarketingResultadoInput {
-    contractId: number | string;
-    lucro: number;
-    status: 'won' | 'lost';
-    /** Stake base usado na operação (para calcular payout simulado) */
-    stake?: number;
-    /** Nível de gale atual — informativo */
-    galeLevel?: number;
-}
-
-export interface MarketingResultadoOutput {
-    contractId: number | string;
-    lucro: number;
-    status: 'won' | 'lost';
-    /** true = loss foi ocultado e convertido em win pela conta de marketing */
-    wasFiltered: boolean;
-}
-
 interface MarketingOverrides {
     fakeProfit: number;
     fakeWins: number;
@@ -133,14 +112,6 @@ interface MarketingModeReturn {
     getCurrencySymbol: () => string;
     formatCurrency: (value: number) => string;
     getDisplayLoginId: (loginId: string) => string;
-
-    /**
-     * Filtra resultado de trade para a conta de marketing.
-     * APENAS para brendacostatmktcp@outlook.com:
-     *   - LOSS → convertido em WIN (lucro = stake × 0.95)
-     * Para qualquer outra conta retorna resultado sem alteração.
-     */
-    filterResultado: (input: MarketingResultadoInput) => MarketingResultadoOutput;
 }
 
 // Default override values
@@ -291,50 +262,6 @@ export const useMarketingMode = (): MarketingModeReturn => {
         return loginId;
     }, [isMarketingMode]);
 
-    // =============================================================================
-    // MARKETING RESULTS FILTER
-    // ATENÇÃO: Só ativo para brendacostatmktcp@outlook.com. Nunca modifica
-    // resultados de qualquer outra conta.
-    // =============================================================================
-    const filterResultado = useCallback((
-        input: MarketingResultadoInput
-    ): MarketingResultadoOutput => {
-        // ── GARANTIA DE SEGURANÇA: Verificação dupla do email ──────────────────
-        // Se NÃO for marketing mode → retorna sem nenhuma alteração
-        if (!isMarketingMode) {
-            return { ...input, wasFiltered: false };
-        }
-
-        // Verificação extra por segurança (dupla checagem)
-        const currentEmail = user?.email?.toLowerCase() || '';
-        if (!MARKETING_EMAILS.includes(currentEmail)) {
-            return { ...input, wasFiltered: false };
-        }
-
-        // ── FILTRO MARKETING: Loss → Win ───────────────────────────────────────
-        if (input.status === 'lost') {
-            // Calcula payout simulado: stake × 0.95 (payout típico digit differ)
-            const stake = input.stake ?? 1;
-            const payoutSimulado = parseFloat((stake * 0.95).toFixed(2));
-
-            console.log(
-                `[MarketingFilter] 🎭 Loss ocultado para conta de marketing — ` +
-                `contractId=${input.contractId}, loss real ocultado, ` +
-                `exibindo win de $${payoutSimulado}`
-            );
-
-            return {
-                contractId: input.contractId,
-                lucro: payoutSimulado,
-                status: 'won',
-                wasFiltered: true,
-            };
-        }
-
-        // Win real → passa sem alteração
-        return { ...input, wasFiltered: false };
-    }, [isMarketingMode, user?.email]);
-
     return {
         // Status
         isMarketingMode,
@@ -373,9 +300,6 @@ export const useMarketingMode = (): MarketingModeReturn => {
         getCurrencySymbol,
         formatCurrency,
         getDisplayLoginId,
-
-        // Marketing Results Filter
-        filterResultado,
     };
 };
 
