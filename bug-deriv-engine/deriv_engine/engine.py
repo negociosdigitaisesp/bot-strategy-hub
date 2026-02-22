@@ -95,36 +95,43 @@ class DerivEngine:
                 logger.error(f"Erro no sync de clientes: {e}")
 
     def _sync_clients_blocking(self) -> None:
-        """Sync bloqueante — rodado em executor para não bloquear event loop."""
+        """Sync bloqueante — rodado em executor para não bloquear event loop.
+
+        Estratégia: reconstrói o dict de clientes ativos a cada ciclo.
+        Isso garante que:
+          - Novos clientes / reativados são adicionados
+          - Clientes desativados são removidos
+          - Configs atualizadas (stake, martingale, etc.) são aplicadas
+          - Re-toggles rápidos (OFF→ON em < 5s) funcionam corretamente
+        """
         resp = (
             self._supabase.table("active_bots")
             .select("*")
             .eq("broker", "deriv")
             .execute()
         )
-        rows = {row["user_id"]: row for row in resp.data}
-        current_ids = set(self.active_clients.keys())
-        db_ids      = set(rows.keys())
 
-        # Novos clientes ou reativados
-        for uid, row in rows.items():
-            if row["is_active"] and uid not in current_ids:
-                self.active_clients[uid] = self._row_to_client(row)
-                logger.info(
-                    f"✅ Cliente ativado: {uid} — "
-                    f"stake={row['stake_amount']} "
-                    f"(total: {len(self.active_clients)})"
-                )
-            elif not row["is_active"] and uid in current_ids:
-                # Cliente desativou o bot
-                self.active_clients.pop(uid, None)
-                logger.info(f"❌ Cliente desativado: {uid} (total: {len(self.active_clients)})")
+        # Constrói novo dict apenas com clientes ativos
+        new_active: dict[str, dict] = {}
+        for row in resp.data:
+            if row["is_active"]:
+                new_active[row["user_id"]] = self._row_to_client(row)
 
-        # Registros deletados do banco
-        for uid in list(current_ids):
-            if uid not in db_ids:
-                self.active_clients.pop(uid, None)
-                logger.info(f"❌ Cliente removido (deleted): {uid} (total: {len(self.active_clients)})")
+        # Detecta mudanças para logging
+        old_ids = set(self.active_clients.keys())
+        new_ids = set(new_active.keys())
+
+        for uid in (new_ids - old_ids):
+            logger.info(
+                f"✅ Cliente ativado: {uid} — "
+                f"stake={new_active[uid]['stake']} "
+                f"(total: {len(new_active)})"
+            )
+        for uid in (old_ids - new_ids):
+            logger.info(f"❌ Cliente desativado: {uid} (total: {len(new_active)})")
+
+        # Substitui o dict inteiro (atômico para o event loop)
+        self.active_clients = new_active
 
     @staticmethod
     def _row_to_client(row: dict) -> dict[str, Any]:

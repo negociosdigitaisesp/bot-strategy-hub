@@ -27,6 +27,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FILES_TO_UPLOAD = [
     "config.py",
     "supabase_client.py",
+    "signal_core.py",
     "order_executor.py",
     "market_analyzer.py",
     "engine.py",

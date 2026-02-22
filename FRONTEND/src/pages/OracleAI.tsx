@@ -170,6 +170,19 @@ export default function OracleAI() {
 
     // ── ID do bot ativo no Supabase ────────────────────────────────────────
     const activeBotIdRef = useRef<string | null>(null);
+    const [dbUserId, setDbUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data }) => {
+            setDbUserId(data.session?.user?.id || null);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setDbUserId(session?.user?.id || null);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
 
     // ── Animação de métricas ───────────────────────────────────────────────
@@ -195,7 +208,7 @@ export default function OracleAI() {
     const processedTradesRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
-        const userId = account?.loginid;
+        const userId = dbUserId;
         if (!userId || !isActive) return;
 
         // Reset on activation
@@ -259,7 +272,7 @@ export default function OracleAI() {
         }, 5000);
 
         return () => clearInterval(pollInterval);
-    }, [account?.loginid, isActive, addLog]);
+    }, [dbUserId, isActive, addLog]);
 
     useEffect(() => {
         if (!isActive) return;
@@ -285,13 +298,16 @@ export default function OracleAI() {
         }
     }, [logs]);
 
-    // ── Integração VPS: escreve em active_bots ao ativar/desativar ─────────
     const activarBotVPS = useCallback(async () => {
         if (!token) {
             toast.error("⚠️ Conecta tu cuenta Deriv primero para activar el bot.");
             return false;
         }
-        const userId = account?.loginid ?? `anon_${Date.now()}`;
+        const userId = dbUserId;
+        if (!userId) {
+            toast.error("⚠️ Sesión no válida. Inicia sesión en la plataforma primero.");
+            return false;
+        }
         const botConfig = {
             user_id: userId,
             broker: "deriv",
@@ -308,14 +324,18 @@ export default function OracleAI() {
 
         try {
             // Verifica se já existe registro para esse user_id
-            const { data: existing } = await supabase
+            const { data: existingRecords, error: fetchError } = await supabase
                 .from("active_bots")
                 .select("id")
                 .eq("user_id", userId)
                 .eq("broker", "deriv")
-                .maybeSingle();
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+            if (fetchError) throw fetchError;
 
             let recordId: string | null = null;
+            const existing = existingRecords?.[0];
 
             if (existing?.id) {
                 // Já existe → apenas atualiza
@@ -347,26 +367,33 @@ export default function OracleAI() {
             addLog(`[ERROR] ${msg}`, "discard");
             return false;
         }
-    }, [token, account, stake, useMartingale, maxGale, martingaleFactor, stopWin, stopLoss, addLog]);
+    }, [token, dbUserId, stake, useMartingale, maxGale, martingaleFactor, stopWin, stopLoss, addLog]);
 
     const desativarBotVPS = useCallback(async () => {
-        const userId = account?.loginid;
-        if (!userId) return;
+        const userId = dbUserId;
+        if (!userId) return false;
 
         try {
-            await supabase
+            const { error } = await supabase
                 .from("active_bots")
                 .update({ is_active: false })
                 .eq("user_id", userId)
                 .eq("broker", "deriv");
 
+            if (error) throw error;
+
             activeBotIdRef.current = null;
             console.log("[OracleAI] ❌ Bot desativado no Supabase.");
             addLog("[🔴 VPS] Engine desativado.", "info");
+            return true;
         } catch (err: any) {
-            console.error("[OracleAI] Erro ao desativar bot:", err);
+            const msg = `Erro ao desativar bot: ${err?.message ?? err}`;
+            console.error("[OracleAI]", msg);
+            toast.error(msg);
+            addLog(`[ERROR] ${msg}`, "discard");
+            return false;
         }
-    }, [account, addLog]);
+    }, [dbUserId, addLog]);
 
     // ── Hook de conexão com VPS ────────────────────────────────────────────
     const handleSinal = useCallback((sinal: Signal) => {
@@ -1108,8 +1135,8 @@ export default function OracleAI() {
                                         if (ok) setIsActive(true);
                                     } else {
                                         // ── DESLIGAR: marca is_active = false no Supabase
-                                        await desativarBotVPS();
-                                        setIsActive(false);
+                                        const ok = await desativarBotVPS();
+                                        if (ok) setIsActive(false);
                                     }
                                 }}
                                 className="px-10 py-3.5 rounded-xl font-black text-sm tracking-wider transition-all"
