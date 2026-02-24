@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { DerivStatus } from './DerivStatus';
+import { BrokerStatusWidget } from './BrokerStatusWidget';
 import { supabase } from '../lib/supabaseClient';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
 import { useMarketingMode } from '../hooks/useMarketingMode';
@@ -168,96 +168,108 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
         }
     };
 
-    const navItems = [
+    const navSections = [
         {
-            name: 'Conectar con Deriv',
-            icon: <Plug size={20} />,
-            path: '/conectar-deriv',
-            isImportant: true,
-            requiresUpgrade: false,
-            description: 'Conecte su cuenta'
+            label: 'ÁREA DEL USUARIO',
+            items: [
+                {
+                    name: 'Mis Brokers',
+                    icon: <Plug size={20} />,
+                    path: '/mis-brokers',
+                    isImportant: true,
+                    requiresUpgrade: false,
+                    description: 'Central de conexiones'
+                },
+                {
+                    name: 'Gestión del Riesgo',
+                    icon: <ShieldCheck size={20} />,
+                    path: '/gestion-riesgo',
+                    isImportant: true,
+                    requiresUpgrade: false,
+                    description: 'Protección inteligente'
+                },
+                {
+                    name: 'Dashboard',
+                    icon: <LayoutDashboard size={20} />,
+                    path: '/',
+                    isImportant: false,
+                    requiresUpgrade: false,
+                    description: 'Panel de Control'
+                },
+            ]
         },
         {
-            name: 'Gestión del Riesgo',
-            icon: <ShieldCheck size={20} />,
-            path: '/gestion-riesgo',
-            isImportant: true,
-            requiresUpgrade: false,
-            description: 'Protección inteligente'
+            label: 'ECOSISTEMA DERIV',
+            items: [
+                {
+                    name: 'ORACLE AI',
+                    icon: <Atom size={20} />,
+                    path: '/oracle-ai',
+                    isImportant: true,
+                    requiresUpgrade: true,
+                    description: 'Maestro v3',
+                    badge: '2.2X'
+                },
+                {
+                    name: 'Efecto Midas',
+                    icon: <Coins size={20} />,
+                    path: '/efecto-midas',
+                    isImportant: false,
+                    requiresUpgrade: true,
+                    description: 'Shadow Mode - Digit Differs'
+                },
+                {
+                    name: 'Bots',
+                    icon: <Bot size={20} />,
+                    path: '/bots',
+                    isImportant: false,
+                    requiresUpgrade: true,
+                    description: 'Seleccionar estrategia'
+                },
+            ]
         },
         {
-            name: 'Dashboard',
-            icon: <LayoutDashboard size={20} />,
-            path: '/',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Panel de Control'
-        },
-
-        {
-            name: 'ORACLE AI',
-            icon: <Atom size={20} />,
-            path: '/oracle-ai',
-            isImportant: true,
-            requiresUpgrade: true,
-            description: 'Maestro v3',
-            badge: '2.2X'
-        },
-
-
-        {
-            name: 'Bots',
-            icon: <Bot size={20} />,
-            path: '/bots',
-            isImportant: false,
-            requiresUpgrade: true,
-            description: 'Seleccionar estrategia'
-        },
-
-        {
-            name: 'Efecto Midas',
-            icon: <Coins size={20} />,
-            path: '/efecto-midas',
-            isImportant: false,
-            requiresUpgrade: true,
-            description: 'Shadow Mode - Digit Differs'
-        },
-
-        {
-            name: 'IQ Option',
-            icon: <TrendingUp size={20} />,
-            path: '/iq-option',
-            isImportant: false,
-            requiresUpgrade: true,
-            description: 'Copy Trading Pro',
-            badge: 'NOVO'
-        },
-
-
-
-        {
-            name: 'Tutorial',
-            icon: <FileText size={20} />,
-            path: '/tutorial',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Academia de Trading'
+            label: 'ECOSISTEMA IQ OPTION',
+            items: [
+                {
+                    name: 'Copy Trading Pro',
+                    icon: <TrendingUp size={20} />,
+                    path: '/iq-option',
+                    isImportant: false,
+                    requiresUpgrade: true,
+                    description: 'Copy Trading automatizado',
+                    badge: 'NUEVO'
+                },
+            ]
         },
         {
-            name: 'Programa de Socios',
-            icon: <Handshake size={20} />,
-            path: '/programa-socios',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Gana 60% de comisión'
-        },
-        {
-            name: 'Configuración',
-            icon: <Settings size={20} />,
-            path: '/settings',
-            isImportant: false,
-            requiresUpgrade: false,
-            description: 'Ajustes del sistema'
+            label: 'AYUDA',
+            items: [
+                {
+                    name: 'Tutorial',
+                    icon: <FileText size={20} />,
+                    path: '/tutorial',
+                    isImportant: false,
+                    requiresUpgrade: false,
+                    description: 'Academia de Trading'
+                },
+                {
+                    name: 'Programa de Socios',
+                    icon: <Handshake size={20} />,
+                    path: '/programa-socios',
+                    isImportant: false,
+                    requiresUpgrade: false,
+                    description: 'Gana 60% de comisión'
+                },
+                {
+                    name: 'Configuración',
+                    icon: <Settings size={20} />,
+                    path: '/settings',
+                    isImportant: false,
+                    requiresUpgrade: false,
+                    description: 'Ajustes del sistema'
+                }
+            ]
         }
     ];
 
@@ -351,96 +363,111 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                             </div>
 
                             {/* Bottom row: Balance Status */}
-                            {(!collapsed || isMobile) && <DerivStatus />}
+                            {(!collapsed || isMobile) && <BrokerStatusWidget />}
                         </div>
                     </div>
 
                     <nav className={cn(
-                        "flex-1 px-3 py-4 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-sidebar-accent scrollbar-track-transparent",
+                        "flex-1 px-3 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-sidebar-accent scrollbar-track-transparent",
                         isMobile && "bg-background/95"
                     )}>
-                        {navItems.map((item, index) => {
-                            const isActive = location.pathname === item.path;
-                            const showUpgradeIndicator = item.requiresUpgrade && !isPro;
-
-                            return (
-                                <Link
-                                    key={item.name}
-                                    to={item.path}
-                                    onClick={() => {
-                                        if (isMobile) toggleSidebar();
-                                    }}
-                                    className={cn(
-                                        "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
-                                        "hover:bg-white/[0.05]",
-                                        isActive && "bg-primary/10 hover:bg-primary/15",
-                                        collapsed && !isMobile && "justify-center px-2"
-                                    )}
-                                >
-                                    {/* Left accent bar for active */}
-                                    <div className={cn(
-                                        "absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full transition-all duration-300",
-                                        isActive ? "bg-primary shadow-lg shadow-primary/50" : "bg-transparent"
-                                    )} />
-
-                                    {/* Icon container */}
-                                    <div className={cn(
-                                        "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
-                                        isActive
-                                            ? "bg-primary/20 text-primary"
-                                            : "text-white/50 group-hover:text-primary group-hover:bg-white/5"
-                                    )}>
-                                        {item.icon}
-                                        {/* Amber Pulse Indicator for Upgrade Items */}
-                                        {showUpgradeIndicator && (
-                                            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                                            </span>
-                                        )}
+                        {navSections.map((section, sectionIndex) => (
+                            <div key={section.label} className={sectionIndex > 0 ? 'mt-4' : ''}>
+                                {/* Section Header */}
+                                {(!collapsed || isMobile) && (
+                                    <div className="px-3 py-2 mb-1">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20">
+                                            {section.label}
+                                        </span>
                                     </div>
+                                )}
+                                {collapsed && !isMobile && sectionIndex > 0 && (
+                                    <div className="mx-2 my-2 h-px bg-white/5" />
+                                )}
 
-                                    {(!collapsed || isMobile) && (
-                                        <div className="flex-1 min-w-0 flex items-center justify-between">
-                                            <div className="flex-1 min-w-0">
-                                                <span className={cn(
-                                                    "block text-sm font-medium truncate transition-colors",
-                                                    isActive ? "text-primary" : "text-white/80 group-hover:text-white"
-                                                )}>
-                                                    {item.name}
-                                                </span>
-                                                <span className="block text-[10px] text-white/40 truncate mt-0.5">
-                                                    {item.description}
-                                                </span>
-                                            </div>
+                                <div className="space-y-1">
+                                    {section.items.map((item) => {
+                                        const isActive = location.pathname === item.path;
+                                        const showUpgradeIndicator = item.requiresUpgrade && !isPro;
 
-                                            {/* Important indicator (subtle) */}
-                                            {item.isImportant && !item.badge && (
-                                                <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-wider bg-primary/20 text-primary border border-primary/30">
-                                                    !
-                                                </span>
-                                            )}
-
-                                            {/* NEW Badge */}
-                                            {item.badge && (
-                                                <span className="ml-2 px-2 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider bg-gradient-to-r from-[#00E5FF] to-[#00D1FF] text-black border border-[#00E5FF]/50 shadow-[0_0_10px_rgba(0,229,255,0.3)] animate-pulse">
-                                                    {item.badge}
-                                                </span>
-                                            )}
-
-                                            <ChevronRight
-                                                size={14}
+                                        return (
+                                            <Link
+                                                key={item.name}
+                                                to={item.path}
+                                                onClick={() => {
+                                                    if (isMobile) toggleSidebar();
+                                                }}
                                                 className={cn(
-                                                    "ml-1 text-white/20 transition-all duration-200",
-                                                    "group-hover:text-white/40 group-hover:translate-x-0.5",
-                                                    isActive && "text-primary/50"
+                                                    "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200",
+                                                    "hover:bg-white/[0.05]",
+                                                    isActive && "bg-primary/10 hover:bg-primary/15",
+                                                    collapsed && !isMobile && "justify-center px-2"
                                                 )}
-                                            />
-                                        </div>
-                                    )}
-                                </Link>
-                            );
-                        })}
+                                            >
+                                                {/* Left accent bar for active */}
+                                                <div className={cn(
+                                                    "absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full transition-all duration-300",
+                                                    isActive ? "bg-primary shadow-lg shadow-primary/50" : "bg-transparent"
+                                                )} />
+
+                                                {/* Icon container */}
+                                                <div className={cn(
+                                                    "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
+                                                    isActive
+                                                        ? "bg-primary/20 text-primary"
+                                                        : "text-white/50 group-hover:text-primary group-hover:bg-white/5"
+                                                )}>
+                                                    {item.icon}
+                                                    {showUpgradeIndicator && (
+                                                        <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {(!collapsed || isMobile) && (
+                                                    <div className="flex-1 min-w-0 flex items-center justify-between">
+                                                        <div className="flex-1 min-w-0">
+                                                            <span className={cn(
+                                                                "block text-sm font-medium truncate transition-colors",
+                                                                isActive ? "text-primary" : "text-white/80 group-hover:text-white"
+                                                            )}>
+                                                                {item.name}
+                                                            </span>
+                                                            <span className="block text-[10px] text-white/40 truncate mt-0.5">
+                                                                {item.description}
+                                                            </span>
+                                                        </div>
+
+                                                        {item.isImportant && !item.badge && (
+                                                            <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-wider bg-primary/20 text-primary border border-primary/30">
+                                                                !
+                                                            </span>
+                                                        )}
+
+                                                        {item.badge && (
+                                                            <span className="ml-2 px-2 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider bg-gradient-to-r from-[#00E5FF] to-[#00D1FF] text-black border border-[#00E5FF]/50 shadow-[0_0_10px_rgba(0,229,255,0.3)] animate-pulse">
+                                                                {item.badge}
+                                                            </span>
+                                                        )}
+
+                                                        <ChevronRight
+                                                            size={14}
+                                                            className={cn(
+                                                                "ml-1 text-white/20 transition-all duration-200",
+                                                                "group-hover:text-white/40 group-hover:translate-x-0.5",
+                                                                isActive && "text-primary/50"
+                                                            )}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
                     </nav>
 
                     <div className="relative">

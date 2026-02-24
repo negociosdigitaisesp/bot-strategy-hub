@@ -94,3 +94,23 @@ tests/**/__pycache__/
 *.test.log
 .vercel
 .env*.local
+
+# Environment & Secrets (AIOS)
+.env.*.local
+*.key
+*.pem
+
+# Dependencies (AIOS)
+node_modules/
+
+# Build & Logs (AIOS)
+logs/
+
+# IDE & OS (AIOS)
+Thumbs.db
+*.swp
+
+# AIOS Local (AIOS)
+.aios-core/local/
+.claude/settings.local.json
+.aios/install-log.txt

@@ -1,19 +1,32 @@
 import React from 'react';
 
-// Status color helper
-function getStatusColor(status) {
+// Status color helpers
+function getSessionColor(status) {
     if (status === 'connected') return '#00FF88';
     if (status === 'connecting') return '#FFB800';
     return '#FF3B5C';
 }
 
+function getServerColor(status) {
+    if (status === 'online') return '#00FF88';
+    if (status === 'checking') return '#FFB800';
+    return '#FF3B5C';
+}
+
+function getServerLabel(status) {
+    if (status === 'online') return '● SERVIDOR ONLINE';
+    if (status === 'checking') return '● RECONECTANDO...';
+    return '● SERVIDOR OFFLINE';
+}
+
 /**
  * IQBotHeader — Barra superior do painel IQ Option.
- * Exibe logo, status da sessão e badge visual.
+ * Exibe logo, status da sessão, badge de modo e pill de status VPS.
  */
-export default function IQBotHeader({ botConfig }) {
+export default function IQBotHeader({ botConfig, serverStatus = 'checking' }) {
     const status = botConfig?.session_status ?? 'disconnected';
-    const statusColor = getStatusColor(status);
+    const sessionColor = getSessionColor(status);
+    const serverColor = getServerColor(serverStatus);
     const isActive = botConfig?.is_active ?? false;
 
     return (
@@ -46,6 +59,31 @@ export default function IQBotHeader({ botConfig }) {
 
                 {/* Status indicators */}
                 <div className="flex items-center gap-5 flex-wrap">
+
+                    {/* VPS Server Status Pill ───────────────── */}
+                    <div
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full"
+                        style={{
+                            background: serverStatus === 'online'
+                                ? 'rgba(0,255,136,0.08)'
+                                : serverStatus === 'checking'
+                                    ? 'rgba(255,184,0,0.08)'
+                                    : 'rgba(255,59,92,0.08)',
+                            border: `1px solid ${serverColor}33`,
+                        }}
+                    >
+                        <span
+                            className="text-[10px] font-black uppercase tracking-widest"
+                            style={{
+                                fontFamily: "'JetBrains Mono', monospace",
+                                color: serverColor,
+                                animation: serverStatus !== 'offline' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                            }}
+                        >
+                            {getServerLabel(serverStatus)}
+                        </span>
+                    </div>
+
                     {/* Mode badge */}
                     <div className="flex items-center gap-1.5">
                         <span
@@ -73,8 +111,8 @@ export default function IQBotHeader({ botConfig }) {
                         <div
                             className="w-2 h-2 rounded-full"
                             style={{
-                                background: statusColor,
-                                boxShadow: `0 0 6px ${statusColor}`,
+                                background: sessionColor,
+                                boxShadow: `0 0 6px ${sessionColor}`,
                                 animation: isActive ? 'pulse 1.5s ease-in-out infinite' : 'none',
                             }}
                         />
@@ -82,7 +120,7 @@ export default function IQBotHeader({ botConfig }) {
                             className="text-[11px] font-bold uppercase tracking-wider"
                             style={{
                                 fontFamily: "'JetBrains Mono', monospace",
-                                color: statusColor,
+                                color: sessionColor,
                             }}
                         >
                             {status.toUpperCase()}

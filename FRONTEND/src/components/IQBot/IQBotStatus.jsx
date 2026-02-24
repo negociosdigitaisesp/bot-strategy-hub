@@ -1,11 +1,13 @@
 import React from 'react';
+import { useIQCountdown } from '../../hooks/useIQCountdown';
 
 /**
  * IQBotStatus — Master switch e seletor de modo (Demo / Real).
  */
 export default function IQBotStatus({ botConfig, updateBotConfig, toggleBot, onConfigureClick }) {
     const isActive = botConfig?.is_active ?? false;
-    const hasCredentials = !!(botConfig?.iq_email && botConfig?.iq_password);
+    const hasCredentials = !!(botConfig?.email && botConfig?.password);
+    const { countdown, isUrgent } = useIQCountdown();
 
     return (
         <div
@@ -82,6 +84,22 @@ export default function IQBotStatus({ botConfig, updateBotConfig, toggleBot, onC
 
             {/* Divider */}
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }} />
+
+            {/* Countdown Display */}
+            <div className="space-y-2 flex justify-between items-center">
+                <div
+                    className="text-[10px] uppercase tracking-widest"
+                    style={{ color: 'rgba(255,255,255,0.4)', fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                    Próxima Operação
+                </div>
+                <div
+                    className={`text-lg font-bold tracking-widest ${isUrgent ? 'iq-breathe' : ''}`}
+                    style={{ color: isUrgent ? '#FF3B5C' : '#00B4FF', fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                    {countdown}
+                </div>
+            </div>
 
             {/* Demo / Real Mode Toggle */}
             <div className="space-y-2">

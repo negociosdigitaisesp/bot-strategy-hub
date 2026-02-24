@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * IQBotFeed — Tabela de histórico de operações em tempo real.
  */
-export default function IQBotFeed({ logs }) {
+export default function IQBotFeed({ logs, newTradeId }) {
     return (
         <div
             className="rounded-xl overflow-hidden flex flex-col"
@@ -30,7 +30,7 @@ export default function IQBotFeed({ logs }) {
                 >
                     Histórico de Operações
                 </span>
-                {logs.length > 0 && (
+                {logs?.length > 0 && (
                     <span
                         className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold"
                         style={{
@@ -46,7 +46,7 @@ export default function IQBotFeed({ logs }) {
             </div>
 
             {/* Content */}
-            {logs.length === 0 ? (
+            {!logs || logs.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-3 py-10">
                     <div className="text-4xl opacity-20">📭</div>
                     <div
@@ -86,7 +86,7 @@ export default function IQBotFeed({ logs }) {
                         </thead>
                         <tbody>
                             {logs.map((log, i) => (
-                                <TradeRow key={log.id ?? i} log={log} />
+                                <TradeRow key={log.id ?? i} log={log} isNew={log.id === newTradeId} />
                             ))}
                         </tbody>
                     </table>
@@ -96,16 +96,19 @@ export default function IQBotFeed({ logs }) {
     );
 }
 
-function TradeRow({ log }) {
+function TradeRow({ log, isNew }) {
     const isWin = log.result === 'win';
     const isLoss = log.result === 'loss';
 
     return (
         <tr
-            className="iq-slide-down transition-colors duration-150"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+            className={`transition-colors duration-150 ${isNew ? 'iq-slide-down' : ''}`}
+            style={{
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
+                background: isNew ? 'rgba(0,180,255,0.1)' : 'transparent'
+            }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = isNew ? 'rgba(0,180,255,0.1)' : 'transparent'; }}
         >
             {/* Date */}
             <td
@@ -123,7 +126,7 @@ function TradeRow({ log }) {
                 className="px-4 py-3 text-[12px] font-bold text-white"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
             >
-                {log.asset}
+                {log.pair || log.asset}
             </td>
 
             {/* Direction */}

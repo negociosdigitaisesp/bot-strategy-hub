@@ -116,14 +116,14 @@ export const AstronPanel: React.FC<AstronPanelProps> = ({ isActive, onToggle, on
         }
     }, [stats.wins, stats.vaultAccumulated, isFree]);
 
-    const handleToggleBot = (manualStart: boolean = true, overrideStrategies?: string[]) => {
+    const handleToggleBot = async (manualStart: boolean = true, overrideStrategies?: string[]) => {
         console.log('🔘 handleToggleBot called:', { manualStart, isRunning, isConnected });
 
         // Stop bot if already running
         if (isRunning && manualStart) {
             console.log('🛑 Stopping bot...');
             try {
-                stopBot();
+                await stopBot();
                 toast.info('Bug Deriv Scanner detenido');
             } catch (error) {
                 console.error('❌ Error stopping bot:', error);

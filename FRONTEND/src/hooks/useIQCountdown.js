@@ -1,44 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
 
-/**
- * useIQCountdown — Contagem regressiva reutilizável.
- * @param {number} initialSeconds - Segundos iniciais
- * @param {boolean} autoStart - Iniciar automaticamente
- */
-export function useIQCountdown(initialSeconds = 0, autoStart = false) {
-    const [remaining, setRemaining] = useState(initialSeconds);
-    const [running, setRunning] = useState(autoStart);
+export const useIQCountdown = () => {
+    const [countdown, setCountdown] = useState('00:00')
+    const [isUrgent, setIsUrgent] = useState(false)
 
     useEffect(() => {
-        if (!running || remaining <= 0) return;
+        const updateCountdown = () => {
+            const now = new Date()
+            const seconds = 60 - now.getSeconds()
 
-        const interval = setInterval(() => {
-            setRemaining((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setRunning(false);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+            const formattedSeconds = seconds === 60 ? '00:00' : `00:${seconds.toString().padStart(2, '0')}`
 
-        return () => clearInterval(interval);
-    }, [running, remaining]);
+            setCountdown(formattedSeconds)
+            setIsUrgent(seconds <= 10 && seconds > 0)
+        }
 
-    const start = (seconds) => {
-        if (seconds !== undefined) setRemaining(seconds);
-        setRunning(true);
-    };
+        // Update immediately and then every second
+        updateCountdown()
+        const intervalId = setInterval(updateCountdown, 1000)
 
-    const stop = () => setRunning(false);
+        return () => clearInterval(intervalId)
+    }, [])
 
-    const restart = (seconds) => {
-        setRemaining(seconds ?? initialSeconds);
-        setRunning(true);
-    };
-
-    const formatted = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
-
-    return { remaining, formatted, running, start, stop, restart };
+    return { countdown, isUrgent }
 }

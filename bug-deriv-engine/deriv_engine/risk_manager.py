@@ -44,6 +44,9 @@ class ClientRiskState:
     consecutive_losses: int = 0
     pause_until: float = 0.0  # timestamp monotonic
 
+    # ── Trava de Execução ──────────────────────────────────────────────
+    is_processing_result: bool = False
+
 
 class RiskManager:
     """Gerencia estado de risco para TODOS os clientes ativos."""
@@ -82,6 +85,10 @@ class RiskManager:
         if state is None:
             return True  # sem estado = sem restrições
 
+        # Trava: ainda estamos processando o resultado anterior
+        if state.is_processing_result:
+            return False
+
         # Stop Win / Stop Loss atingido
         if state.is_stopped:
             return False
@@ -117,6 +124,20 @@ class RiskManager:
             )
 
         return round(stake, 2)
+
+    def lock_trade(self, user_id: str) -> None:
+        """Trava o cliente para não receber novas ordens até o resultado processar."""
+        state = self._states.get(user_id)
+        if state:
+            state.is_processing_result = True
+            logger.debug(f"[RISK] 🔒 Lock ativado para {user_id}")
+
+    def unlock_trade(self, user_id: str) -> None:
+        """Destrava o cliente."""
+        state = self._states.get(user_id)
+        if state:
+            state.is_processing_result = False
+            logger.debug(f"[RISK] 🔓 Lock desativado para {user_id}")
 
     def process_result(self, user_id: str, status: str, profit: float) -> None:
         """
@@ -226,7 +247,9 @@ class RiskManager:
     def sync_clients(self, active_clients: dict[str, dict]) -> None:
         """
         Sincroniza estados com os clientes ativos.
-        Inicializa novos clientes e remove desativados.
+        - Inicializa novos clientes
+        - Remove desativados
+        - Hot-update configs de clientes existentes (sem resetar contadores)
         """
         current_ids = set(self._states.keys())
         new_ids = set(active_clients.keys())
@@ -235,9 +258,72 @@ class RiskManager:
         for uid in (new_ids - current_ids):
             self.init_client(uid, active_clients[uid])
 
+        # Clientes existentes: atualizar config SEM resetar contadores de sessão
+        for uid in (new_ids & current_ids):
+            self._hot_update_config(uid, active_clients[uid])
+
         # Clientes removidos: limpar estado
         for uid in (current_ids - new_ids):
             self.remove_client(uid)
+
+    def _hot_update_config(self, user_id: str, config: dict) -> None:
+        """Atualiza configs de risco sem resetar estado de sessão (gale_level, profit, etc.)."""
+        state = self._states.get(user_id)
+        if state is None:
+            return
+
+        new_use_mg = bool(config.get("use_martingale", False))
+        new_max_gale = int(config.get("max_gale", 3))
+        new_mg_factor = float(config.get("martingale_factor", 2.5))
+        new_use_soros = bool(config.get("use_soros", False))
+        new_soros_levels = int(config.get("soros_levels", 2))
+        new_stop_win = float(config.get("stop_win", 50.0))
+        new_stop_loss = float(config.get("stop_loss", 25.0))
+        
+        changed = (
+            state.use_martingale != new_use_mg
+            or state.max_gale != new_max_gale
+            or state.martingale_factor != new_mg_factor
+            or state.use_soros != new_use_soros
+            or state.soros_levels != new_soros_levels
+            or state.stop_win != new_stop_win
+            or state.stop_loss != new_stop_loss
+        )
+
+        new_base_stake = float(config.get("stake", state.base_stake))
+        # APENAS atualiza o stake base se o usuário não estiver dentro de um Martingale. 
+        # Isso evita que o Supabase sobrescreva a base_stake com o valor de um "Gale Stake" lido do DB a cada 5s.
+        if state.gale_level == 0 and state.base_stake != new_base_stake:
+            state.base_stake = new_base_stake
+            changed = True
+
+        if not changed:
+            return
+
+        # Se Martingale foi desativado → resetar gale_level
+        if state.use_martingale and not new_use_mg:
+            state.gale_level = 0
+
+        # Se Soros foi desativado → resetar acumulado
+        if state.use_soros and not new_use_soros:
+            state.consecutive_wins = 0
+            state.soros_accumulated = 0.0
+
+        state.use_martingale = new_use_mg
+        state.max_gale = new_max_gale
+        state.martingale_factor = new_mg_factor
+        state.use_soros = new_use_soros
+        state.soros_levels = new_soros_levels
+        state.stop_win = new_stop_win
+        state.stop_loss = new_stop_loss
+        
+        logger.info(
+            f"[RISK] ♻️ Config atualizada para {user_id} — "
+            f"martingale={'ON' if new_use_mg else 'OFF'} "
+            f"(G{new_max_gale}×{new_mg_factor}) "
+            f"soros={'ON' if new_use_soros else 'OFF'} "
+            f"stake={state.base_stake}"
+        )
 
     def get_state_summary(self, user_id: str) -> dict | None:
         """Retorna resumo do estado de risco (para logging/debug)."""

@@ -44,6 +44,7 @@ import SecurityGate from "./components/SecurityGate";
 import PaginaDeTeste from "./pages/PaginaDeTeste";
 import PaginaBloqueada from "./pages/PaginaBloqueada";
 import DerivConnectionPage from "./pages/DerivConnectionPage";
+import BrokerHubPage from "./pages/BrokerHubPage";
 import BotAlpha from "./pages/BotAlpha";
 import BotSelection from "./pages/BotSelection";
 
@@ -315,6 +316,15 @@ const App = () => {
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                               <DerivConnectionPage />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/mis-brokers" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BrokerHubPage />
                             </main>
                           </>
                         } />

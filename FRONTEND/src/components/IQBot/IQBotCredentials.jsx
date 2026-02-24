@@ -1,17 +1,27 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 
 /**
- * IQBotCredentials — Formulário de configuração da conta IQ Option.
+ * IQBotCredentials — Formulario de configuración de la cuenta IQ Option.
  */
 export default function IQBotCredentials({ config, onSave, onCancel }) {
     const [email, setEmail] = useState(config?.iq_email ?? '');
     const [password, setPassword] = useState(config?.iq_password ?? '');
-    const [stakeAmount, setStakeAmount] = useState(config?.stake_amount ?? 10.00);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onSave({ iq_email: email, iq_password: password, stake_amount: parseFloat(stakeAmount) || 10 });
-        onCancel();
+        setIsLoading(true);
+        try {
+            await onSave({ iq_email: email, iq_password: password, stake_amount: Number(config?.stake_amount || 10) });
+            toast.success('Credenciales de IQ Option guardadas correctamente');
+            onCancel();
+        } catch (error) {
+            console.error(error);
+            toast.error('Error al guardar credenciales');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const inputStyle = {
@@ -53,9 +63,9 @@ export default function IQBotCredentials({ config, onSave, onCancel }) {
                     🔑
                 </div>
                 <div>
-                    <h3 className="font-bold text-white text-sm tracking-wide">Configurações da Conta IQ Option</h3>
+                    <h3 className="font-bold text-white text-sm tracking-wide">Configuración de la Cuenta IQ Option</h3>
                     <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                        Suas credenciais são armazenadas de forma segura no Supabase.
+                        Tus credenciales se almacenan de forma segura en Supabase.
                     </p>
                 </div>
             </div>
@@ -67,7 +77,7 @@ export default function IQBotCredentials({ config, onSave, onCancel }) {
                         className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5"
                         style={{ color: 'rgba(255,255,255,0.5)' }}
                     >
-                        Email IQ Option
+                        Correo Electrónico
                     </label>
                     <input
                         type="email"
@@ -76,7 +86,7 @@ export default function IQBotCredentials({ config, onSave, onCancel }) {
                         onChange={(e) => setEmail(e.target.value)}
                         onFocus={handleFocus}
                         onBlur={handleBlur}
-                        placeholder="seuemail@exemplo.com"
+                        placeholder="tu-correo@ejemplo.com"
                         required
                     />
                 </div>
@@ -87,7 +97,7 @@ export default function IQBotCredentials({ config, onSave, onCancel }) {
                         className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5"
                         style={{ color: 'rgba(255,255,255,0.5)' }}
                     >
-                        Senha IQ Option
+                        Contraseña
                     </label>
                     <input
                         type="password"
@@ -99,35 +109,6 @@ export default function IQBotCredentials({ config, onSave, onCancel }) {
                         placeholder="••••••••"
                         required
                     />
-                </div>
-
-                {/* Stake Amount */}
-                <div>
-                    <label
-                        className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5"
-                        style={{ color: 'rgba(255,255,255,0.5)' }}
-                    >
-                        Valor de Entrada (Stake)
-                    </label>
-                    <div className="relative">
-                        <span
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold"
-                            style={{ color: 'rgba(255,255,255,0.4)', fontFamily: "'JetBrains Mono', monospace" }}
-                        >
-                            R$
-                        </span>
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="1"
-                            style={{ ...inputStyle, paddingLeft: '36px' }}
-                            value={stakeAmount}
-                            onChange={(e) => setStakeAmount(e.target.value)}
-                            onFocus={handleFocus}
-                            onBlur={handleBlur}
-                            required
-                        />
-                    </div>
                 </div>
 
                 {/* Buttons */}
@@ -148,17 +129,20 @@ export default function IQBotCredentials({ config, onSave, onCancel }) {
                     </button>
                     <button
                         type="submit"
+                        disabled={isLoading}
                         className="px-5 py-2 text-sm font-black rounded-lg transition-all duration-200"
                         style={{
                             background: 'linear-gradient(135deg,#00FF88,#00C866)',
                             color: '#000',
                             boxShadow: '0 0 20px rgba(0,255,136,0.3)',
                             letterSpacing: '0.04em',
+                            opacity: isLoading ? 0.7 : 1,
+                            cursor: isLoading ? 'not-allowed' : 'pointer'
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 30px rgba(0,255,136,0.5)'; }}
+                        onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.boxShadow = '0 0 30px rgba(0,255,136,0.5)'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 20px rgba(0,255,136,0.3)'; }}
                     >
-                        ✓ Salvar
+                        {isLoading ? 'Guardando...' : '✓ Guardar'}
                     </button>
                 </div>
             </form>

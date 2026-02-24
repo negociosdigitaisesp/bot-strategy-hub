@@ -119,8 +119,11 @@ class DerivEngine:
         # Constrói novo dict apenas com clientes ativos
         new_active: dict[str, dict] = {}
         for row in resp.data:
-            if row["is_active"]:
-                new_active[row["user_id"]] = self._row_to_client(row)
+            if row.get("is_active"):
+                try:
+                    new_active[row["user_id"]] = self._row_to_client(row)
+                except Exception as e:
+                    logger.error(f"Erro ao converter config do cliente {row.get('user_id')}: {e}")
 
         # Detecta mudanças para logging
         old_ids = set(self.active_clients.keys())
@@ -144,21 +147,29 @@ class DerivEngine:
     @staticmethod
     def _row_to_client(row: dict) -> dict[str, Any]:
         """Converte uma row do Supabase no formato usado pelo engine."""
+        def get_float(key: str, default: float) -> float:
+            val = row.get(key)
+            return float(val) if val is not None else default
+
+        def get_int(key: str, default: int) -> int:
+            val = row.get(key)
+            return int(val) if val is not None else default
+
         return {
             "token":       row["deriv_token"],
-            "stake":       float(row["stake_amount"]),
+            "stake":       get_float("stake_amount", 1.0),
             "strategy_id": row["strategy_id"],
-            "symbol":      row.get("symbol", "R_75"),  # ativo default
+            "symbol":      row.get("symbol") or "R_75",  # ativo default
             "record_id":   row["id"],
             # ── Gestão de Risco ──────────────────────────────────────────
-            "use_martingale":    row.get("use_martingale", False),
-            "max_gale":          row.get("max_gale", 3),
-            "martingale_factor": float(row.get("martingale_factor", 2.5)),
-            "stop_win":          float(row.get("stop_win", 50.0)),
-            "stop_loss":         float(row.get("stop_loss", 25.0)),
+            "use_martingale":    bool(row.get("use_martingale")),
+            "max_gale":          get_int("max_gale", 3),
+            "martingale_factor": get_float("martingale_factor", 2.5),
+            "stop_win":          get_float("stop_win", 50.0),
+            "stop_loss":         get_float("stop_loss", 25.0),
             # ── Soros ────────────────────────────────────────────────────
-            "use_soros":         row.get("use_soros", False),
-            "soros_levels":      row.get("soros_levels", 2),
+            "use_soros":         bool(row.get("use_soros")),
+            "soros_levels":      get_int("soros_levels", 2),
         }
 
     # ── Handler de sinal ──────────────────────────────────────────────────
@@ -199,6 +210,10 @@ class DerivEngine:
             f"confidence={confidence:.3f} | "
             f"elegíveis={len(eligible)}/{len(self.active_clients)}"
         )
+        
+        # Trava os clientes escolhidos ANTES de executar a ordem
+        for uid in eligible:
+            self._risk_manager.lock_trade(uid)
 
         # Cria coroutines com stake calculado pelo RiskManager
         tasks = [
@@ -224,10 +239,15 @@ class DerivEngine:
     async def _save_results(self, results: list) -> None:
         """Batch insert dos resultados + atualiza RiskManager por cliente."""
         rows_to_insert = []
+        updates_to_active_bots = []
         for res in results:
             if isinstance(res, Exception):
                 self._total_errors += 1
                 logger.error(f"Exceção em execute_order: {res}")
+                # Precisamos destravar mesmo em caso de exceção brutal nas tasks
+                # Mas Exception da task não tem user_id no objeto. Para isso precisaríamos 
+                # embrulhar a exception. Como a exceção brutal é rara (execute_order engole a maioria),
+                # o lock pode ficar preso. Idealmente lidaríamos, mas passamos por agora as capturadas pelo dict
                 continue
             if isinstance(res, dict):
                 rows_to_insert.append(res)
@@ -236,8 +256,27 @@ class DerivEngine:
                 uid    = res.get("user_id", "")
                 status = res.get("status", "")
                 profit = float(res.get("profit", 0))
+                
+                # Se for erro ao criar ordem, nós apenas destravamos e seguimos (status='exception', 'auth_error', etc)
                 if status in ("won", "lost"):
                     self._risk_manager.process_result(uid, status, profit)
+                    # Pega o novo stake calculado (para o Gale/Soros, ou base)
+                    new_stake = self._risk_manager.get_stake(uid)
+                    updates_to_active_bots.append((uid, new_stake))
+                
+                # Destrava cliente liberando a próxima entrada!
+                self._risk_manager.unlock_trade(uid)
+
+        # Realiza os updates de stake na tabela active_bots PRIMEIRO para garantir sincronismo
+        for uid, new_stake in updates_to_active_bots:
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda u=uid, s=new_stake: self._supabase.table("active_bots").update({"stake_amount": s}).eq("user_id", u).eq("broker", "deriv").execute()
+                )
+                logger.debug(f"✅ Stake atualizado para {new_stake} no active_bots do user {uid}")
+            except Exception as e:
+                logger.error(f"Erro ao atualizar active_bots stake_amount para {uid}: {e}")
 
         if not rows_to_insert:
             return

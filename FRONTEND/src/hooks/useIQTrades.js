@@ -1,71 +1,82 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useState, useEffect, useCallback } from 'react'
+import { getIQTradeLogs, subscribeToTrades } from '@/lib/supabaseIQ'
 
-/**
- * useIQTrades — Busca e subscreve ao histórico de operações IQ Option.
- * Separado do useIQBot para poder ser usado isoladamente em subcomponentes.
- *
- * @param {string|null} userId
- * @param {number} limit - Número máximo de registros (padrão: 50)
- */
-export function useIQTrades(userId, limit = 50) {
-    const [trades, setTrades] = useState([]);
-    const [loadingTrades, setLoadingTrades] = useState(true);
+export const useIQTrades = (botId) => {
+    const [trades, setTrades] = useState([])
+    const [allTrades, setAllTrades] = useState([])
+    const [page, setPage] = useState(1)
+    const [hasMore, setHasMore] = useState(true)
+    const [newTradeId, setNewTradeId] = useState(null)
+
+    const tradesPerPage = 10
 
     useEffect(() => {
-        if (!userId) {
-            setLoadingTrades(false);
-            return;
+        if (!botId) return
+
+        let tradeSubscription = null
+
+        const loadInitialTrades = async () => {
+            // Load initial batch for the feed (max 6 typically shown in top summary)
+            // but allTrades stores more for history or loadMore
+            const { data } = await getIQTradeLogs(botId, tradesPerPage)
+
+            if (data) {
+                setTrades(data.slice(0, 6))
+                setAllTrades(data)
+                setHasMore(data.length === tradesPerPage)
+            }
+
+            // Subscribe to Realtime inserts
+            tradeSubscription = subscribeToTrades(botId, handleNewTrade)
         }
 
-        // Busca inicial
-        const fetchTrades = async () => {
-            setLoadingTrades(true);
-            const { data, error } = await supabase
-                .from('iq_trade_logs')
-                .select('*')
-                .eq('user_id', userId)
-                .order('executed_at', { ascending: false })
-                .limit(limit);
+        const handleNewTrade = (trade) => {
+            setNewTradeId(trade.id)
 
-            if (!error) setTrades(data || []);
-            else console.error('[useIQTrades] fetchTrades error:', error);
+            setTrades(prev => {
+                const updated = [trade, ...prev]
+                return updated.slice(0, 6)
+            })
 
-            setLoadingTrades(false);
-        };
+            setAllTrades(prev => [trade, ...prev])
 
-        fetchTrades();
+            // Reset newTradeId after animation time
+            setTimeout(() => setNewTradeId(null), 1000)
+        }
 
-        // Realtime: novas inserções
-        const subscription = supabase
-            .channel(`iq_trades_sub_${userId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'iq_trade_logs',
-                    filter: `user_id=eq.${userId}`,
-                },
-                (payload) => {
-                    setTrades((prev) => [payload.new, ...prev].slice(0, limit));
-                }
-            )
-            .subscribe();
+        loadInitialTrades()
 
-        return () => supabase.removeChannel(subscription);
-    }, [userId, limit]);
+        return () => {
+            if (tradeSubscription) {
+                tradeSubscription.unsubscribe()
+            }
+        }
+    }, [botId])
 
-    // Estatísticas derivadas
-    const wins = trades.filter((t) => t.result === 'win').length;
-    const losses = trades.filter((t) => t.result === 'loss').length;
-    const pending = trades.filter((t) => t.result !== 'win' && t.result !== 'loss').length;
-    const totalPnL = trades.reduce((sum, t) => {
-        if (t.result === 'win') return sum + (t.amount || 0);
-        if (t.result === 'loss') return sum - (t.amount || 0);
-        return sum;
-    }, 0);
-    const winRate = wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0;
+    const loadMore = async () => {
+        if (!botId || !hasMore) return
 
-    return { trades, loadingTrades, wins, losses, pending, totalPnL, winRate };
+        const nextPage = page + 1
+        const offset = page * tradesPerPage
+
+        // Instead of relying on a real offset based fetch with Supabase here
+        // we fetch again with higher limits or use offset in typical pagination:
+        const { data: supabase } = await import('@/lib/supabaseClient')
+        const { data } = await supabase.supabase
+            .from('iq_trade_logs')
+            .select('*')
+            .eq('bot_id', botId)
+            .order('executed_at', { ascending: false })
+            .range(offset, offset + tradesPerPage - 1)
+
+        if (data && data.length > 0) {
+            setAllTrades(prev => [...prev, ...data])
+            setPage(nextPage)
+            setHasMore(data.length === tradesPerPage)
+        } else {
+            setHasMore(false)
+        }
+    }
+
+    return { trades, allTrades, newTradeId, loadMore, hasMore }
 }

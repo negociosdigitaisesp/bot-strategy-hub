@@ -168,17 +168,59 @@ export default function OracleAI() {
         isPaused: false,
     });
 
+    // ── Referências de Risco para Arquitetura Bulletproof ──────────────────
+    const currentStakeRef = useRef(1);
+    const isProcessingResultRef = useRef(false);
+    const stopTradeRef = useRef(false); // Para travar caso bata stop win/loss
+
     // ── ID do bot ativo no Supabase ────────────────────────────────────────
     const activeBotIdRef = useRef<string | null>(null);
     const [dbUserId, setDbUserId] = useState<string | null>(null);
 
     useEffect(() => {
+        const checkActive = async (userId: string) => {
+            try {
+                const { data, error } = await supabase
+                    .from("active_bots")
+                    .select("*")
+                    .eq("user_id", userId)
+                    .eq("broker", "deriv")
+                    .eq("strategy_id", "digitdiff_v1")
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (data && !error) {
+                    setIsActive(!!data.is_active);
+                    if (data.is_active) {
+                        activeBotIdRef.current = data.id;
+                    }
+                    // ── Restaurar configurações salvas no Supabase ──────────
+                    // Previne que page refresh resete Martingale/Soros para defaults
+                    if (data.use_martingale !== undefined) setUseMartingale(!!data.use_martingale);
+                    if (data.max_gale !== undefined) setMaxGale(String(data.max_gale));
+                    if (data.martingale_factor !== undefined) setMartingaleFactor(String(data.martingale_factor));
+                    if (data.use_soros !== undefined) setUseSoros(!!data.use_soros);
+                    if (data.soros_levels !== undefined) setSorosLevels(Number(data.soros_levels));
+                    if (data.stop_win !== undefined) setStopWin(String(data.stop_win));
+                    if (data.stop_loss !== undefined) setStopLoss(String(data.stop_loss));
+                    if (data.stake_amount !== undefined) setStake(Number(data.stake_amount));
+                }
+            } catch (err) {
+                console.error("[OracleAI] Error checking active status:", err);
+            }
+        };
+
         supabase.auth.getSession().then(({ data }) => {
-            setDbUserId(data.session?.user?.id || null);
+            const uid = data.session?.user?.id || null;
+            setDbUserId(uid);
+            if (uid) checkActive(uid);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setDbUserId(session?.user?.id || null);
+            const uid = session?.user?.id || null;
+            setDbUserId(uid);
+            if (uid) checkActive(uid);
         });
 
         return () => subscription.unsubscribe();
@@ -207,6 +249,13 @@ export default function OracleAI() {
     const lastTradeCheckRef = useRef<string>(new Date().toISOString());
     const processedTradesRef = useRef<Set<string>>(new Set());
 
+    // Virtual Risco State (apenas UI mimic do backend Python)
+    const galeLevelRef = useRef(0);
+    const consecutiveWinsRef = useRef(0);
+    const consecutiveLossesRef = useRef(0);
+    const streakPauseUntilRef = useRef(0);
+    const sorosAccumulatedRef = useRef(0);
+
     useEffect(() => {
         const userId = dbUserId;
         if (!userId || !isActive) return;
@@ -214,6 +263,9 @@ export default function OracleAI() {
         // Reset on activation
         lastTradeCheckRef.current = new Date().toISOString();
         processedTradesRef.current = new Set();
+        isProcessingResultRef.current = false;
+        stopTradeRef.current = false;
+        currentStakeRef.current = stake;
 
         const pollInterval = setInterval(async () => {
             try {
@@ -249,15 +301,85 @@ export default function OracleAI() {
                         }));
                         setProfit(prev => prev + tradeProfit);
 
+                        // ── Gestão de Risco Visual ───────────────────
+                        let currentStake = stake;
+                        const maxG = parseInt(maxGale) || 3;
+                        const factor = parseFloat(martingaleFactor) || 2.5;
+
+                        if (isWin) {
+                            galeLevelRef.current = 0;
+                            consecutiveLossesRef.current = 0;
+                            if (useSoros) {
+                                consecutiveWinsRef.current++;
+                                sorosAccumulatedRef.current += tradeProfit;
+                                if (consecutiveWinsRef.current >= (sorosLevels || 2)) {
+                                    consecutiveWinsRef.current = 0;
+                                    sorosAccumulatedRef.current = 0;
+                                }
+                            } else {
+                                consecutiveWinsRef.current = 0;
+                                sorosAccumulatedRef.current = 0;
+                            }
+                        } else {
+                            consecutiveWinsRef.current = 0;
+                            sorosAccumulatedRef.current = 0;
+                            consecutiveLossesRef.current++;
+
+                            if (useMartingale) {
+                                if (galeLevelRef.current < maxG) {
+                                    galeLevelRef.current++;
+                                } else {
+                                    galeLevelRef.current = 0; // reseta no max gale
+                                }
+                            }
+
+                            if (consecutiveLossesRef.current >= 3) {
+                                streakPauseUntilRef.current = Date.now() + 60000;
+                                consecutiveLossesRef.current = 0;
+                                galeLevelRef.current = 0;
+                            }
+                        }
+
+                        // Calcula Next Stake para a UI
+                        if (useMartingale && galeLevelRef.current > 0) {
+                            currentStake = stake * Math.pow(factor, galeLevelRef.current);
+                        } else if (useSoros && consecutiveWinsRef.current > 0 && sorosAccumulatedRef.current > 0) {
+                            currentStake = stake + sorosAccumulatedRef.current;
+                        }
+
+                        currentStakeRef.current = currentStake;
+
+                        setGaleState({
+                            level: galeLevelRef.current,
+                            currentStake: currentStake,
+                            consecutiveLosses: consecutiveLossesRef.current,
+                            isPaused: Date.now() < streakPauseUntilRef.current
+                        });
+
                         addLog(
                             `[🏁 RESULTADO] ${isWin ? "✅ VICTORIA" : "❌ DERROTA"} | ${row.contract_type} ${row.strategy_id} | ${tradeProfit > 0 ? "+" : ""}${tradeProfit.toFixed(2)} USD`,
                             isWin ? "target" : "discard"
                         );
 
+                        // Exibe logs de proteção da próxima rodada se houver
+                        if (!isWin && useMartingale && galeLevelRef.current > 0) {
+                            addLog(`[🎰 GALE ${galeLevelRef.current}] Próximo Stake: $${currentStake.toFixed(2)}`, "info");
+                        } else if (isWin && useSoros && consecutiveWinsRef.current > 0) {
+                            addLog(`[🔄 SOROS ${consecutiveWinsRef.current}] Próximo Stake: $${currentStake.toFixed(2)}`, "info");
+                        }
+
+                        if (Date.now() < streakPauseUntilRef.current) {
+                            addLog(`[⚠️ STREAK PAUSE] Proteção ativada (3 derrotas) - Stop de 60s`, "discard");
+                        }
+
                         setWinFlash(isWin ? "win" : "loss");
                         setTimeout(() => setWinFlash(null), 1200);
+
+                        // Libera o lock após processar o resultado para o frontend!
+                        isProcessingResultRef.current = false;
                     } else if (status === "auth_error" || status === "order_error" || status === "exception") {
                         addLog(`[⚠️ ERROR] ${status}: ${contractId}`, "discard");
+                        isProcessingResultRef.current = false;
                     } else {
                         addLog(`[📤 ORDEM] ${status} | Contract: ${contractId} | Stake: ${row.stake}`, "info");
                     }
@@ -369,7 +491,7 @@ export default function OracleAI() {
             addLog(`[ERROR] ${msg}`, "discard");
             return false;
         }
-    }, [token, dbUserId, stake, useMartingale, maxGale, martingaleFactor, stopWin, stopLoss, addLog]);
+    }, [token, dbUserId, stake, useMartingale, maxGale, martingaleFactor, stopWin, stopLoss, useSoros, sorosLevels, addLog]);
 
     const desativarBotVPS = useCallback(async () => {
         const userId = dbUserId;
@@ -400,11 +522,22 @@ export default function OracleAI() {
     // ── Hook de conexão com VPS ────────────────────────────────────────────
     const handleSinal = useCallback((sinal: Signal) => {
         setLastSignal(sinal);
+
+        // Atualiza UI com logs de auditoria
         addLog(
             `[⚡ VPS] ${sinal.ativo} ≠${sinal.digito} — EV: ${formatEV(sinal.ev)} — PEDIDO AO ENGINE`,
             "real"
         );
-    }, [addLog]);
+        
+        // Log "Inquebrável" exigido
+        const atualStake = isNaN(currentStakeRef.current) ? stake : currentStakeRef.current;
+        addLog(
+            `Oracle AI -> Entrada solicitada. Stake Base: ${stake} | Fator: ${martingaleFactor} | Stake Calculada Agora: ${atualStake.toFixed(2)}`,
+            "info"
+        );
+        
+        isProcessingResultRef.current = true;
+    }, [addLog, stake, martingaleFactor]);
 
     useBugDeriv(null, {
         stake,
@@ -428,34 +561,6 @@ export default function OracleAI() {
         },
         onCompra: (contractId) => {
             addLog(`[✅ ORDEN ABIERTA] Contract ID: ${contractId}`, "target");
-        },
-        onResultado: (resultado) => {
-            const isWin = resultado.status === "won";
-            setStats(prev => ({
-                wins: prev.wins + (isWin ? 1 : 0),
-                losses: prev.losses + (isWin ? 0 : 1)
-            }));
-            setProfit(prev => prev + (resultado.lucro ?? 0));
-
-            addLog(
-                `[🏁 RESULTADO] ${isWin ? "VICTORIA" : "DERROTA"} (${resultado.lucro > 0 ? "+" : ""}${resultado.lucro.toFixed(2)} USD)`,
-                isWin ? "target" : "discard"
-            );
-
-            setWinFlash(isWin ? "win" : "loss");
-            setTimeout(() => setWinFlash(null), 1200);
-        },
-        onMartingaleChange: (state) => {
-            setGaleState(state);
-            if (state.level > 0) {
-                addLog(
-                    `[🎰 GALE ${state.level}] Stake: $${state.currentStake.toFixed(2)}`,
-                    "info"
-                );
-            }
-            if (state.isPaused) {
-                addLog(`[⚠️ STREAK PAUSE] Proteção ativada — aguardando 60s`, "discard");
-            }
         },
     });
 

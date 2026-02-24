@@ -886,36 +886,57 @@ export const useBotAstron = () => {
     // ============================================
     // STOP BOT
     // ============================================
-    const stopBot = useCallback(() => {
-        if (channelRef.current) {
-            supabase.removeChannel(channelRef.current);
-            channelRef.current = null;
+    const stopBot = useCallback(async () => {
+        try {
+            // 2. Limpeza de Memória
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+            }
+
+            if (cooldownTimerRef.current) {
+                clearInterval(cooldownTimerRef.current);
+                cooldownTimerRef.current = null;
+            }
+
+            // 3. Sincronização com VPS: UPDATE assíncrono na tabela 'active_bots'
+            const { data } = await supabase.auth.getSession();
+            const userId = data.session?.user?.id;
+            if (userId) {
+                const { error } = await supabase
+                    .from('active_bots')
+                    .update({ is_active: false })
+                    .eq('user_id', userId);
+
+                if (error) {
+                    console.error('❌ Falha ao sincronizar parada com VPS:', error);
+                } else {
+                    console.log('✅ VPS notificada da parada com sucesso.');
+                }
+            }
+
+        } catch (error) {
+            console.error('❌ Erro crítico no stopBot:', error);
+        } finally {
+            // 4. Forçar Estado
+            setIsRunning(false);
+            isRunningRef.current = false;
+            setIsCoolingDown(false);
+            setCooldownTime(0);
+            setIsWarmingUp(false);
+            setActiveAsset(null);
+            setActiveBot(null);
+            setConnectionStatus('DISCONNECTED');
+
+            // Deactivate all strategies visually when stopping
+            setStrategies(prev => prev.map(s => ({ ...s, active: false })));
+            activeStrategyNameRef.current = null;
+
+            if (vaultAccumulatedRef.current > 0) {
+                addLog(`🏦 BÓVEDA FINAL: $${vaultAccumulatedRef.current.toFixed(2)} protegidos en ${vaultCountRef.current} depósitos`, 'gold');
+            }
+            addLog('🛑 Bug Deriv Scanner detenido', 'warning');
         }
-
-        if (cooldownTimerRef.current) {
-            clearInterval(cooldownTimerRef.current);
-            cooldownTimerRef.current = null;
-        }
-
-        setIsRunning(false);
-        isRunningRef.current = false;
-        setIsCoolingDown(false);
-        setCooldownTime(0);
-        setIsWarmingUp(false);
-        setActiveAsset(null);
-        setActiveBot(null);
-        setConnectionStatus('DISCONNECTED');
-
-        // Deactivate all strategies visually when stopping
-        setStrategies(prev => prev.map(s => ({ ...s, active: false })));
-        // activeStrategyNameRef.current = null; // Don't clear ref immediately if we want to remember selection on restart? 
-        // No, UI clears active state, so logic should too.
-        activeStrategyNameRef.current = null;
-
-        if (vaultAccumulatedRef.current > 0) {
-            addLog(`🏦 BÓVEDA FINAL: $${vaultAccumulatedRef.current.toFixed(2)} protegidos en ${vaultCountRef.current} depósitos`, 'gold');
-        }
-        addLog('🛑 Bug Deriv Scanner detenido', 'warning');
     }, [addLog, setActiveBot]);
 
     // Cleanup on unmount
