@@ -42,8 +42,8 @@ export const useBrokerHub = (): BrokerHubState => {
         setIqLoading(true)
         try {
             const { data } = await getIQBot(userId)
-            // IQ is "connected" if bot record exists with email set
-            setIqConnected(!!data?.iq_email)
+            // IQ is "connected" if bot record exists with SSID set
+            setIqConnected(!!data?.ssid)
         } catch {
             setIqConnected(false)
         } finally {
@@ -78,7 +78,7 @@ export const useBrokerHub = (): BrokerHubState => {
         icon: '📈'
     }), [iqConnected, iqLoading])
 
-    const brokers = useMemo(() => [derivBroker, iqBroker], [derivBroker, iqBroker])
+    const brokers = useMemo(() => [derivBroker], [derivBroker])
 
     const connectedCount = brokers.filter(b => b.isConnected).length
     const totalBalance = brokers.reduce((sum, b) => sum + (b.balance ?? 0), 0)

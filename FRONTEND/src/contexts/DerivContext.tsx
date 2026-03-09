@@ -63,12 +63,17 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
 
   // Ref to track if disconnection was intentional (user clicked logout) or accidental (network error)
   const shouldReconnect = React.useRef(true);
+  // Ref to the live socket — avoids stale closure issues in initWebSocket
+  const socketRef = React.useRef<WebSocket | null>(null);
+  // Exponential backoff counter
+  const reconnectAttemptsRef = React.useRef(0);
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   // Function to initialize WebSocket connection
   const initWebSocket = useCallback((apiToken: string) => {
-    // Prevent multiple connection attempts
-    if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
-      return socket;
+    // Prevent multiple connection attempts — use socketRef to avoid stale closure
+    if (socketRef.current && (socketRef.current.readyState === WebSocket.CONNECTING || socketRef.current.readyState === WebSocket.OPEN)) {
+      return socketRef.current;
     }
 
     setIsConnecting(true);
@@ -76,6 +81,7 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
     shouldReconnect.current = true; // Enable auto-reconnect by default when starting
 
     const ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${APP_ID}`);
+    socketRef.current = ws; // Keep ref in sync immediately
 
     ws.onopen = () => {
       console.log('Deriv WS Connected');
@@ -354,16 +360,23 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
       pendingRequests.current.forEach(({ reject }) => reject(new Error('Connection closed')));
       pendingRequests.current.clear();
 
-      // Auto-Reconnect Logic
+      // [RECONNECT] Auto-Reconnect com Exponential Backoff
       if (shouldReconnect.current) {
-        toast.info('Conexão perdida. Tentando reconectar...');
+        reconnectAttemptsRef.current += 1;
+        if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
+          toast.error('Deriv: Falha persistente. Recarregue a página.', { id: 'deriv-reconnect-fail' });
+          return;
+        }
+        // Backoff: 3s, 6s, 12s, 24s, 48s
+        const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current - 1), 48000);
+        toast.info(`Conexão perdida. Reconectando em ${Math.round(delay / 1000)}s... (tentativa ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`, { id: 'deriv-reconnect' });
         setTimeout(() => {
           const activeToken = localStorage.getItem('deriv_active_token');
           if (activeToken) {
-            console.log('Attempting auto-reconnect...');
+            console.log(`[DrCtx] Auto-reconnect attempt ${reconnectAttemptsRef.current}...`);
             initWebSocket(activeToken);
           }
-        }, 3000); // Wait 3 seconds before reconnecting
+        }, delay);
       }
     };
 
@@ -371,21 +384,25 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
       console.error('Deriv WS Error:', error);
       setLastError('Erro na conexão com a Deriv');
       setIsConnecting(false);
+      // onerror is always followed by onclose — reconnect handled there
     };
 
     setSocket(ws);
+    socketRef.current = ws; // keep ref in sync
     return ws;
-  }, [socket]); // socket dep preserved
+  }, []); // [FIXED] removed 'socket' dep — use socketRef.current instead to avoid stale closures
 
   // Connect function exposed to consumers
   const connect = async (apiToken: string): Promise<boolean> => {
-    if (socket) {
-      // If manually connecting, we close any existing socket first
-      shouldReconnect.current = false; // Disable reconnect for the old socket
-      socket.close();
+    if (socketRef.current) {
+      // If manually connecting, close any existing socket first
+      shouldReconnect.current = false;
+      reconnectAttemptsRef.current = 0; // Reset backoff on manual connect
+      socketRef.current.close();
+      socketRef.current = null;
     }
     // Small delay to ensure clean state
-    setTimeout(() => initWebSocket(apiToken), 100);
+    setTimeout(() => { shouldReconnect.current = true; initWebSocket(apiToken); }, 100);
     return true;
   };
 
@@ -409,7 +426,7 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ ping: 1 }));
         }
-      }, 20000); // 20 seconds ping (Safe Keep-Alive)
+      }, 15000); // [PASSO 1] 15s ping (mais agressivo para evitar timeout em produção)
       setKeepAliveInterval(interval);
 
       return () => clearInterval(interval);

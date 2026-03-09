@@ -57,10 +57,7 @@ import SensorExplosivo from "./pages/SensorExplosivo";
 import EfectoMidas from "./pages/EfectoMidas";
 import AstronBot from "./pages/AstronBot";
 import OracleAI from "./pages/OracleAI";
-import IQBotPage from "./pages/IQBotPage";
-
-
-
+import OracleQuant from "./pages/OracleQuant";
 
 import ReferralLanding from "./pages/ReferralLanding";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
@@ -300,14 +297,7 @@ const App = () => {
                           </>
                         } />
 
-                        <Route path="/bots" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <BotSelection />
-                            </main>
-                          </>
-                        } />
+
 
 
 
@@ -329,14 +319,7 @@ const App = () => {
                           </>
                         } />
 
-                        <Route path="/gestion-riesgo" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <RiskSettings />
-                            </main>
-                          </>
-                        } />
+
 
                         <Route path="/bot-alpha" element={
                           <>
@@ -405,29 +388,15 @@ const App = () => {
 
 
 
-                        <Route path="/efecto-midas" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <EfectoMidas />
-                            </main>
-                          </>
-                        } />
 
-                        <Route path="/oracle-ai" element={
-                          <>
-                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
-                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <OracleAI />
-                            </main>
-                          </>
-                        } />
 
-                        <Route path="/iq-option" element={
+
+
+                        <Route path="/oracle-quant" element={
                           <>
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
-                              <IQBotPage />
+                              <OracleQuant />
                             </main>
                           </>
                         } />

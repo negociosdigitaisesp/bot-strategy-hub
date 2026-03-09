@@ -3,7 +3,7 @@ import { Plug, Shield, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import BrokerCard from '../components/BrokerCard';
 import { DerivConnectionForm } from '../components/DerivConnectionForm';
-import IQBotCredentials from '../components/IQBot/IQBotCredentials';
+import { IQOptionConnectionForm } from '../components/IQBot/IQOptionConnectionForm';
 import { useBrokerHub } from '../hooks/useBrokerHub';
 import { useAuth } from '../contexts/AuthContext';
 import { useDeriv } from '../contexts/DerivContext';
@@ -11,17 +11,19 @@ import { useIQBot } from '../hooks/useIQBot';
 import RecentGainsTicker from '../components/RecentGainsTicker';
 import { SpecialOfferModal } from '../components/SpecialOfferModal';
 import { useFreemiumLimiter } from '../hooks/useFreemiumLimiter';
+import { toast } from 'sonner';
 
 const BrokerHubPage: React.FC = () => {
     const { derivBroker, iqBroker, totalBalance, connectedCount, totalBrokers, refreshIQ } = useBrokerHub();
     const { isConnected: derivConnected, account: derivAccount } = useDeriv();
-    const { bot: iqBot, saveCredentials } = useIQBot();
+    const { bot: iqBot, iqEmail, saveCredentials } = useIQBot();
     const { user } = useAuth();
     const { daysLeft } = useFreemiumLimiter();
 
     const [showDerivForm, setShowDerivForm] = useState(false);
     const [showIQForm, setShowIQForm] = useState(false);
     const [showOfferModal, setShowOfferModal] = useState(false);
+    const [iqLoading, setIqLoading] = useState(false);
 
     const derivBalance = derivConnected && derivAccount ? parseFloat(derivAccount.balance) : null;
     const isExpired = daysLeft !== null && daysLeft <= 0;
@@ -87,16 +89,16 @@ const BrokerHubPage: React.FC = () => {
                 />
 
                 {/* IQ Option Card */}
-                <BrokerCard
+                {false && <BrokerCard
                     name="IQ Option"
                     logoFallback="📈"
-                    isConnected={iqBroker.isConnected || !!iqBot?.iq_email}
+                    isConnected={iqBroker.isConnected || !!iqEmail}
                     balance={null}
                     ctaLabel="Administrar Conexión"
-                    ctaDisconnectedLabel="Iniciar Sesión"
+                    ctaDisconnectedLabel="Conectar con E-mail"
                     onCtaClick={() => setShowIQForm(!showIQForm)}
                     description="Copy Trading & opciones binarias"
-                />
+                />}
 
                 {/* Coming Soon Card */}
                 <BrokerCard
@@ -134,16 +136,25 @@ const BrokerHubPage: React.FC = () => {
                     <div className="rounded-2xl border border-cyan-500/10 bg-[#0B0E14]/60 p-6">
                         <div className="flex items-center gap-3 mb-4">
                             <Shield className="text-cyan-400" size={20} />
-                            <h3 className="text-lg font-bold text-white">Conexión IQ Option — Credenciales</h3>
+                            <h3 className="text-lg font-bold text-white">Conexión IQ Option — E-mail</h3>
                         </div>
-                        <IQBotCredentials
-                            config={iqBot ? { iq_email: iqBot.iq_email, iq_password: '', stake_amount: iqBot.stake_amount || 10 } : undefined}
-                            onSave={async (data: any) => {
-                                const result = await saveCredentials(data.iq_email, data.iq_password, data.stake_amount);
-                                if (result?.error) throw new Error(result.error);
+                        <IQOptionConnectionForm
+                            loading={iqLoading}
+                            hasCredentials={!!iqEmail}
+                            savedEmail={iqEmail}
+                            onConnect={async (email, pass) => {
+                                setIqLoading(true);
+                                const res = await saveCredentials(email, pass);
+                                setIqLoading(false);
+                                if (res?.error) {
+                                    toast.error(res.error);
+                                    throw new Error(res.error);
+                                }
+                                toast.success('Credenciales guardadas. Ve a la pestaña IQ Quant para operar.');
+                                setShowIQForm(false);
                                 refreshIQ();
+                                return res;
                             }}
-                            onCancel={() => setShowIQForm(false)}
                         />
                     </div>
                 </div>

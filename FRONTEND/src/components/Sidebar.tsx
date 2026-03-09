@@ -180,14 +180,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                     requiresUpgrade: false,
                     description: 'Central de conexiones'
                 },
-                {
-                    name: 'Gestión del Riesgo',
-                    icon: <ShieldCheck size={20} />,
-                    path: '/gestion-riesgo',
-                    isImportant: true,
-                    requiresUpgrade: false,
-                    description: 'Protección inteligente'
-                },
+
                 {
                     name: 'Dashboard',
                     icon: <LayoutDashboard size={20} />,
@@ -202,43 +195,12 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             label: 'ECOSISTEMA DERIV',
             items: [
                 {
-                    name: 'ORACLE AI',
-                    icon: <Atom size={20} />,
-                    path: '/oracle-ai',
+                    name: 'Copy Trading',
+                    icon: <Crosshair size={20} />,
+                    path: '/oracle-quant',
                     isImportant: true,
                     requiresUpgrade: true,
-                    description: 'Maestro v3',
-                    badge: '2.2X'
-                },
-                {
-                    name: 'Efecto Midas',
-                    icon: <Coins size={20} />,
-                    path: '/efecto-midas',
-                    isImportant: false,
-                    requiresUpgrade: true,
-                    description: 'Shadow Mode - Digit Differs'
-                },
-                {
-                    name: 'Bots',
-                    icon: <Bot size={20} />,
-                    path: '/bots',
-                    isImportant: false,
-                    requiresUpgrade: true,
-                    description: 'Seleccionar estrategia'
-                },
-            ]
-        },
-        {
-            label: 'ECOSISTEMA IQ OPTION',
-            items: [
-                {
-                    name: 'Copy Trading Pro',
-                    icon: <TrendingUp size={20} />,
-                    path: '/iq-option',
-                    isImportant: false,
-                    requiresUpgrade: true,
-                    description: 'Copy Trading automatizado',
-                    badge: 'NUEVO'
+                    description: 'Motor HFT Estatístico'
                 },
             ]
         },

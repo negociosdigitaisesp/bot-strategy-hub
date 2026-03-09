@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { getReferralCodeFromStorage, lookupAffiliateId } from '../hooks/useReferral';
 
 // Constante para la clave de almacenamiento local
-const DEMO_STORAGE_KEY = 'supabase.auth.token';
+const DEMO_STORAGE_KEY = 'sb-central-auth';
 
 interface AuthContextType {
   session: Session | null;
