@@ -177,12 +177,12 @@ export default function IQBotExtension({ trader = null, ativo = false, lucroHoje
                     onClick={onToggleBot}
                     style={{
                         width: '100%', padding: '10px',
-                        borderRadius: 8, border: 'none',
+                        borderRadius: 8,
+                        border: ativo ? '1px solid rgba(255,59,92,0.35)' : 'none',
                         background: ativo
                             ? 'rgba(255,59,92,0.15)'
                             : 'linear-gradient(135deg, #00FF88, #00D4FF)',
                         color: ativo ? '#FF3B5C' : '#07100D',
-                        border: ativo ? '1px solid rgba(255,59,92,0.35)' : 'none',
                         fontSize: 12, fontWeight: 800, cursor: 'pointer',
                         transition: 'opacity 150ms',
                     }}
