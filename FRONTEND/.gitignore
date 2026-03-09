@@ -80,6 +80,6 @@ venv.bak/
 bot_logs/
 trading_data/
 *.csv
-*.json
+!vercel.json
 .vercel
 .env*.local
