@@ -1,6 +1,6 @@
 {
-    "buildCommand": "cd FRONTEND && npm install && npm run build",
-    "outputDirectory": "FRONTEND/dist",
+    "buildCommand": "npm install && npm run build",
+    "outputDirectory": "dist",
     "rewrites": [
         {
             "source": "/(.*)",

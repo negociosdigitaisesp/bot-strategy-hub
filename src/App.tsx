@@ -57,6 +57,8 @@ import EfectoMidas from "./pages/EfectoMidas";
 import AstronBot from "./pages/AstronBot";
 import IQBotMarketplace from "./pages/IQBotMarketplace";
 import IQBotPanel from "./components/iq-bot/IQBotPanel";
+import OracleQuant from "./pages/OracleQuant";
+import IQQuant from "./pages/IQQuant";
 
 
 
@@ -82,7 +84,7 @@ const App = () => {
   };
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AuthProvider>
@@ -429,6 +431,24 @@ const App = () => {
                             <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
                             <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
                               <AstronBot />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/oracle-quant" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <OracleQuant />
+                            </main>
+                          </>
+                        } />
+
+                        <Route path="/iq-quant" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <IQQuant />
                             </main>
                           </>
                         } />

@@ -237,17 +237,18 @@ class DerivEngine:
     # ── Persistência de resultados ─────────────────────────────────────────
 
     async def _save_results(self, results: list) -> None:
-        """Batch insert dos resultados + atualiza RiskManager por cliente."""
+        """Batch insert dos resultados + atualiza RiskManager por cliente.
+        
+        IMPORTANTE: NÃO escrevemos o stake calculado de volta no active_bots.
+        O RiskManager gerencia o stake inteiramente em RAM (gale_level, base_stake).
+        Escrever o gale stake de volta no DB causava race condition:
+        o sync loop lia o valor e sobrescrevia o base_stake, corrompendo o Martingale.
+        """
         rows_to_insert = []
-        updates_to_active_bots = []
         for res in results:
             if isinstance(res, Exception):
                 self._total_errors += 1
                 logger.error(f"Exceção em execute_order: {res}")
-                # Precisamos destravar mesmo em caso de exceção brutal nas tasks
-                # Mas Exception da task não tem user_id no objeto. Para isso precisaríamos 
-                # embrulhar a exception. Como a exceção brutal é rara (execute_order engole a maioria),
-                # o lock pode ficar preso. Idealmente lidaríamos, mas passamos por agora as capturadas pelo dict
                 continue
             if isinstance(res, dict):
                 rows_to_insert.append(res)
@@ -257,26 +258,21 @@ class DerivEngine:
                 status = res.get("status", "")
                 profit = float(res.get("profit", 0))
                 
-                # Se for erro ao criar ordem, nós apenas destravamos e seguimos (status='exception', 'auth_error', etc)
                 if status in ("won", "lost"):
                     self._risk_manager.process_result(uid, status, profit)
-                    # Pega o novo stake calculado (para o Gale/Soros, ou base)
-                    new_stake = self._risk_manager.get_stake(uid)
-                    updates_to_active_bots.append((uid, new_stake))
+                    # Log do próximo stake (apenas informativo, NÃO escreve no DB)
+                    next_stake = self._risk_manager.get_stake(uid)
+                    risk_summary = self._risk_manager.get_state_summary(uid)
+                    logger.info(
+                        f"📊 RISK RESULT {uid}: {status} | "
+                        f"profit={profit:+.2f} | "
+                        f"next_stake={next_stake:.2f} | "
+                        f"gale={risk_summary.get('gale_level', 0) if risk_summary else 0} | "
+                        f"session_pnl={risk_summary.get('session_profit', 0) if risk_summary else 0}"
+                    )
                 
                 # Destrava cliente liberando a próxima entrada!
                 self._risk_manager.unlock_trade(uid)
-
-        # Realiza os updates de stake na tabela active_bots PRIMEIRO para garantir sincronismo
-        for uid, new_stake in updates_to_active_bots:
-            try:
-                await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda u=uid, s=new_stake: self._supabase.table("active_bots").update({"stake_amount": s}).eq("user_id", u).eq("broker", "deriv").execute()
-                )
-                logger.debug(f"✅ Stake atualizado para {new_stake} no active_bots do user {uid}")
-            except Exception as e:
-                logger.error(f"Erro ao atualizar active_bots stake_amount para {uid}: {e}")
 
         if not rows_to_insert:
             return

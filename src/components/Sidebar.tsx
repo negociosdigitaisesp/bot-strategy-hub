@@ -31,7 +31,8 @@ import {
     LayoutDashboard,
     Bot,
     Crosshair,
-    Atom
+    Atom,
+    Database
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -204,6 +205,25 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             badge: '2.2X'
         },
 
+        {
+            name: 'Copy Trading',
+            icon: <Database size={20} />,
+            path: '/oracle-quant',
+            isImportant: true,
+            requiresUpgrade: true,
+            description: 'Estratégias HFT por horário',
+            badge: 'HFT'
+        },
+
+        {
+            name: 'IQ Quant',
+            icon: <Crosshair size={20} />,
+            path: '/iq-quant',
+            isImportant: true,
+            requiresUpgrade: true,
+            description: 'Motor HFT IQ Option',
+            badge: 'IQ'
+        },
 
         {
             name: 'Bots',

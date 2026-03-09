@@ -58,9 +58,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Get current session
+    // Get current session — com timeout de segurança de 8s
     const getSession = async () => {
       setLoading(true);
+
+      // Safety net: se Supabase não responder em 8s (DNS falhou, projeto pausado etc.)
+      // liberamos o loading para que o usuário veja a tela de login normalmente.
+      const loadingTimeout = setTimeout(() => {
+        console.warn('[Auth] Timeout de 8s atingido — Supabase não respondeu. Liberando loading.');
+        setLoading(false);
+      }, 8000);
+
       try {
         // console.log('Retrieving Supabase session...');
         const { data, error } = await supabase.auth.getSession();
@@ -93,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Unexpected error retrieving session:', err);
         checkOfflineMode();
       } finally {
+        clearTimeout(loadingTimeout); // cancela timeout se Supabase respondeu normalmente
         setLoading(false);
       }
     };

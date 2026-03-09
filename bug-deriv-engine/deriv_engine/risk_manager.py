@@ -110,16 +110,17 @@ class RiskManager:
         # ── Martingale: escala stake após derrota ──────────────────────
         if state.use_martingale and state.gale_level > 0:
             stake = state.base_stake * (state.martingale_factor ** state.gale_level)
-            logger.debug(
-                f"[RISK] {user_id} Martingale G{state.gale_level}: "
+            logger.info(
+                f"[RISK] 🎰 {user_id} Martingale G{state.gale_level}: "
+                f"base={state.base_stake:.2f} × {state.martingale_factor}^{state.gale_level} = "
                 f"stake={stake:.2f}"
             )
 
         # ── Soros: reinveste lucro acumulado ───────────────────────────
         if state.use_soros and state.consecutive_wins > 0 and state.soros_accumulated > 0:
             stake = state.base_stake + state.soros_accumulated
-            logger.debug(
-                f"[RISK] {user_id} Soros W{state.consecutive_wins}: "
+            logger.info(
+                f"[RISK] 🔄 {user_id} Soros W{state.consecutive_wins}: "
                 f"stake={stake:.2f} (base + {state.soros_accumulated:.2f})"
             )
 
@@ -296,6 +297,12 @@ class RiskManager:
         if state.gale_level == 0 and state.base_stake != new_base_stake:
             state.base_stake = new_base_stake
             changed = True
+        elif state.gale_level > 0 and state.base_stake != new_base_stake:
+            logger.info(
+                f"[RISK] 🛡️ GUARD: Bloqueou atualização de base_stake para {user_id} "
+                f"(gale_level={state.gale_level}, base={state.base_stake:.2f}, "
+                f"DB_tentou={new_base_stake:.2f})"
+            )
 
         if not changed:
             return
