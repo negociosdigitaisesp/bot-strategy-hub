@@ -380,9 +380,11 @@ const OracleQuant = () => {
     } catch { /* ignore parse errors */ }
     return []
   })
-  const [sessionWins, setSessionWins] = useState(0)
-  const [sessionLosses, setSessionLosses] = useState(0)
-  const [sessionProfit, setSessionProfit] = useState(0)
+  // [FIX] Stats derivados do sessionHistory (persistido no localStorage)
+  // Isso garante que os contadores NÃO resetam ao recarregar a página
+  const sessionWins = useMemo(() => sessionHistory.filter(t => t.result === 'WIN').length, [sessionHistory])
+  const sessionLosses = useMemo(() => sessionHistory.filter(t => t.result === 'LOSS').length, [sessionHistory])
+  const sessionProfit = useMemo(() => sessionHistory.reduce((sum, t) => sum + (t.profit || 0), 0), [sessionHistory])
   const [togglingStrategy, setTogglingStrategy] = useState<string | null>(null)
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
@@ -750,15 +752,13 @@ const OracleQuant = () => {
           addLog('ok', `[ðŸ† WIN G${i}] ${ativo} | Lucro: +$${result.profit.toFixed(2)}`)
           finalResult = 'WIN'
           finalWon = true
-          setSessionWins(p => p + 1)
-          setSessionProfit(p => p + result.profit)
+          // Stats são derivados automaticamente do sessionHistory (useMemo)
           break
         } else {
           addLog('error', `[ðŸŸ¥ LOSS G${i}] ${ativo} | -$${stake.toFixed(2)}`)
           if (i === 2) {
             finalResult = 'LOSS'
-            setSessionLosses(p => p + 1)
-            setSessionProfit(p => p + totalProfit)
+            // Stats são derivados automaticamente do sessionHistory (useMemo)
           }
         }
       }
@@ -783,7 +783,7 @@ const OracleQuant = () => {
       stake: base,
     }
     setSessionHistory(prev => [entry, ...prev].slice(0, 50))
-  }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setSessionHistory, setOpenPositions, setSessionWins, setSessionLosses, setSessionProfit])
+  }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setSessionHistory, setOpenPositions])
 
   // [SHIELD_AGENT] Ref estÃ¡vel para evitar re-subscribe do canal Realtime
   const executeGaleChainRef = useRef(executeGaleChain)
