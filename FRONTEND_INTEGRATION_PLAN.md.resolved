@@ -1,0 +1,101 @@
+# Plano de Integração: Módulo IQ Bot → FRONTEND Principal
+
+Este documento detalha o passo a passo completo para migrar (integrar) o módulo **IQ Option CopyTrading** (atualmente no projeto de teste/exemplo deste repositório) para o seu **FRONTEND Principal**.
+
+A arquitetura do fluxo orgânico final validado (Market Data → Shadow Engine → Central Engine → Frontend via Supabase) exige que o frontend saiba se comunicar apenas com o **Supabase** (para configuração, start/stop e histórico) e receba os dados em tempo real.
+
+---
+
+## 1. Variáveis de Ambiente e Configuração da VPS
+
+O seu Frontend Principal precisa das variáveis do Supabase para conectar ao banco que a VPS já está usando. 
+Garanta que o arquivo [.env.local](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/.env.local) (ou [.env](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/.env)) do **FRONTEND Principal** inclua o acesso correto ao Supabase.
+
+```env
+# Conexão com o Supabase (O mesmo usado no projeto de teste e na VPS)
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anon_do_supabase
+```
+
+**Nota sobre a VPS:** O frontend não se conecta diretamente à VPS. Ele se conecta ao **Supabase**. Quando o usuário clica em "Iniciar", o frontend atualiza o `is_active=true` na tabela `iq_bots` no Supabase. O `iq-central-engine` rodando na VPS escuta essa alteração via realtime e dispara a automação na IQ Option. O histórico de win/loss sobe da VPS de volta para o Supabase e aparece no front. O fluxo já está 100% testado e validado.
+
+---
+
+## 2. Arquivos e Diretórios a Serem Migrados
+
+A estrutura do Módulo IQ Bot depende de Hooks, Páginas e eventualmente Utils. Você precisará copiar a seguinte estrutura do projeto atual de exemplo para o projeto FRONTEND Principal.
+
+### A. Hooks React (Lógica de Negócio e Conexão)
+Estes arquivos fazem a "ponte" via Supabase Realtime:
+- Copiar de: `src/hooks/useIQBot.js` (ou [.ts](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/vite.config.ts))  → Para: `FRONTEND/src/hooks/useIQBot.ts`
+- Copiar de: `src/hooks/useIQTrades.js` (ou [.ts](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/vite.config.ts)) → Para: `FRONTEND/src/hooks/useIQTrades.ts`
+- Copiar de: `src/hooks/useIQCountdown.js` (ou [.ts](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/vite.config.ts)) → Para: `FRONTEND/src/hooks/useIQCountdown.ts`
+
+*(Certifique-se de que os imports dentro destes hooks apontem para o cliente Supabase correto do seu FRONTEND Principal, frequentemente localizado em `src/lib/supabaseClient.ts`)*
+
+### B. Páginas e Componentes UI
+A página principal do robô que mostramos operando (com o visual premium, loaders, e Flash de win/loss).
+- Copiar de: [src/pages/IQBotPage.tsx](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/src/pages/IQBotPage.tsx) → Para: [FRONTEND/src/pages/IQBotPage.tsx](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/src/pages/IQBotPage.tsx)
+*(Verifique se os imports como Framer Motion e ícones batem com a estrutura do FRONTEND Principal. Se necessário, adicione `framer-motion` no [package.json](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/package.json) do Frontend Principal)*
+
+---
+
+## 3. Roteamento (Adicionando a Tela ao App.tsx)
+
+No seu FRONTEND Principal ([FRONTEND/src/App.tsx](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/src/App.tsx) ou router principal), você deve importar e registrar a rota do módulo IQ Bot para que ela fique acessível no seu Sidebar/Menu lateral.
+
+### No arquivo de Roteamento ([App.tsx](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/src/App.tsx) ou [main.tsx](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/src/main.tsx)):
+```tsx
+// 1. Importar a página
+import IQBotPage from './pages/IQBotPage';
+
+// 2. Adicionar nas rotas (dentro do <Routes>)
+<Route path="/iq-option" element={<IQBotPage />} />
+```
+
+### No Sidebar/Menu de Navegação (`Sidebar.tsx` ou similar):
+Adicionar o link no menu para o usuário poder acessar a nova página.
+```tsx
+<Link to="/iq-option" className="seu-estilo-de-menu">
+  <IconeAdequado className="sua-classe-icone" />
+  <span>Módulo IQ Bot</span>
+</Link>
+```
+
+---
+
+## 4. Banco de Dados (Tabelas do Supabase)
+
+O frontend assume que existem certas tabelas no Supabase para salvar senhas e puxar histórico. Como conectamos a VPS, essas tabelas **já existem no seu Supabase**, pois testamos hoje:
+
+1. `iq_bots` (configurações, emails e is_active)
+2. `iq_trade_logs` (histórico de win/loss/empate)
+
+**Atenção:** Garanta que as regras de segurança (Row Level Security - RLS) destas tabelas no Supabase permitem que usuários autenticados (`authenticated`) façam `SELECT`, `INSERT` e `UPDATE` *apenas nas linhas onde o `user_id` seja o deles mesmos*.
+
+---
+
+## 5. Instalação de Dependências (Se necessário)
+
+Ao analisar a página [IQBotPage.tsx](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/FRONTEND/src/pages/IQBotPage.tsx), vemos que ela utiliza algumas dependências de animação. No terminal do **FRONTEND Principal**, execute caso não tenha:
+
+```bash
+npm install framer-motion
+# ou
+yarn add framer-motion
+```
+
+---
+
+## 6. Fluxo de Execução Real
+
+Quando o FRONTEND Principal estiver com a tela no ar, esse será o formato de ponta a ponta:
+
+1. Cliente faz login no **Frontend Principal**.
+2. Navega até a página **Módulo IQ Bot** (`/iq-option`).
+3. Cadastra o *Email* e *Senha* da corretora e clica em **Iniciar**.
+4. O [useIQBot](file:///d:/IQ%20-%20COPY%20TRADING%20-%20AIOS%20SCALING/src/components/CopyTradingIQ/hooks/useIQBot.js#4-137) altera o `is_active` para `true` lá no Supabase.
+5. A VPS capta o evento, destrava a API e entra na conta da corretora do cliente.
+6. A página no frontend exibe os "Trades" na tabela inferior consumindo em tempo real da tabela `iq_trade_logs` via WebSockets do Supabase, piscando Verde (Win) ou Vermelho (Loss).
+
+Isso finaliza a integração Frontend-VPS de forma assíncrona, robusta e escalável, sem conexões diretas perigosas do navegador ao Python. A ponte inteira é o Supabase.

@@ -1,4 +1,5 @@
 {
+    "rootDirectory": "FRONTEND",
     "buildCommand": "npm install && npm run build",
     "outputDirectory": "dist",
     "rewrites": [
