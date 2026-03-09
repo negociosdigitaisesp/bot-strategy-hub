@@ -11,7 +11,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Database, Clock, TrendingUp, TrendingDown, Zap, Shield, Target, Activity,
   BarChart3, Timer, ChevronRight, Sparkles, Eye, Crosshair, Gem, Radio,
-  RefreshCw, Bug, Wand2, Brain, Users,
+  RefreshCw, Bug, Wand2, Brain, Users, Trash2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -22,7 +22,6 @@ import { useDeriv } from '@/contexts/DerivContext'
 import { useClientId } from '@/hooks/useClientId'
 import { TradingBackground } from '@/components/oracle/TradingBackground'
 import { RiskManagementPanel } from '@/components/oracle/RiskManagement'
-import { TradeHistoryPanel, type TradeEntry } from '@/components/oracle/TradeHistory'
 import { OpenPositionsPanel, type OpenPosition } from '@/components/oracle/OpenPositions'
 
 // â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -373,18 +372,31 @@ const OracleQuant = () => {
   })
   const [selectedBot, setSelectedBot] = useState<BotId | null>(null)
   const [openPositions, setOpenPositions] = useState<OpenPosition[]>([])
-  const [sessionHistory, setSessionHistory] = useState<TradeEntry[]>(() => {
-    try {
-      const raw = localStorage.getItem('oracle_trade_history')
-      if (raw) return (JSON.parse(raw) as TradeEntry[]).slice(0, 50)
-    } catch { /* ignore parse errors */ }
-    return []
-  })
-  // [FIX] Stats derivados do sessionHistory (persistido no localStorage)
-  // Isso garante que os contadores NÃO resetam ao recarregar a página
-  const sessionWins = useMemo(() => sessionHistory.filter(t => t.result === 'WIN').length, [sessionHistory])
-  const sessionLosses = useMemo(() => sessionHistory.filter(t => t.result === 'LOSS').length, [sessionHistory])
-  const sessionProfit = useMemo(() => sessionHistory.reduce((sum, t) => sum + (t.profit || 0), 0), [sessionHistory])
+  // --- Session Stats from Supabase B pending_trades ---
+  const CLIENT_ID = '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
+  const [sessionWins, setSessionWins] = useState(0)
+  const [sessionLosses, setSessionLosses] = useState(0)
+  const [sessionProfit, setSessionProfit] = useState(0)
+  const fetchSessionStats = useCallback(async () => {
+    const { data } = await hftSupabase
+      .from('pending_trades')
+      .select('result, profit')
+      .eq('client_id', CLIENT_ID)
+    if (!data) return
+    setSessionWins(data.filter(r => r.result === 'win').length)
+    setSessionLosses(data.filter(r => r.result === 'hit').length)
+    setSessionProfit(data.reduce((sum, r) => sum + (Number(r.profit) || 0), 0))
+  }, [])
+  useEffect(() => {
+    fetchSessionStats()
+    const ch = hftSupabase
+      .channel('pending-trades-stats')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_trades', filter: `client_id=eq.${CLIENT_ID}` }, () => {
+        fetchSessionStats()
+      })
+      .subscribe()
+    return () => { hftSupabase.removeChannel(ch) }
+  }, [fetchSessionStats])
   const [togglingStrategy, setTogglingStrategy] = useState<string | null>(null)
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
@@ -563,7 +575,6 @@ const OracleQuant = () => {
     let totalProfit = 0
     let finalWon = false
     const now = new Date()
-    const timeStr = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`
 
     // [LGN_AUDITOR] Sizing Guard: sÃ©rie completa â‰¤ 1% da banca
     const balance = await getBalanceFromWs()
@@ -746,13 +757,11 @@ const OracleQuant = () => {
           addLog('ok', `[ðŸ† WIN G${i}] ${ativo} | Lucro: +$${result.profit.toFixed(2)}`)
           finalResult = 'WIN'
           finalWon = true
-          // Stats são derivados automaticamente do sessionHistory (useMemo)
           break
         } else {
           addLog('error', `[ðŸŸ¥ LOSS G${i}] ${ativo} | -$${stake.toFixed(2)}`)
           if (i === 2) {
             finalResult = 'LOSS'
-            // Stats são derivados automaticamente do sessionHistory (useMemo)
           }
         }
       }
@@ -765,19 +774,21 @@ const OracleQuant = () => {
 
     addLog(finalWon ? 'ok' : 'error', `[FIM] ${ativo} â†’ ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
 
-    // FIX #4: Salva TODOS os resultados no histÃ³rico (inclusive CANCELLED)
-    const entry: TradeEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      time: timeStr,
-      asset: ativo,
-      direction: direcao as 'CALL' | 'PUT',
-      bot: bot ?? 'Oracle',
-      result: finalWon ? 'WIN' : (finalResult === 'CANCELLED' ? 'CANCELLED' : 'LOSS') as 'WIN' | 'LOSS' | 'CANCELLED',
-      profit: totalProfit,
+    // FIX #4: Persiste resultado no Supabase B pending_trades
+    const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    await hftSupabase.from('pending_trades').insert({
+      client_id: CLIENT_ID,
+      signal_id: idempotencyKey,
+      idempotency_key: idempotencyKey,
+      ativo: ativo,
+      active_id: ativo,
+      direcao: direcao,
       stake: base,
-    }
-    setSessionHistory(prev => [entry, ...prev].slice(0, 50))
-  }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setSessionHistory, setOpenPositions])
+      status: 'executed',
+      result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
+      profit: totalProfit,
+    })
+  }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setOpenPositions])
 
   // [SHIELD_AGENT] Ref estÃ¡vel para evitar re-subscribe do canal Realtime
   const executeGaleChainRef = useRef(executeGaleChain)
@@ -867,9 +878,15 @@ const OracleQuant = () => {
   // â”€â”€â”€ Persist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => { localStorage.setItem('oracle_active_bots', JSON.stringify([...activeBots])) }, [activeBots])
   useEffect(() => { localStorage.setItem('oracle_master_on', String(masterOn)) }, [masterOn])
-  useEffect(() => {
-    try { localStorage.setItem('oracle_trade_history', JSON.stringify(sessionHistory.slice(0, 50))) } catch { /* ignore */ }
-  }, [sessionHistory])
+
+  // â”€â”€â”€ Reset pending_trades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const handleReset = useCallback(async () => {
+    await hftSupabase.from('pending_trades').delete().eq('client_id', CLIENT_ID)
+    setSessionWins(0)
+    setSessionLosses(0)
+    setSessionProfit(0)
+    toast.success('Histórico resetado!')
+  }, [])
 
   // â”€â”€â”€ Fetch Grade from Supabase B â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // [SHIELD_AGENT] Schema Protection: valida colunas essenciais no resultado
@@ -1083,6 +1100,13 @@ const OracleQuant = () => {
                 className="p-2.5 rounded-xl border border-white/10 bg-black/20 text-white/35 hover:border-white/20 hover:text-white/55 transition-all disabled:opacity-40"
               >
                 <RefreshCw size={14} className={cn(loading && 'animate-spin')} />
+              </button>
+              <button
+                onClick={handleReset}
+                className="p-2.5 rounded-xl border border-red-500/20 bg-black/20 text-red-400/50 hover:border-red-500/40 hover:text-red-400 transition-all"
+                title="Resetar histórico"
+              >
+                <Trash2 size={14} />
               </button>
             </div>
           </div>
@@ -1346,7 +1370,7 @@ const OracleQuant = () => {
         </div>
 
         {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DEBUG LOGS PANEL (temporÃ¡rio) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-        <motion.div variants={itemVariants} className="hidden rounded-2xl border border-yellow-500/20 bg-black/40 backdrop-blur-sm overflow-hidden">
+        <motion.div variants={itemVariants} className="block rounded-2xl border border-yellow-500/20 bg-black/40 backdrop-blur-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-yellow-500/10 bg-yellow-500/5">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
