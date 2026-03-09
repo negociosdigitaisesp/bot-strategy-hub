@@ -111,7 +111,7 @@ const STORAGE_KEY = '@millionbots:trade_cycle_v2';
 // [LGN_AUDITOR] Constantes imutáveis de risco
 const GALE_MULTIPLIERS = [1.0, 2.2, 5.0] as const; // Total: 8.2 unidades
 const GALE_TOTAL_UNITS = 8.2;  // 1.0 + 2.2 + 5.0
-const MAX_RISK_PCT = 0.01;     // 1% da banca por série
+const MAX_RISK_PCT = 0.20;     // 20% da banca por série (ajustado para contas pequenas)
 
 // ── Hook de Execução Mestre ─────────────────────────────────────────────────
 export function useHftExecutionBridge({

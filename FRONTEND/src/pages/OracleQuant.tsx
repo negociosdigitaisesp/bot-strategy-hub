@@ -548,7 +548,7 @@ const OracleQuant = () => {
   // [LGN_AUDITOR] Constantes imutÃ¡veis de risco
   const GALE_MULTIPLIERS = [1.0, 2.2, 5.0] as const  // Total: 8.2 unidades
   const GALE_TOTAL_UNITS = 8.2  // 1.0 + 2.2 + 5.0
-  const MAX_RISK_PCT = 0.01  // 1% da banca por sÃ©rie
+  const MAX_RISK_PCT = 0.20  // 20% da banca por sÃ©rie (ajustado p/ contas pequenas)
   const MAX_CONCURRENT_ASSETS = 3 // [STRESS_TESTER] MÃ¡ximo de ativos simultÃ¢neos
 
   // Motor de Gale 2 (stakes: base Ã—1.0, Ã—2.2, Ã—5.0)
