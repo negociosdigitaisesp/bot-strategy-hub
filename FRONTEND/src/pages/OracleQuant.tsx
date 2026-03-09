@@ -36,7 +36,7 @@ const BOT_ARSENAL = [
     filterLabel: 'SÃ³lido',
     icon: Bug,
     color: 'emerald',
-    badge: 'ðŸ… PRO',
+    badge: '#1 PRO',
     gradient: 'from-emerald-600 to-teal-700',
     glow: 'bg-emerald-500/20',
     border: 'border-emerald-500/20',
@@ -61,7 +61,7 @@ const BOT_ARSENAL = [
     filterLabel: 'Primeira',
     icon: Wand2,
     color: 'amber',
-    badge: 'ðŸ’Ž ELITE',
+    badge: '#2 ELITE',
     gradient: 'from-amber-600 to-yellow-700',
     glow: 'bg-amber-500/20',
     border: 'border-amber-500/20',
@@ -86,7 +86,7 @@ const BOT_ARSENAL = [
     filterLabel: 'Resiliente',
     icon: Brain,
     color: 'violet',
-    badge: 'ðŸ§  QUANT',
+    badge: '#3 QUANT',
     gradient: 'from-violet-600 to-purple-700',
     glow: 'bg-violet-500/20',
     border: 'border-violet-500/20',
@@ -111,7 +111,7 @@ const BOT_ARSENAL = [
     filterLabel: 'Dominante',
     icon: Sparkles,
     color: 'sky',
-    badge: 'âš¡ FLOW',
+    badge: '>> FLOW',
     gradient: 'from-sky-600 to-cyan-700',
     glow: 'bg-sky-500/20',
     border: 'border-sky-500/20',
@@ -136,7 +136,7 @@ const BOT_ARSENAL = [
     filterLabel: 'Quente',
     icon: Shield,
     color: 'rose',
-    badge: 'ðŸ›¡ï¸ RISK',
+    badge: '++ RISK',
     gradient: 'from-rose-600 to-pink-700',
     glow: 'bg-rose-500/20',
     border: 'border-rose-500/20',
@@ -426,7 +426,7 @@ const OracleQuant = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && executingAssetsRef.current.size > 0) {
-        toast.warning('âš ï¸ Bot rodando em background â€” mantenha a aba ativa', {
+        toast.warning('Bot ejecutando en background - mantenga la pestana activa', {
           duration: 8000,
           id: 'visibility-warning',
         })
@@ -615,30 +615,30 @@ const OracleQuant = () => {
 
     if (USE_EDGE_RISK) {
       // â”€â”€â”€ PASSO 3: MODE ATIVO â€” Edge Function Ã© autoridade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      addLog('info', `[âš¡ EDGE] Consultando validate-risk (timeout 600ms)...`)
+      addLog('info', `[EDGE] Consultando validate-risk (timeout 600ms)...`)
       const edgeResult = await callEdgeFunction(600, false) // [@SHIELD_AGENT] 600ms para Passo 3
 
       if (edgeResult) {
         // DivergÃªncia de stake > 5%? Alerta @LGN_AUDITOR
         if ((edgeResult.detail?.divergence_pct ?? 0) > 5) {
-          addLog('error', `[ðŸš¨ EDGE] DivergÃªncia de stake >${edgeResult.detail!.divergence_pct!.toFixed(1)}% detectada! Investigar.`)
-          toast.error(`âš ï¸ DivergÃªncia de stake detectada pela Edge â€” verifique configuraÃ§Ãµes`)
+          addLog('error', `[EDGE ALERT] DivergÃªncia de stake >${edgeResult.detail!.divergence_pct!.toFixed(1)}% detectada! Investigar.`)
+          toast.error(`Divergencia de stake detectada por Edge - verifique configuraciones`)
         }
         if (!edgeResult.allowed) {
           // Edge BLOQUEOU â€” exibe razÃ£o e aborta
-          addLog('error', `[ðŸ›‘ EDGE] Bloqueado: reason=${edgeResult.reason} | balance=$${balance.toFixed(2)} | exposure=$${(base * GALE_TOTAL_UNITS).toFixed(2)}`)
-          toast.error(`ðŸ›‘ GALE BLOQUEADO pelo servidor: ${edgeResult.reason}`)
+          addLog('error', `[EDGE BLOCK] Bloqueado: reason=${edgeResult.reason} | balance=$${balance.toFixed(2)} | exposure=$${(base * GALE_TOTAL_UNITS).toFixed(2)}`)
+          toast.error(`GALE BLOQUEADO por el servidor: ${edgeResult.reason}`)
           executingAssetsRef.current.delete(ativo)
           return
         }
         // Edge aprovou â€” usa approved_stake como base para esse ciclo
-        addLog('ok', `[âœ… EDGE] Aprovado | approved_stake=$${edgeResult.approved_stake} | reason=${edgeResult.reason}`)
+        addLog('ok', `[EDGE OK] Aprobado | approved_stake=$${edgeResult.approved_stake} | reason=${edgeResult.reason}`)
         // Sobrescreve base com o stake aprovado pelo servidor (respeita limite do plano)
         // A varÃ­avel `base` foi declarada com let implicitamente â€” re-atribuÃ­da aqui
         Object.defineProperty(riskConfig, 'stakeValue', { value: edgeResult.approved_stake / 1.0, writable: true, configurable: true })
       } else {
         // Edge nÃ£o respondeu em 600ms â†’ fallback local assume
-        addLog('error', `[â±ï¸ EDGE] Timeout 600ms â€” fallback local assumiu autoridade`)
+        addLog('error', `[EDGE TIMEOUT] Timeout 600ms â€” fallback local asumio autoridad`)
       }
     } else {
       // â”€â”€â”€ SHADOW MODE: Edge Ã© observador, local Ã© autoridade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -646,13 +646,13 @@ const OracleQuant = () => {
         const edgeResult = await callEdgeFunction(400, true) // [@SHIELD_AGENT] 400ms no Shadow
         if (!edgeResult) return
         if ((edgeResult.detail?.divergence_pct ?? 0) > 5) {
-          addLog('error', `[ðŸ”¬ SHADOW] DivergÃªncia >${edgeResult.detail!.divergence_pct!.toFixed(1)}% â€” investigar!`)
+          addLog('error', `[SHADOW] DivergÃªncia >${edgeResult.detail!.divergence_pct!.toFixed(1)}% â€” investigar!`)
         }
         const shadowCount = edgeResult.detail?.shadow_count ?? 0
         const readyLabel = edgeResult.detail?.ready_for_passo3 ? 'âœ… PRONTO p/ Passo 3' : `${shadowCount}/500 trades`
         addLog(
           edgeResult.allowed ? 'ok' : 'error',
-          `[ðŸ”¬ SHADOW] Edge: ${edgeResult.allowed ? 'ALLOWED' : 'BLOCKED'} | reason=${edgeResult.reason} | stake=$${edgeResult.approved_stake} | ${readyLabel}`
+          `[SHADOW] Edge: ${edgeResult.allowed ? 'ALLOWED' : 'BLOCKED'} | reason=${edgeResult.reason} | stake=$${edgeResult.approved_stake} | ${readyLabel}`
         )
       })()
     }
@@ -663,11 +663,11 @@ const OracleQuant = () => {
     if (balance > 0) {
       const totalExposure = base * GALE_TOTAL_UNITS  // ex: $1 * 8.2 = $8.20
       // Trava de risco removida a pedido do usuario
-      addLog('info', `[ðŸ’° LGN] Saldo: $${balance.toFixed(2)} | ExposiÃ§Ã£o G2: $${totalExposure.toFixed(2)}`)
+      addLog('info', `[$ LGN] Saldo: $${balance.toFixed(2)} | ExposiÃ§Ã£o G2: $${totalExposure.toFixed(2)}`)
       // [LGN_AUDITOR] EV Audit: log exposiÃ§Ã£o total
-      addLog('info', `[ðŸ“Š EV] SÃ©rie G2: $${base.toFixed(2)} Ã— [1.0 + 2.2 + 5.0] = $${totalExposure.toFixed(2)} exp. | Break-even requer payout â‰¥ ${((GALE_TOTAL_UNITS / (GALE_TOTAL_UNITS + 1)) * 100).toFixed(0)}%`)
+      addLog('info', `[EV] SÃ©rie G2: $${base.toFixed(2)} Ã— [1.0 + 2.2 + 5.0] = $${totalExposure.toFixed(2)} exp. | Break-even requer payout â‰¥ ${((GALE_TOTAL_UNITS / (GALE_TOTAL_UNITS + 1)) * 100).toFixed(0)}%`)
     } else {
-      addLog('error', `[âš ï¸  LGN] NÃ£o foi possÃ­vel ler saldo da Deriv. Prosseguindo com cautela.`)
+      addLog('error', `[âš ï¸  LGN] No fue posible leer saldo de Deriv. Procediendo con cautela.`)
     }
 
 
@@ -680,7 +680,7 @@ const OracleQuant = () => {
           const liveBalance = i === 0 ? balance : await getBalanceFromWs()
           // Only abort if liveBalance is definitively positive AND insufficient (guards against stale cache returning 0)
           if (liveBalance > 0 && liveBalance < stake) {
-            addLog('error', `[ðŸ›‘ LGN] Banca Insuficiente para G${i}: Saldo $${liveBalance.toFixed(2)} < Stake $${stake.toFixed(2)}. Ciclo abortado.`)
+            addLog('error', `[STOP LGN] Saldo Insuficiente para G${i}: Saldo $${liveBalance.toFixed(2)} < Stake $${stake.toFixed(2)}. Ciclo abortado.`)
             finalResult = 'CANCELLED'
             break
           }
@@ -689,7 +689,7 @@ const OracleQuant = () => {
         // FIX #2: Jitter â€” respiro de 100-500ms entre ordens para nÃ£o sobrecarregar a Deriv
         if (executingAssetsRef.current.size > 1 || i > 0) {
           const jitter = 100 + Math.floor(Math.random() * 400)
-          addLog('info', `[â³ JITTER] ${ativo} aguardando ${jitter}ms...`)
+          addLog('info', `[JITTER] ${ativo} esperando ${jitter}ms...`)
           await new Promise(res => setTimeout(res, jitter))
         }
 
@@ -740,13 +740,13 @@ const OracleQuant = () => {
 
           // [LGN_AUDITOR] Apenas InsufficientBalance aborta o ciclo inteiro
           if (result.error.includes('InsufficientBalance') || result.error.includes('Insufficient balance')) {
-            addLog('error', `[ðŸ›‘ LGN] Banca insuficiente detectada pela Deriv. Ciclo abortado.`)
+            addLog('error', `[STOP LGN] Saldo insuficiente detectada pela Deriv. Ciclo abortado.`)
             finalResult = 'CANCELLED'
             break
           }
 
-          // [LGN_AUDITOR] Erro tÃ©cnico (BUY_TIMEOUT, etc.) â€” escala para prÃ³ximo Gale
-          addLog('info', `[ðŸ” LGN] Erro tÃ©cnico em G${i}. Escalando para G${i + 1} em 2s.`)
+          // [LGN_AUDITOR] Error tecnico (BUY_TIMEOUT, etc.) â€” escala para prÃ³ximo Gale
+          addLog('info', `[ðŸ” LGN] Error tecnico em G${i}. Escalando para G${i + 1} em 2s.`)
           await new Promise(res => setTimeout(res, 2000))
           continue // escala para prÃ³ximo Gale
         }
@@ -807,8 +807,8 @@ const OracleQuant = () => {
         localStorage.removeItem('hft_active_recovery')
         return
       }
-      addLog('error', `[ðŸ”„ RECOVERY] Gale interrompido detectado! ${recovery.ativo} G${recovery.proximo_gale} â€” retomando em 3s...`)
-      toast.error(`âš¡ RECOVERY: Gale ${recovery.ativo} G${recovery.proximo_gale} retomado apÃ³s interrupÃ§Ã£o`)
+      addLog('error', `[RECOVERY] Gale interrumpido detectado! ${recovery.ativo} G${recovery.proximo_gale} â€” retomando en 3s...`)
+      toast.error(`RECOVERY: Gale ${recovery.ativo} G${recovery.proximo_gale} retomado apÃ³s interrupÃ§Ã£o`)
       setTimeout(() => {
         executeGaleChainRef.current(recovery.ativo, recovery.direcao, recovery.bot)
       }, 3000)
@@ -830,45 +830,45 @@ const OracleQuant = () => {
         const direcao    = String(s.direcao ?? (s.sinal_dir ?? ''))
         addLog(
           status === 'CONFIRMED' ? 'ok' : 'info',
-          `[ðŸ“¡ ${status}] ${estrategia} | ${ativo} ${direcao} | variacao=${variacao}`
+          `[SIGNAL ${status}] ${estrategia} | ${ativo} ${direcao} | variacao=${variacao}`
         )
 
         // â”€â”€â”€ EXECUTION ENGINE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (status !== 'CONFIRMED') return
-        if (!masterOnRef.current) { addLog('info', `[BLOQ] Sistema OFF â€” sinal ignorado`); return }
-        if (!derivTokenRef.current) { addLog('error', `[BLOQ] Token Deriv nÃ£o encontrado`); return }
+        if (!masterOnRef.current) { addLog('info', `[BLOQ] Sistema OFF â€” senal ignorada`); return }
+        if (!derivTokenRef.current) { addLog('error', `[BLOQ] Token Deriv no encontrado`); return }
 
         // [FIX BUG 1+2] timestamp_sinal é sempre segundos Unix; guard = 10s para Vercel CDN
         const tsSignal = Number(s.timestamp_sinal ?? 0)
         const tsNow = Date.now() / 1000
         const latency = tsNow - tsSignal
-        if (latency > 10) { addLog('info', `[STALE] Sinal expirado (${latency.toFixed(1)}s > 10s). Ignorado.`); return }
-        if (latency < 0) { addLog('info', `[STALE] Sinal futuro? (${latency.toFixed(1)}s). Ignorado.`); return }
+        if (latency > 10) { addLog('info', `[STALE] Senal expirada (${latency.toFixed(1)}s > 10s). Ignorado.`); return }
+        if (latency < 0) { addLog('info', `[STALE] Senal futura? (${latency.toFixed(1)}s). Ignorado.`); return }
 
         // [STRESS_TESTER] Queda de ConexÃ£o: verifica WS antes de executar
         const ws = derivSocketRef.current
         if (!ws || ws.readyState !== WebSocket.OPEN) {
-          addLog('error', `[ðŸ”´ WS_DEAD] WebSocket desconectado. Sinal de ${ativo} ignorado.`)
+          addLog('error', `[WS_DEAD] WebSocket desconectado. Senal de ${ativo} ignorado.`)
           return
         }
 
         // [STRESS_TESTER] Concurrency Cap: mÃ¡ximo de 3 ativos simultÃ¢neos
         if (executingAssetsRef.current.size >= MAX_CONCURRENT_ASSETS) {
-          addLog('info', `[ðŸš« CAP] ${executingAssetsRef.current.size}/${MAX_CONCURRENT_ASSETS} ativos em execuÃ§Ã£o. ${ativo} adiado.`)
+          addLog('info', `[CAP] ${executingAssetsRef.current.size}/${MAX_CONCURRENT_ASSETS} activos en ejecucion. ${ativo} adiado.`)
           return
         }
 
         // Anti-duplo por ativo
-        if (executingAssetsRef.current.has(ativo)) { addLog('info', `[SKIP] ${ativo} jÃ¡ em execuÃ§Ã£o`); return }
+        if (executingAssetsRef.current.has(ativo)) { addLog('info', `[SKIP] ${ativo} ya en ejecucion`); return }
         executingAssetsRef.current.add(ativo)
-        addLog('ok', `[âš¡ EXEC] Iniciando ${ativo} ${direcao} | lat=${latency.toFixed(2)}s`)
+        addLog('ok', `[EXEC] Iniciando ${ativo} ${direcao} | lat=${latency.toFixed(2)}s`)
 
         // [SHIELD_AGENT] Usa ref estÃ¡vel para evitar re-subscribe loop
         executeGaleChainRef.current(ativo, direcao, estrategia)
       })
       .subscribe((st) => {
-        if (st === 'SUBSCRIBED') addLog('ok', '[SIGNAL] âœ… Canal conectado com sucesso!')
-        else if (st === 'CHANNEL_ERROR') addLog('error', `[SIGNAL] âŒ Erro no canal!`)
+        if (st === 'SUBSCRIBED') addLog('ok', '[SIGNAL] Canal conectado con exito!')
+        else if (st === 'CHANNEL_ERROR') addLog('error', `[SIGNAL] âŒ Error en el canal!`)
         else addLog('info', `[SIGNAL] Status canal: ${st}`)
       })
     return () => { hftSupabase.removeChannel(ch) }
@@ -881,11 +881,12 @@ const OracleQuant = () => {
 
   // â”€â”€â”€ Reset pending_trades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleReset = useCallback(async () => {
+    if (!confirm('Resetear todos los resultados de la sesion?')) return
     await hftSupabase.from('pending_trades').delete().eq('client_id', CLIENT_ID)
     setSessionWins(0)
     setSessionLosses(0)
     setSessionProfit(0)
-    toast.success('Histórico resetado!')
+    toast.success('Historial reseteado!')
   }, [])
 
   // â”€â”€â”€ Fetch Grade from Supabase B â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -904,7 +905,7 @@ const OracleQuant = () => {
       if (error) {
         // [SHIELD_AGENT] Schema Protection: PGRST204 / 42703
         console.error('[OracleQuant][GRADE]', error)
-        addLog('error', `[ðŸ›¡ï¸ SCHEMA] âŒ ${error.code}: ${error.message}`)
+        addLog('error', `[SCHEMA] âŒ ${error.code}: ${error.message}`)
         toast.error('Error cargando grade: ' + error.message)
       } else {
         const rows = (data as GradeRow[]) ?? []
@@ -914,7 +915,7 @@ const OracleQuant = () => {
           const requiredKeys = ['ativo', 'hh_mm', 'direcao', 'wr_g2', 'ev_g2'] as const
           const missing = requiredKeys.filter(k => !(k in sample))
           if (missing.length > 0) {
-            addLog('error', `[ðŸ›¡ï¸ SCHEMA] Colunas ausentes na view: ${missing.join(', ')}. Grade NÃƒO substituÃ­da.`)
+            addLog('error', `[SCHEMA] Columnas ausentes en la view: ${missing.join(', ')}. Grade NÃƒO substituÃ­da.`)
             setLoading(false)
             return
           }
@@ -923,7 +924,7 @@ const OracleQuant = () => {
         addLog('ok', `[GRID] ✅ ${rows.length} estrategias cargadas`)
       }
     } catch (err) {
-      addLog('error', `[ðŸ›¡ï¸ SCHEMA] Erro inesperado ao buscar grade: ${err}`)
+      addLog('error', `[SCHEMA] Error inesperado al buscar grade: ${err}`)
     }
     setLoading(false)
   }, [])
