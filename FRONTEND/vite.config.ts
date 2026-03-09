@@ -11,7 +11,7 @@ export default defineConfig(() => ({
     port: 8080,
   },
   build: {
-    outDir: "dist",
+    outDir: "../dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 2000,
   },
