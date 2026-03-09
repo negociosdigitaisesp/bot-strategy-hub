@@ -920,7 +920,7 @@ const OracleQuant = () => {
           }
         }
         setGrade(rows)
-        addLog('ok', `[GRADE] âœ… ${rows.length} estratÃ©gias carregadas`)
+        addLog('ok', `[GRID] ✅ ${rows.length} estrategias cargadas`)
       }
     } catch (err) {
       addLog('error', `[ðŸ›¡ï¸ SCHEMA] Erro inesperado ao buscar grade: ${err}`)
@@ -945,7 +945,7 @@ const OracleQuant = () => {
           const mapa: Record<string, boolean> = {};
           ((data as ClientConfig[]) ?? []).forEach((c) => { mapa[c.strategy_id] = c.ativo_flag })
           setConfig(mapa)
-          addLog('ok', `[CONFIG] âœ… ${Object.keys(mapa).length} estratÃ©gias configuradas`)
+          addLog('ok', `[CONFIG] ✅ ${Object.keys(mapa).length} estrategias configuradas`)
         }
       })
   }, [clientId])
@@ -1065,18 +1065,18 @@ const OracleQuant = () => {
 
               <div className="space-y-1.5">
                 <h1 className="text-2xl md:text-3xl font-black text-white leading-none tracking-tight">Copy Trading</h1>
-                <p className="text-xs md:text-sm text-white/45">Central de Copy Trading — Mesa de Traders Quantitativos</p>
+                <p className="text-xs md:text-sm text-white/45">Central de Copy Trading — Mesa de Traders Cuantitativos</p>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <span className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider',
                     masterOn ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-red-400/30 bg-red-500/10 text-red-300'
                   )}>
                     <span className={cn('h-1.5 w-1.5 rounded-full', masterOn ? 'bg-emerald-300 animate-pulse' : 'bg-red-300')} />
-                    {masterOn ? 'Rede Ativa' : 'Rede Pausada'}
+                    {masterOn ? 'Red Activa' : 'Red Pausada'}
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60">
                     <Users size={10} />
-                    {activeBots.size} Traders Em Execução
+                    {activeBots.size} Traders En Ejecución
                   </span>
                 </div>
               </div>
@@ -1092,7 +1092,7 @@ const OracleQuant = () => {
                     : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/15'
                 )}
               >
-                {masterOn ? 'DESLIGAR BOT' : 'LIGAR BOT'}
+                {masterOn ? 'APAGAR BOT' : 'ENCENDER BOT'}
               </button>
               <button
                 onClick={fetchGrade}
@@ -1104,7 +1104,7 @@ const OracleQuant = () => {
               <button
                 onClick={handleReset}
                 className="p-2.5 rounded-xl border border-red-500/20 bg-black/20 text-red-400/50 hover:border-red-500/40 hover:text-red-400 transition-all"
-                title="Resetar histórico"
+                title="Limpiar historial"
               >
                 <Trash2 size={14} />
               </button>
@@ -1119,8 +1119,8 @@ const OracleQuant = () => {
             const stats = [
               { label: 'Wins', value: sessionWins, icon: TrendingUp, colorKey: 'emerald' as StatColor, format: (v: number) => String(v) },
               { label: 'Losses', value: sessionLosses, icon: TrendingDown, colorKey: 'red' as StatColor, format: (v: number) => String(v) },
-              { label: 'Lucro / PrejuÃ­zo', value: sessionProfit, icon: Target, colorKey: profitColor, format: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} USD` },
-              { label: 'Assertividade G2', value: globalStats.allWrG2, icon: BarChart3, colorKey: 'violet' as StatColor, format: (v: number) => `${(v * 100).toFixed(1)}%` },
+              { label: 'Beneficio / Pérdida', value: sessionProfit, icon: Target, colorKey: profitColor, format: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} USD` },
+              { label: 'Asertividad G2', value: globalStats.allWrG2, icon: BarChart3, colorKey: 'violet' as StatColor, format: (v: number) => `${(v * 100).toFixed(1)}%` },
             ]
             return stats.map((stat) => {
               const cls = STAT_COLOR_CLASSES[stat.colorKey]
@@ -1210,7 +1210,7 @@ const OracleQuant = () => {
                         {stats?.lowSample && stats.count > 0 && (
                           <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
                             <Radio size={10} className="text-yellow-400" />
-                            <span className="text-[9px] text-yellow-400 font-bold">Aguardando Amostra</span>
+                            <span className="text-[9px] text-yellow-400 font-bold">Esperando Muestra</span>
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1271,7 +1271,7 @@ const OracleQuant = () => {
                       ) : (
                         <selectedBotData.bot.icon size={16} className={selectedBotData.bot.text} />
                       )}
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">{selectedBotData.bot.name} â€” Horarios</h3>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">{selectedBotData.bot.name} — Horarios</h3>
                     </div>
                     <span className="text-[10px] text-white/20 font-mono">{selectedBotData.stats.count} estrategias</span>
                   </div>
@@ -1374,18 +1374,18 @@ const OracleQuant = () => {
           <div className="flex items-center justify-between px-4 py-3 border-b border-yellow-500/10 bg-yellow-500/5">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-              <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Debug Logs â€” Supabase B (hft_lake)</span>
+              <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Debug Logs — Supabase B (hft_lake)</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-yellow-400/50">{debugLogs.length} entradas</span>
               <button onClick={() => setDebugLogs([])} className="text-[10px] text-white/20 hover:text-white/50 transition-colors px-2 py-0.5 rounded border border-white/10">
-                Limpar
+                Limpiar
               </button>
             </div>
           </div>
           <div className="h-48 overflow-y-auto p-3 font-mono text-[11px] space-y-0.5">
             {debugLogs.length === 0 ? (
-              <p className="text-white/20 text-center py-6">Aguardando eventos... (carregue a pÃ¡gina)</p>
+              <p className="text-white/20 text-center py-6">Esperando eventos... (recargue la página)</p>
             ) : (
               debugLogs.map((log, i) => (
                 <div key={i} className={cn('flex gap-2', log.level === 'error' ? 'text-red-400' : log.level === 'ok' ? 'text-emerald-400' : 'text-white/50')}>
