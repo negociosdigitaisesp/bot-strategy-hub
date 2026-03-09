@@ -220,14 +220,8 @@ export function useHftExecutionBridge({
     const balance = await HftDerivService.getBalance(derivSocketRef.current);
     if (balance > 0) {
       const totalExposure = baseStakeRef.current * GALE_TOTAL_UNITS;
-      const maxAllowed = balance * MAX_RISK_PCT;
-      addLog(`[💰 LGN] Saldo: $${balance.toFixed(2)} | Exposição G2: $${totalExposure.toFixed(2)} (max 1%: $${maxAllowed.toFixed(2)})`, 'info');
-      if (totalExposure > maxAllowed) {
-        addLog(`[🛑 LGN] Stake $${baseStakeRef.current.toFixed(2)} compromete ${((totalExposure / balance) * 100).toFixed(1)}% da banca. Máx: $${(maxAllowed / GALE_TOTAL_UNITS).toFixed(2)}/op. ABORTANDO.`, 'error');
-        activeAssetsRef.current.delete(payload.ativo);
-        setTradeCycle({ isActive: false, galeLevel: 0 });
-        return;
-      }
+      // Trava de risco removida a pedido do usuario
+      addLog(`[💰 LGN] Saldo: $${balance.toFixed(2)} | Exposição G2: $${totalExposure.toFixed(2)}`, 'info');
       addLog(`[📊 EV] Série G2: $${baseStakeRef.current.toFixed(2)} × [1.0+2.2+5.0] = $${totalExposure.toFixed(2)} | Break-even: payout ≥ ${((GALE_TOTAL_UNITS / (GALE_TOTAL_UNITS + 1)) * 100).toFixed(0)}%`, 'info');
     } else {
       addLog(`[⚠️ LGN] Não foi possível ler saldo. Prosseguindo com cautela.`, 'warn');

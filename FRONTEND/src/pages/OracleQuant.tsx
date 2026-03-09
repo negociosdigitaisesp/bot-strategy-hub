@@ -651,18 +651,12 @@ const OracleQuant = () => {
 
     if (balance > 0) {
       const totalExposure = base * GALE_TOTAL_UNITS  // ex: $1 * 8.2 = $8.20
-      const maxAllowed = balance * MAX_RISK_PCT      // ex: $1000 * 0.01 = $10
-      addLog('info', `[ðŸ’° LGN] Saldo: $${balance.toFixed(2)} | ExposiÃ§Ã£o G2: $${totalExposure.toFixed(2)} (max 1%: $${maxAllowed.toFixed(2)})`)
-      if (totalExposure > maxAllowed) {
-        addLog('error', `[ðŸ›‘ LGN] Stake base $${base.toFixed(2)} compromete ${((totalExposure / balance) * 100).toFixed(1)}% da banca. MÃ¡x permitido: $${(maxAllowed / GALE_TOTAL_UNITS).toFixed(2)}/op. ABORTANDO.`)
-        toast.error(`ðŸ›‘ GALE BLOQUEADO: Risco excede 1% da banca ($${totalExposure.toFixed(2)} > $${maxAllowed.toFixed(2)} permitido)`)
-        executingAssetsRef.current.delete(ativo)
-        return
-      }
+      // Trava de risco removida a pedido do usuario
+      addLog('info', `[ðŸ’° LGN] Saldo: $${balance.toFixed(2)} | ExposiÃ§Ã£o G2: $${totalExposure.toFixed(2)}`)
       // [LGN_AUDITOR] EV Audit: log exposiÃ§Ã£o total
       addLog('info', `[ðŸ“Š EV] SÃ©rie G2: $${base.toFixed(2)} Ã— [1.0 + 2.2 + 5.0] = $${totalExposure.toFixed(2)} exp. | Break-even requer payout â‰¥ ${((GALE_TOTAL_UNITS / (GALE_TOTAL_UNITS + 1)) * 100).toFixed(0)}%`)
     } else {
-      addLog('error', `[âš ï¸ LGN] NÃ£o foi possÃ­vel ler saldo da Deriv. Prosseguindo com cautela.`)
+      addLog('error', `[âš ï¸  LGN] NÃ£o foi possÃ­vel ler saldo da Deriv. Prosseguindo com cautela.`)
     }
 
 
