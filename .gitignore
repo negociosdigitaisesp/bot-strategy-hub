@@ -35,9 +35,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-# Python lib folders (not src/lib)
+# Python lib folders (not frontend src/lib)
 **/lib/
 **/lib64/
+!src/lib/
 !src/lib/**
 parts/
 sdist/
