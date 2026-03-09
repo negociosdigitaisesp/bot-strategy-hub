@@ -30,7 +30,7 @@ const BOT_ARSENAL = [
   {
     id: 'V1',
     name: 'MARCUS VEGA',
-    slogan: 'Scalper de alta precisÃ£o',
+    slogan: 'Scalper de alta precisão',
     photo: '/marcus.png',
     filter: 'FV1',
     filterLabel: 'SÃ³lido',
@@ -55,7 +55,7 @@ const BOT_ARSENAL = [
   {
     id: 'V2',
     name: 'Rael Duart',
-    slogan: 'Timing cirÃºrgico de reversÃ£o',
+    slogan: 'Timing cirúrgico de reversão',
     photo: '/rael duart.png',
     filter: 'FV2',
     filterLabel: 'Primeira',
@@ -80,7 +80,7 @@ const BOT_ARSENAL = [
   {
     id: 'V4',
     name: 'ORION ALMEIDA',
-    slogan: 'Leitura algorÃ­tmica institucional',
+    slogan: 'Leitura algorítmica institucional',
     photo: '/Samir Vegas.png',
     filter: 'FV4',
     filterLabel: 'Resiliente',
@@ -105,7 +105,7 @@ const BOT_ARSENAL = [
   {
     id: 'V5',
     name: 'TIAGO QUINTANA',
-    slogan: 'ConfirmaÃ§Ã£o multi-fator avanÃ§ada',
+    slogan: 'Confirmação multi-fator avançada',
     photo: '/rafael.png',
     filter: 'FV5',
     filterLabel: 'Dominante',
@@ -130,7 +130,7 @@ const BOT_ARSENAL = [
   {
     id: 'V7',
     name: 'SOFIA CENTINELA',
-    slogan: 'ProteÃ§Ã£o profissional de capital',
+    slogan: 'Proteção profissional de capital',
     photo: '/aria.png',
     filter: 'FV3',
     filterLabel: 'Quente',
