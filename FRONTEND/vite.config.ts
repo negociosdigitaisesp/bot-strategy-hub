@@ -14,6 +14,16 @@ export default defineConfig(() => ({
     outDir: "dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-framer': ['framer-motion'],
+          'vendor-ui': ['lucide-react', 'sonner'],
+        },
+      },
+    },
   },
   resolve: {
     alias: {

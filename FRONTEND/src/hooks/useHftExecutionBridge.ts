@@ -422,19 +422,36 @@ export function useHftExecutionBridge({
               });
             }
           } else if (signal.status === 'CONFIRMED') {
-            const now = Date.now();
-            const signalTimeMs = signal.timestamp_sinal > 20000000000
-              ? signal.timestamp_sinal
-              : signal.timestamp_sinal * 1000;
-            const diff = now - signalTimeMs;
+            const now = Date.now()
 
-            // [SHIELD_AGENT] Latency Guard: 2s máximo (era 8s)
-            if (diff >= 0 && diff <= 2000) {
-              addLog(`[HFT] CONFIRMED para ${signal.ativo} (Latência: ${diff}ms). Executando...`, 'success');
-              // [SHIELD_AGENT] Usa ref para evitar re-subscribe loop
-              executeOrderChainRef.current?.(signal);
+            // [FIX BUG 2] timestamp_sinal é SEMPRE segundos Unix no VPS
+            const signalTimeMs = signal.timestamp_sinal * 1000
+            const diff = now - signalTimeMs
+
+            // [FIX BUG 1] 10s de tolerância para Vercel CDN
+            if (diff >= 0 && diff <= 10000) {
+              const msIntoCandle = now % 60000
+              const msToSync = msIntoCandle <= 4000
+                ? 0
+                : 60000 - msIntoCandle
+
+              addLog(
+                `[✅ EXEC] ${signal.ativo} | lat=${diff}ms | sync=${msToSync}ms`,
+                'success'
+              )
+
+              // [FIX BUG 3] Sincroniza com início da próxima vela se já passou 4s
+              if (msToSync > 0 && msToSync < 56000) {
+                addLog(`[⏱ SYNC] Aguardando ${msToSync}ms para próxima vela`, 'info')
+                setTimeout(() => executeOrderChainRef.current?.(signal), msToSync)
+              } else {
+                executeOrderChainRef.current?.(signal)
+              }
             } else {
-              addLog(`[STALE] Sinal de ${signal.ativo} expirou. Latência de ${Math.max(0, diff)}ms > 2000ms. Ignorado.`, 'warn');
+              addLog(
+                `[STALE] ${signal.ativo} | diff=${diff}ms | ts_ms=${signalTimeMs} | now=${now}`,
+                'warn'
+              )
             }
           }
         }

@@ -827,11 +827,11 @@ const OracleQuant = () => {
         if (!masterOnRef.current) { addLog('info', `[BLOQ] Sistema OFF â€” sinal ignorado`); return }
         if (!derivTokenRef.current) { addLog('error', `[BLOQ] Token Deriv nÃ£o encontrado`); return }
 
-        // [SHIELD_AGENT] Latency Guard: â‰¤2s (era 8s)
+        // [FIX BUG 1+2] timestamp_sinal é sempre segundos Unix; guard = 10s para Vercel CDN
         const tsSignal = Number(s.timestamp_sinal ?? 0)
         const tsNow = Date.now() / 1000
         const latency = tsNow - tsSignal
-        if (latency > 8) { addLog('info', `[STALE] Sinal expirado (${latency.toFixed(1)}s > 8s). Ignorado.`); return }
+        if (latency > 10) { addLog('info', `[STALE] Sinal expirado (${latency.toFixed(1)}s > 10s). Ignorado.`); return }
         if (latency < 0) { addLog('info', `[STALE] Sinal futuro? (${latency.toFixed(1)}s). Ignorado.`); return }
 
         // [STRESS_TESTER] Queda de ConexÃ£o: verifica WS antes de executar
