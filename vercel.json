@@ -1,3 +1,5 @@
 {
-  "ignoreCommand": "exit 1"
+  "buildCommand": "cd FRONTEND && npm install && npm run build",
+  "outputDirectory": "FRONTEND/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
