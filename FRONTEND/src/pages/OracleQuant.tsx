@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OracleQuant.tsx â€” Trading Command Center (Redesign Pro) v2
  * Arsenal de bots especialistas com dados do Supabase B (hft_lake)
  * 
@@ -372,10 +372,16 @@ const OracleQuant = () => {
   })
   const [selectedBot, setSelectedBot] = useState<BotId | null>(null)
   const [openPositions, setOpenPositions] = useState<OpenPosition[]>([])
-  // [LOCALSTORAGE] Wins/Losses — reseta ao recarregar a página
-  const [sessionWins, setSessionWins] = useState(0)
-  const [sessionLosses, setSessionLosses] = useState(0)
-  const [sessionProfit, setSessionProfit] = useState(0)
+  const RESULTS_KEY = '@oracle:session_results'
+  const [sessionWins, setSessionWins] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); return s.wins ?? 0 } catch { return 0 }
+  })
+  const [sessionLosses, setSessionLosses] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); return s.losses ?? 0 } catch { return 0 }
+  })
+  const [sessionProfit, setSessionProfit] = useState<number>(() => {
+    try { const s = JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); return s.profit ?? 0 } catch { return 0 }
+  })
   const [togglingStrategy, setTogglingStrategy] = useState<string | null>(null)
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
@@ -497,11 +503,13 @@ const OracleQuant = () => {
               return
             }
 
-            // Fase 2: Timeout de 65s para o resultado final do contrato
+            // Fase 2: Timeout de 95s para o resultado final do contrato
+            // [BUG#1 FIX] 95s = worst case: contrato inicia 30s dentro da vela (60s) + 5s margem
             const resultTimeout = setTimeout(() => {
               ws.removeEventListener('message', pocHandler)
-              safeResolve({ won: false, profit: 0, error: 'RESULT_TIMEOUT (65s)' })
-            }, 65000)
+              clearInterval(pollInterval)
+              safeResolve({ won: false, profit: 0, error: 'RESULT_TIMEOUT (95s)' })
+            }, 95000)
 
             const pocHandler = (pocMsg: MessageEvent) => {
               try {
@@ -510,6 +518,7 @@ const OracleQuant = () => {
                   const poc = pocData.proposal_open_contract
                   if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_final_price) {
                     clearTimeout(resultTimeout)
+                    clearInterval(pollInterval)
                     ws.removeEventListener('message', pocHandler)
                     const profit = parseFloat(poc.profit ?? '0')
                     safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
@@ -518,7 +527,21 @@ const OracleQuant = () => {
               } catch { /* ignore parse errors */ }
             }
             ws.addEventListener('message', pocHandler)
+            // Subscription primária — escuta resultado via push
             ws.send(JSON.stringify({ proposal_open_contract: 1, contract_id: contractId, subscribe: 1 }))
+
+            // [BUG#1 FIX] Polling ativo a cada 10s como safety net:
+            // Se o socket reconectar e a subscription for perdida, o polling garante
+            // que o resultado seja recuperado via single-shot query (subscribe: 0).
+            const pollInterval = setInterval(() => {
+              if (resolved) { clearInterval(pollInterval); return }
+              if (ws.readyState !== WebSocket.OPEN) return
+              ws.send(JSON.stringify({
+                proposal_open_contract: 1,
+                contract_id: contractId,
+                subscribe: 0  // single-shot — não re-subscribe, só consulta estado atual
+              }))
+            }, 10000)
           }
         } catch { /* ignore parse errors */ }
       }
@@ -717,19 +740,36 @@ const OracleQuant = () => {
         setOpenPositions(prev => prev.filter(p => p.id !== posId))
 
         if (result.error) {
-          addLog('error', `[âŒ DERIV] ${result.error}`)
+          addLog('error', `[❌ DERIV] ${result.error}`)
 
-          // [LGN_AUDITOR] Apenas InsufficientBalance aborta o ciclo inteiro
+          // [BUG#2 FIX] RESULT_TIMEOUT ≠ LOSS. O BUY foi aceito (dinheiro debitado)
+          // mas o resultado é DESCONHECIDO. NUNCA escalar Gale neste caso —
+          // o contrato pode ter ganhado e escalar seria duplicar a exposição desnecessariamente.
+          if (result.error.includes('RESULT_TIMEOUT')) {
+            addLog('error', `[⚠️ LGN] TIMEOUT G${i}: resultado DESCONHECIDO. NÃO escalando Gale.`)
+            addLog('error', `[⚠️ LGN] Contrato pode ter ganhado. Verifique manualmente no portal Deriv.`)
+            finalResult = 'TIMEOUT_UNKNOWN'
+            break  // PARA o ciclo — nunca continua após resultado desconhecido
+          }
+
+          // [LGN_AUDITOR] BUY_TIMEOUT = dinheiro NÃO foi debitado (BUY não aceito) — pode escalar
+          if (result.error.includes('BUY_TIMEOUT')) {
+            addLog('info', `[🔍 LGN] BUY não aceito em G${i}. Escalando para G${i + 1} em 2s.`)
+            await new Promise(res => setTimeout(res, 2000))
+            continue
+          }
+
+          // [LGN_AUDITOR] InsufficientBalance — aborta ciclo inteiro
           if (result.error.includes('InsufficientBalance') || result.error.includes('Insufficient balance')) {
             addLog('error', `[STOP LGN] Saldo insuficiente detectada pela Deriv. Ciclo abortado.`)
             finalResult = 'CANCELLED'
             break
           }
 
-          // [LGN_AUDITOR] Error tecnico (BUY_TIMEOUT, etc.) â€” escala para prÃ³ximo Gale
-          addLog('info', `[ðŸ” LGN] Error tecnico em G${i}. Escalando para G${i + 1} em 2s.`)
+          // Outros erros técnicos desconhecidos — escala com cautela
+          addLog('info', `[🔍 LGN] Error tecnico em G${i}. Escalando para G${i + 1} em 2s.`)
           await new Promise(res => setTimeout(res, 2000))
-          continue // escala para prÃ³ximo Gale
+          continue
         }
 
         // [LGN_AUDITOR] Apenas acumula profit quando a ordem foi ACEITA pela Deriv
@@ -879,12 +919,46 @@ const OracleQuant = () => {
   useEffect(() => { localStorage.setItem('oracle_active_bots', JSON.stringify([...activeBots])) }, [activeBots])
   useEffect(() => { localStorage.setItem('oracle_master_on', String(masterOn)) }, [masterOn])
 
+  // [BUG#3 FIX] Camada 1: Sync wins/losses/profit para localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(RESULTS_KEY, JSON.stringify({
+        wins: sessionWins,
+        losses: sessionLosses,
+        profit: sessionProfit,
+        updatedAt: Date.now()
+      }))
+    } catch {}
+  }, [sessionWins, sessionLosses, sessionProfit])
+
+  // [BUG#3 FIX] Camada 2: Rehydrate do Supabase ao montar (source of truth para sessões longas)
+  useEffect(() => {
+    if (!clientId) return
+    const today = new Date().toISOString().split('T')[0]
+    hftSupabase.from('pending_trades')
+      .select('result, profit')
+      .eq('client_id', clientId)
+      .gte('executed_at', today)
+      .then(({ data }) => {
+        if (!data || data.length === 0) return
+        const wins = data.filter(d => d.result === 'win').length
+        const losses = data.filter(d => d.result === 'hit').length
+        const profit = data.reduce((s: number, d: { profit?: number }) => s + (d.profit || 0), 0)
+        setSessionWins(wins)
+        setSessionLosses(losses)
+        setSessionProfit(profit)
+        addLog('info', `[SESSION] Rehydrated: ${wins}W/${losses}L | P&L: $${profit.toFixed(2)}`)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId])
+
   // â”€â”€â”€ Reset pending_trades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleReset = useCallback(() => {
     if (!confirm('Resetear todos los resultados de la sesion?')) return
     setSessionWins(0)
     setSessionLosses(0)
     setSessionProfit(0)
+    localStorage.removeItem(RESULTS_KEY)
     toast.success('Historial reseteado!')
   }, [])
 
