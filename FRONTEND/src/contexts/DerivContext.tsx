@@ -40,6 +40,7 @@ interface DerivContextType {
   lastError: string | null;
   socket: WebSocket | null;
   api: DerivAPI | null; // New API object
+  contractSettlements: React.MutableRefObject<Map<number, (tx: any) => void>>;
 }
 
 const DerivContext = createContext<DerivContextType | undefined>(undefined);
@@ -60,6 +61,9 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
   const reqIdCounter = useRef(1);
   const pendingRequests = useRef<Map<number, { resolve: (data: any) => void; reject: (err: any) => void }>>(new Map());
   const observers = useRef<Set<(data: any) => void>>(new Set());
+
+  // Transaction Stream: Map<contract_id, callback> — resolves when Deriv sends sell notification
+  const contractSettlements = useRef<Map<number, (tx: any) => void>>(new Map());
 
   // Ref to track if disconnection was intentional (user clicked logout) or accidental (network error)
   const shouldReconnect = React.useRef(true);
@@ -106,7 +110,19 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
       // 2. Notify observers (API Layer)
       observers.current.forEach((callback) => callback(data));
 
-      // 3. Handle Internal Context Logic
+      // 3. Handle Transaction Stream (contract settlements)
+      if (data.msg_type === 'transaction') {
+        const tx = data.transaction;
+        if (tx && tx.action === 'sell' && tx.contract_id) {
+          const callback = contractSettlements.current.get(tx.contract_id);
+          if (callback) {
+            callback(tx);
+            contractSettlements.current.delete(tx.contract_id);
+          }
+        }
+      }
+
+      // 4. Handle Internal Context Logic
       if (data.error) {
         // Only log/handle critical errors here, specific request errors are handled by promise rejection above
         if (data.error.code === 'InvalidToken') {
@@ -330,6 +346,10 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
           // Request balance
           ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
 
+          // Transaction stream — notifies ALL buy/sell events on the account
+          // Re-subscribes automatically on reconnect (completeAuthorization runs on every authorize)
+          ws.send(JSON.stringify({ transaction: 1, subscribe: 1 }));
+
           // Convert loginid for marketing mode display
           const userEmail = getCurrentUserEmail();
           const displayLoginId = convertLoginIdForMarketing(loginid, userEmail);
@@ -484,7 +504,8 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
         disconnect,
         lastError,
         socket,
-        api
+        api,
+        contractSettlements
       }}
     >
       {children}
