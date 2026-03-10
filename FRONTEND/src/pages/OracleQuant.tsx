@@ -869,7 +869,7 @@ const OracleQuant = () => {
       localStorage.removeItem('hft_active_recovery')
     }
 
-    addLog(finalWon ? 'ok' : 'error', `[FIM] ${ativo} = ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
+    addLog(finalWon ? 'ok' : finalResult === 'TIMEOUT_UNKNOWN' ? 'info' : 'error', `[FIM] ${ativo} = ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
 
     // [FIX ARCH] Atualiza stats DIRETO na memoria - sem esperar DB ou Realtime
     if (finalWon) {
@@ -893,7 +893,7 @@ const OracleQuant = () => {
       direcao: direcao,
       stake: base,
       status: 'completed',
-      result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
+      result: finalWon ? 'win' : finalResult === 'CANCELLED' ? 'cancelled' : finalResult === 'TIMEOUT_UNKNOWN' ? 'timeout' : 'hit',
       profit: totalProfit,
       executed_at: new Date().toISOString(),
     }).then(({ error: insertError }) => {
@@ -931,6 +931,42 @@ const OracleQuant = () => {
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // [SESSION REHYDRATE] Carrega wins/losses da sessao atual do banco
+  useEffect(() => {
+    const safeClientId = clientIdRef.current || '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    hftSupabase
+      .from('pending_trades')
+      .select('result, profit')
+      .eq('client_id', safeClientId)
+      .gte('executed_at', todayStart.toISOString())
+      .in('result', ['win', 'hit'])
+      .then(({ data, error }) => {
+        if (error || !data) return
+        let wins = 0
+        let losses = 0
+        let profit = 0
+        for (const row of data) {
+          if (row.result === 'win') {
+            wins++
+            profit += parseFloat(String(row.profit ?? 0))
+          } else if (row.result === 'hit') {
+            losses++
+            profit += parseFloat(String(row.profit ?? 0))
+          }
+          // 'timeout' and 'cancelled' are NOT counted
+        }
+        setSessionWins(wins)
+        setSessionLosses(losses)
+        setSessionProfit(profit)
+        addLog('info', `[SESSION] Rehydrated: ${wins}W/${losses}L | P&L: $${profit.toFixed(2)}`)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
 
   // â”€â”€â”€ Signal Monitor + Execution (escuta hft_catalogo_estrategias) â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
