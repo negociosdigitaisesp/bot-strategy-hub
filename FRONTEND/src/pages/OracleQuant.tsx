@@ -877,7 +877,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
       localStorage.removeItem('hft_active_recovery')
     }
 
-    addLog(finalWon ? 'ok' : 'error', `[FIM] ${ativo} = ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
+    addLog(finalWon ? 'ok' : finalResult === 'TIMEOUT_UNKNOWN' ? 'info' : 'error', `[FIM] ${ativo} = ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
 
     // [FIX ARCH] Atualiza stats DIRETO na memoria - sem esperar DB ou Realtime
     if (finalWon) {
@@ -901,7 +901,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
       direcao: direcao,
       stake: base,
       status: 'completed',
-      result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
+      result: finalWon ? 'win' : finalResult === 'CANCELLED' ? 'cancelled' : finalResult === 'TIMEOUT_UNKNOWN' ? 'timeout' : 'hit',
       profit: totalProfit,
       executed_at: new Date().toISOString(),
     }).then(({ error: insertError }) => {
