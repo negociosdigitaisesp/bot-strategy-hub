@@ -372,32 +372,32 @@ const OracleQuant = () => {
   })
   const [selectedBot, setSelectedBot] = useState<BotId | null>(null)
   const [openPositions, setOpenPositions] = useState<OpenPosition[]>([])
-  // --- Session Stats from Supabase B pending_trades ---
+  // --- Session Stats — updated directly in-memory after each trade + loaded from DB on mount ---
+  // [FIX ARCH] Nao depende de clientId do auth - usa DISPLAY_CLIENT_ID fixo
+  const DISPLAY_CLIENT_ID = '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
   const [sessionWins, setSessionWins] = useState(0)
   const [sessionLosses, setSessionLosses] = useState(0)
   const [sessionProfit, setSessionProfit] = useState(0)
   const fetchSessionStats = useCallback(async () => {
-    if (!clientId) return
-    const { data } = await hftSupabase
+    const { data, error } = await hftSupabase
       .from('pending_trades')
       .select('result, profit')
-      .eq('client_id', clientId)
-    if (!data) return
+      .eq('client_id', DISPLAY_CLIENT_ID)
+    if (error || !data) return
     setSessionWins(data.filter(r => r.result === 'win').length)
     setSessionLosses(data.filter(r => r.result === 'hit').length)
     setSessionProfit(data.reduce((sum, r) => sum + (Number(r.profit) || 0), 0))
-  }, [clientId])
+  }, [])
   useEffect(() => {
     fetchSessionStats()
-    if (!clientId) return
     const ch = hftSupabase
       .channel('pending-trades-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_trades', filter: `client_id=eq.${clientId}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_trades', filter: `client_id=eq.${DISPLAY_CLIENT_ID}` }, () => {
         fetchSessionStats()
       })
       .subscribe()
     return () => { hftSupabase.removeChannel(ch) }
-  }, [fetchSessionStats, clientId])
+  }, [fetchSessionStats])
   const [togglingStrategy, setTogglingStrategy] = useState<string | null>(null)
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
@@ -640,7 +640,7 @@ const OracleQuant = () => {
         // A varÃ­avel `base` foi declarada com let implicitamente â€” re-atribuÃ­da aqui
         Object.defineProperty(riskConfig, 'stakeValue', { value: edgeResult.approved_stake / 1.0, writable: true, configurable: true })
       } else {
-        // Edge nÃ£o respondeu em 600ms â†’ fallback local assume
+        // Edge nÃ£o respondeu em 600ms â†' fallback local assume
         addLog('error', `[EDGE TIMEOUT] Timeout 600ms â€” fallback local asumio autoridad`)
       }
     } else {
@@ -775,14 +775,22 @@ const OracleQuant = () => {
       localStorage.removeItem('hft_active_recovery')
     }
 
-    addLog(finalWon ? 'ok' : 'error', `[FIM] ${ativo} â†’ ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
+    addLog(finalWon ? 'ok' : 'error', `[FIM] ${ativo} = ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
 
-    // FIX #4: Persiste resultado no Supabase B pending_trades
-    // [FIX CRÍTICO] Usa clientIdRef.current — clientId do closure seria null (captura inicial)
+    // [FIX ARCH] Atualiza stats DIRETO na memoria - sem esperar DB ou Realtime
+    if (finalWon) {
+      setSessionWins(prev => prev + 1)
+      setSessionProfit(prev => prev + totalProfit)
+    } else if (finalResult === 'LOSS') {
+      setSessionLosses(prev => prev + 1)
+      setSessionProfit(prev => prev + totalProfit)
+    }
+
+    // Persiste no Supabase B (background - nao bloqueia display)
     const safeClientId = clientIdRef.current || '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
     const idempotencyKey = `${safeClientId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    addLog('info', `[DB] Gravando trade... clientId=${safeClientId.substring(0, 8)} result=${finalWon ? 'win' : 'hit'}`)
-    const { error: insertError } = await hftSupabase.from('pending_trades').insert({
+    addLog('info', `[DB] Gravando trade... cid=${safeClientId.substring(0, 8)} result=${finalWon ? 'win' : 'hit'}`)
+    hftSupabase.from('pending_trades').insert({
       client_id: safeClientId,
       signal_id: idempotencyKey,
       idempotency_key: idempotencyKey,
@@ -794,14 +802,15 @@ const OracleQuant = () => {
       result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
       profit: totalProfit,
       executed_at: new Date().toISOString(),
+    }).then(({ error: insertError }) => {
+      if (insertError) {
+        addLog('error', `[DB] ERRO INSERT: ${insertError.message} | code: ${insertError.code}`)
+        console.error('[DB] INSERT ERROR FULL:', JSON.stringify(insertError))
+      } else {
+        addLog('ok', `[DB] Trade persistido OK | result=${finalWon ? 'win' : 'hit'} | profit=$${totalProfit.toFixed(2)}`)
+      }
     })
-    if (insertError) {
-      addLog('error', `[DB] ERRO INSERT: ${insertError.message} | code: ${insertError.code}`)
-      console.error('[DB] INSERT ERROR FULL:', JSON.stringify(insertError))
-    } else {
-      addLog('ok', `[DB] Trade gravado OK | result=${finalWon ? 'win' : 'hit'} | profit=$${totalProfit.toFixed(2)}`)
-    }
-  }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setOpenPositions])
+  }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setOpenPositions, setSessionWins, setSessionLosses, setSessionProfit])
 
   // [SHIELD_AGENT] Ref estÃ¡vel para evitar re-subscribe do canal Realtime
   const executeGaleChainRef = useRef(executeGaleChain)
