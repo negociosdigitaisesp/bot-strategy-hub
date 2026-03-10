@@ -372,32 +372,10 @@ const OracleQuant = () => {
   })
   const [selectedBot, setSelectedBot] = useState<BotId | null>(null)
   const [openPositions, setOpenPositions] = useState<OpenPosition[]>([])
-  // --- Session Stats — updated directly in-memory after each trade + loaded from DB on mount ---
-  // [FIX ARCH] Nao depende de clientId do auth - usa DISPLAY_CLIENT_ID fixo
-  const DISPLAY_CLIENT_ID = '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
+  // [LOCALSTORAGE] Wins/Losses — reseta ao recarregar a página
   const [sessionWins, setSessionWins] = useState(0)
   const [sessionLosses, setSessionLosses] = useState(0)
   const [sessionProfit, setSessionProfit] = useState(0)
-  const fetchSessionStats = useCallback(async () => {
-    const { data, error } = await hftSupabase
-      .from('pending_trades')
-      .select('result, profit')
-      .eq('client_id', DISPLAY_CLIENT_ID)
-    if (error || !data) return
-    setSessionWins(data.filter(r => r.result === 'win').length)
-    setSessionLosses(data.filter(r => r.result === 'hit').length)
-    setSessionProfit(data.reduce((sum, r) => sum + (Number(r.profit) || 0), 0))
-  }, [])
-  useEffect(() => {
-    fetchSessionStats()
-    const ch = hftSupabase
-      .channel('pending-trades-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_trades', filter: `client_id=eq.${DISPLAY_CLIENT_ID}` }, () => {
-        fetchSessionStats()
-      })
-      .subscribe()
-    return () => { hftSupabase.removeChannel(ch) }
-  }, [fetchSessionStats])
   const [togglingStrategy, setTogglingStrategy] = useState<string | null>(null)
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
@@ -902,10 +880,8 @@ const OracleQuant = () => {
   useEffect(() => { localStorage.setItem('oracle_master_on', String(masterOn)) }, [masterOn])
 
   // â”€â”€â”€ Reset pending_trades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleReset = useCallback(async () => {
+  const handleReset = useCallback(() => {
     if (!confirm('Resetear todos los resultados de la sesion?')) return
-    const safeClientId = clientIdRef.current || '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
-    await hftSupabase.from('pending_trades').delete().eq('client_id', safeClientId)
     setSessionWins(0)
     setSessionLosses(0)
     setSessionProfit(0)
