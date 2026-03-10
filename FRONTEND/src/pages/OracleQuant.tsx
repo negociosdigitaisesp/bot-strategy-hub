@@ -373,30 +373,31 @@ const OracleQuant = () => {
   const [selectedBot, setSelectedBot] = useState<BotId | null>(null)
   const [openPositions, setOpenPositions] = useState<OpenPosition[]>([])
   // --- Session Stats from Supabase B pending_trades ---
-  const CLIENT_ID = '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
   const [sessionWins, setSessionWins] = useState(0)
   const [sessionLosses, setSessionLosses] = useState(0)
   const [sessionProfit, setSessionProfit] = useState(0)
   const fetchSessionStats = useCallback(async () => {
+    if (!clientId) return
     const { data } = await hftSupabase
       .from('pending_trades')
       .select('result, profit')
-      .eq('client_id', CLIENT_ID)
+      .eq('client_id', clientId)
     if (!data) return
     setSessionWins(data.filter(r => r.result === 'win').length)
     setSessionLosses(data.filter(r => r.result === 'hit').length)
     setSessionProfit(data.reduce((sum, r) => sum + (Number(r.profit) || 0), 0))
-  }, [])
+  }, [clientId])
   useEffect(() => {
     fetchSessionStats()
+    if (!clientId) return
     const ch = hftSupabase
       .channel('pending-trades-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_trades', filter: `client_id=eq.${CLIENT_ID}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_trades', filter: `client_id=eq.${clientId}` }, () => {
         fetchSessionStats()
       })
       .subscribe()
     return () => { hftSupabase.removeChannel(ch) }
-  }, [fetchSessionStats])
+  }, [fetchSessionStats, clientId])
   const [togglingStrategy, setTogglingStrategy] = useState<string | null>(null)
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
@@ -776,18 +777,20 @@ const OracleQuant = () => {
 
     // FIX #4: Persiste resultado no Supabase B pending_trades
     const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    await hftSupabase.from('pending_trades').insert({
-      client_id: CLIENT_ID,
-      signal_id: idempotencyKey,
-      idempotency_key: idempotencyKey,
-      ativo: ativo,
-      active_id: ativo,
-      direcao: direcao,
-      stake: base,
-      status: 'executed',
-      result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
-      profit: totalProfit,
-    })
+    if (clientId) {
+      await hftSupabase.from('pending_trades').insert({
+        client_id: clientId,
+        signal_id: idempotencyKey,
+        idempotency_key: idempotencyKey,
+        ativo: ativo,
+        active_id: ativo,
+        direcao: direcao,
+        stake: base,
+        status: 'completed',
+        result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
+        profit: totalProfit,
+      })
+    }
   }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setOpenPositions])
 
   // [SHIELD_AGENT] Ref estÃ¡vel para evitar re-subscribe do canal Realtime
