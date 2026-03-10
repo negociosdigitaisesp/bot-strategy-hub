@@ -1023,6 +1023,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
       .select('result, profit')
       .eq('client_id', clientId)
       .gte('executed_at', today)
+      .in('result', ['win', 'hit'])
       .then(({ data }) => {
         if (!data || data.length === 0) return
         const wins = data.filter(d => d.result === 'win').length
