@@ -417,11 +417,13 @@ const OracleQuant = () => {
   const derivSocketRef = useRef(derivSocket)
   const masterOnRef = useRef(masterOn)
   const derivAccountRef = useRef(derivAccount)
+  const clientIdRef = useRef(clientId)
 
   useEffect(() => { derivTokenRef.current = derivToken }, [derivToken])
   useEffect(() => { derivSocketRef.current = derivSocket }, [derivSocket])
   useEffect(() => { masterOnRef.current = masterOn }, [masterOn])
   useEffect(() => { derivAccountRef.current = derivAccount }, [derivAccount])
+  useEffect(() => { clientIdRef.current = clientId }, [clientId])
 
   // [PAGE_VISIBILITY] Aviso quando o usuÃ¡rio sai da aba com Gale rodando
   useEffect(() => {
@@ -776,20 +778,28 @@ const OracleQuant = () => {
     addLog(finalWon ? 'ok' : 'error', `[FIM] ${ativo} â†’ ${finalResult} | P&L: $${totalProfit.toFixed(2)}`)
 
     // FIX #4: Persiste resultado no Supabase B pending_trades
-    const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    if (clientId) {
-      await hftSupabase.from('pending_trades').insert({
-        client_id: clientId,
-        signal_id: idempotencyKey,
-        idempotency_key: idempotencyKey,
-        ativo: ativo,
-        active_id: ativo,
-        direcao: direcao,
-        stake: base,
-        status: 'completed',
-        result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
-        profit: totalProfit,
-      })
+    // [FIX CRÍTICO] Usa clientIdRef.current — clientId do closure seria null (captura inicial)
+    const safeClientId = clientIdRef.current || '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
+    const idempotencyKey = `${safeClientId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    addLog('info', `[DB] Gravando trade... clientId=${safeClientId.substring(0, 8)} result=${finalWon ? 'win' : 'hit'}`)
+    const { error: insertError } = await hftSupabase.from('pending_trades').insert({
+      client_id: safeClientId,
+      signal_id: idempotencyKey,
+      idempotency_key: idempotencyKey,
+      ativo: ativo,
+      active_id: ativo,
+      direcao: direcao,
+      stake: base,
+      status: 'completed',
+      result: finalWon ? 'win' : (finalResult === 'CANCELLED' ? 'cancelled' : 'hit'),
+      profit: totalProfit,
+      executed_at: new Date().toISOString(),
+    })
+    if (insertError) {
+      addLog('error', `[DB] ERRO INSERT: ${insertError.message} | code: ${insertError.code}`)
+      console.error('[DB] INSERT ERROR FULL:', JSON.stringify(insertError))
+    } else {
+      addLog('ok', `[DB] Trade gravado OK | result=${finalWon ? 'win' : 'hit'} | profit=$${totalProfit.toFixed(2)}`)
     }
   }, [addLog, executeDerivContract, getRiskConfig, getBalanceFromWs, setOpenPositions])
 
@@ -885,7 +895,8 @@ const OracleQuant = () => {
   // â”€â”€â”€ Reset pending_trades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleReset = useCallback(async () => {
     if (!confirm('Resetear todos los resultados de la sesion?')) return
-    await hftSupabase.from('pending_trades').delete().eq('client_id', CLIENT_ID)
+    const safeClientId = clientIdRef.current || '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
+    await hftSupabase.from('pending_trades').delete().eq('client_id', safeClientId)
     setSessionWins(0)
     setSessionLosses(0)
     setSessionProfit(0)
