@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OracleQuant.tsx â€” Trading Command Center (Redesign Pro) v2
  * Arsenal de bots especialistas com dados do Supabase B (hft_lake)
  * 
@@ -380,7 +380,7 @@ const OracleQuant = () => {
   const realtimeRef = useRef<ReturnType<typeof supabaseOracle.channel> | null>(null)
 
   // â”€â”€â”€ Execution State (Deriv & Risk) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const { token: derivToken, socket: derivSocket, account: derivAccount } = useDeriv()
+  const { token: derivToken, socket: derivSocket, account: derivAccount, contractSettlements } = useDeriv()
 
   const getRiskConfig = useCallback(() => {
     try {
@@ -450,8 +450,58 @@ const OracleQuant = () => {
     setDebugLogs(prev => [{ ts, level, msg }, ...prev].slice(0, 80))
   }, [])
 
-  // â”€â”€â”€ ExecuÃ§Ã£o de Contratos Deriv â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // FIX #3: Timeout bifurcado â€” 5s para BUY, 65s para resultado do contrato
+  // ——— queryContractResult: fallback manual query ———————————————
+  const queryContractResult = useCallback(async (contractId: number): Promise<{ won: boolean; profit: number } | null> => {
+    const ws = derivSocketRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return null
+
+    return new Promise<{ won: boolean; profit: number } | null>((resolve) => {
+      const reqId = Math.floor(Math.random() * 900000) + 100000
+      const timeout = setTimeout(() => {
+        ws.removeEventListener('message', handler)
+        resolve(null)
+      }, 5000)
+
+      const handler = (msg: MessageEvent) => {
+        try {
+          const data = JSON.parse(msg.data)
+          if (data.req_id !== reqId) return
+          clearTimeout(timeout)
+          ws.removeEventListener('message', handler)
+
+          if (data.error) { resolve(null); return }
+
+          const poc = data.proposal_open_contract
+          if (!poc) { resolve(null); return }
+
+          if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_sold || poc.is_final_price) {
+            const profit = parseFloat(poc.profit ?? '0')
+            resolve({ won: profit > 0, profit })
+          } else {
+            resolve(null)
+          }
+        } catch { resolve(null) }
+      }
+
+      ws.addEventListener('message', handler)
+      ws.send(JSON.stringify({
+        proposal_open_contract: 1,
+        contract_id: contractId,
+        req_id: reqId
+      }))
+    })
+  }, [])
+
+  // Retry wrapper: tries up to 2 times with 3s delay
+  const queryContractResultWithRetry = useCallback(async (contractId: number): Promise<{ won: boolean; profit: number } | null> => {
+    const r1 = await queryContractResult(contractId)
+    if (r1) return r1
+    await new Promise(r => setTimeout(r, 3000))
+    return queryContractResult(contractId)
+  }, [queryContractResult])
+
+  // ——— executeDerivContract V3: Transaction Stream + Polling Fallback ———
+  // 3-layer architecture: Transaction Stream (primary) > POC Subscribe (secondary) > Polling (tertiary)
   const executeDerivContract = useCallback((ativo: string, direcao: string, stake: number) => {
     return new Promise<{ won: boolean; profit: number; contractId?: string; error?: string }>((resolve) => {
       const ws = derivSocketRef.current
@@ -459,71 +509,122 @@ const OracleQuant = () => {
         resolve({ won: false, profit: 0, error: 'Socket not connected' })
         return
       }
-    const contractType = direcao === 'CALL' ? 'CALL' : 'PUT'
-    const reqId = Math.floor(Math.random() * 900000) + 100000
+      const contractType = direcao === 'CALL' ? 'CALL' : 'PUT'
+      const reqId = Math.floor(Math.random() * 900000) + 100000
 
-      let resolved = false  // [FIX A] guard contra chamadas duplas ao safeResolve
+      let resolved = false
+      let contractId: number | null = null
+      let pollInterval: ReturnType<typeof setInterval> | null = null
+      let resultTimeout: ReturnType<typeof setTimeout> | null = null
+
       const safeResolve = (val: { won: boolean; profit: number; contractId?: string; error?: string }) => {
         if (resolved) return
         resolved = true
+        // Cleanup everything
+        clearTimeout(buyTimeout)
+        if (resultTimeout) clearTimeout(resultTimeout)
+        if (pollInterval) clearInterval(pollInterval)
+        if (contractId) contractSettlements.current.delete(contractId)
+        try { ws.removeEventListener('message', buyHandler) } catch {}
         resolve(val)
       }
 
-      // Fase 1: Timeout de 2.5s para receber o contract_id (BUY) [LGN_AUDITOR fix]
+      // ═══ PHASE 1: Buy (2.5s timeout) ═══════════════════════════
       const buyTimeout = setTimeout(() => {
-        ws.removeEventListener('message', handler)
         safeResolve({ won: false, profit: 0, error: 'BUY_TIMEOUT (2.5s)' })
       }, 2500)
 
-      const handler = (msg: MessageEvent) => {
+      const buyHandler = (msg: MessageEvent) => {
         try {
           const data = JSON.parse(msg.data)
           if (data.req_id !== reqId) return
 
           if (data.error) {
-            clearTimeout(buyTimeout)
-            ws.removeEventListener('message', handler)
             safeResolve({ won: false, profit: 0, error: data.error.message })
             return
           }
 
           if (data.msg_type === 'buy') {
-            clearTimeout(buyTimeout) // Buy recebido, cancela timeout de 5s
-            ws.removeEventListener('message', handler)
+            clearTimeout(buyTimeout)
+            ws.removeEventListener('message', buyHandler)
 
-            const contractId = data.buy?.contract_id
+            contractId = data.buy?.contract_id
             if (!contractId) {
               safeResolve({ won: false, profit: 0, error: 'no contract_id' })
               return
             }
 
-            // Fase 2: Timeout de 65s para o resultado final do contrato
-            const resultTimeout = setTimeout(() => {
-              ws.removeEventListener('message', pocHandler)
-              safeResolve({ won: false, profit: 0, error: 'RESULT_TIMEOUT (65s)' })
-            }, 65000)
+            const buyPrice = parseFloat(data.buy?.buy_price ?? stake)
 
+            // ═══ PHASE 2: Wait for result (90s max) ═══════════════
+            resultTimeout = setTimeout(async () => {
+              // Timeout hit — try manual query as last resort
+              if (contractId) {
+                const lastCheck = await queryContractResultWithRetry(contractId)
+                if (lastCheck) {
+                  safeResolve({ won: lastCheck.won, profit: lastCheck.profit, contractId: String(contractId) })
+                  return
+                }
+              }
+              safeResolve({ won: false, profit: 0, error: 'RESULT_TIMEOUT (90s)', contractId: contractId ? String(contractId) : undefined })
+            }, 90000)
+
+            // STRATEGY A: Transaction stream (primary — most reliable)
+            contractSettlements.current.set(contractId, (tx: any) => {
+              const sellPrice = parseFloat(tx.amount ?? '0')
+              const profit = sellPrice - buyPrice
+              safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
+            })
+
+            // STRATEGY B: proposal_open_contract subscribe (secondary)
             const pocHandler = (pocMsg: MessageEvent) => {
               try {
                 const pocData = JSON.parse(pocMsg.data)
-                if (pocData.msg_type === 'proposal_open_contract' && pocData.proposal_open_contract?.contract_id === contractId) {
+                if (
+                  pocData.msg_type === 'proposal_open_contract' &&
+                  pocData.proposal_open_contract?.contract_id === contractId
+                ) {
                   const poc = pocData.proposal_open_contract
-                  if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_final_price) {
-                    clearTimeout(resultTimeout)
-                    ws.removeEventListener('message', pocHandler)
+                  if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_sold || poc.is_final_price) {
+                    try { ws.removeEventListener('message', pocHandler) } catch {}
                     const profit = parseFloat(poc.profit ?? '0')
                     safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
                   }
                 }
-              } catch { /* ignore parse errors */ }
+              } catch {}
             }
             ws.addEventListener('message', pocHandler)
             ws.send(JSON.stringify({ proposal_open_contract: 1, contract_id: contractId, subscribe: 1 }))
+
+            // STRATEGY C: Polling fallback every 10s (survives reconnections)
+            pollInterval = setInterval(() => {
+              if (resolved) { clearInterval(pollInterval!); return }
+              const currentWs = derivSocketRef.current
+              if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return
+
+              const pollReqId = Math.floor(Math.random() * 900000) + 100000
+              const pollHandler = (pollMsg: MessageEvent) => {
+                try {
+                  const pollData = JSON.parse(pollMsg.data)
+                  if (pollData.req_id !== pollReqId) return
+                  currentWs.removeEventListener('message', pollHandler)
+                  if (pollData.error) return
+                  const poc = pollData.proposal_open_contract
+                  if (poc && (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_sold || poc.is_final_price)) {
+                    const profit = parseFloat(poc.profit ?? '0')
+                    safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
+                  }
+                } catch {}
+              }
+              currentWs.addEventListener('message', pollHandler)
+              currentWs.send(JSON.stringify({ proposal_open_contract: 1, contract_id: contractId, req_id: pollReqId }))
+              setTimeout(() => { try { currentWs.removeEventListener('message', pollHandler) } catch {} }, 4500)
+            }, 10000) // Poll every 10s (less aggressive since transaction stream is primary)
           }
-        } catch { /* ignore parse errors */ }
+        } catch {}
       }
 
-      ws.addEventListener('message', handler)
+      ws.addEventListener('message', buyHandler)
       ws.send(JSON.stringify({
         buy: 1, subscribe: 1, price: stake,
         req_id: reqId,
@@ -536,7 +637,7 @@ const OracleQuant = () => {
         }
       }))
     })
-  }, [])
+  }, [queryContractResultWithRetry])
 
   // [LGN_AUDITOR] Constantes imutÃ¡veis de risco
   const GALE_MULTIPLIERS = [1.0, 2.2, 5.0] as const  // Total: 8.2 unidades
@@ -717,19 +818,34 @@ const OracleQuant = () => {
         setOpenPositions(prev => prev.filter(p => p.id !== posId))
 
         if (result.error) {
-          addLog('error', `[âŒ DERIV] ${result.error}`)
+          addLog('error', `[❌ DERIV] ${result.error}`)
 
-          // [LGN_AUDITOR] Apenas InsufficientBalance aborta o ciclo inteiro
+          // InsufficientBalance → abort everything
           if (result.error.includes('InsufficientBalance') || result.error.includes('Insufficient balance')) {
-            addLog('error', `[STOP LGN] Saldo insuficiente detectada pela Deriv. Ciclo abortado.`)
+            addLog('error', `[STOP LGN] Saldo insuficiente. Ciclo abortado.`)
             finalResult = 'CANCELLED'
             break
           }
 
-          // [LGN_AUDITOR] Error tecnico (BUY_TIMEOUT, etc.) â€” escala para prÃ³ximo Gale
-          addLog('info', `[ðŸ” LGN] Error tecnico em G${i}. Escalando para G${i + 1} em 2s.`)
+          // RESULT_TIMEOUT → money WAS debited, result unknown — DO NOT escalate Gale
+          if (result.error.includes('RESULT_TIMEOUT')) {
+            addLog('error', `[⚠️ LGN] TIMEOUT G${i}: resultado DESCONHECIDO. NÃO escalando Gale.`)
+            addLog('error', `[⚠️ LGN] Contrato pode ter ganhado. Verifique manualmente no portal Deriv.`)
+            finalResult = 'TIMEOUT_UNKNOWN'
+            break
+          }
+
+          // BUY_TIMEOUT → money NOT debited, can escalate
+          if (result.error.includes('BUY_TIMEOUT')) {
+            addLog('info', `[🔍 LGN] BUY não aceito em G${i}. Escalando para G${i + 1} em 2s.`)
+            await new Promise(res => setTimeout(res, 2000))
+            continue
+          }
+
+          // Other technical errors → escalate (money not debited)
+          addLog('info', `[🔍 LGN] Error tecnico em G${i}. Escalando para G${i + 1} em 2s.`)
           await new Promise(res => setTimeout(res, 2000))
-          continue // escala para prÃ³ximo Gale
+          continue
         }
 
         // [LGN_AUDITOR] Apenas acumula profit quando a ordem foi ACEITA pela Deriv
@@ -773,7 +889,7 @@ const OracleQuant = () => {
       signal_id: idempotencyKey,
       idempotency_key: idempotencyKey,
       ativo: ativo,
-      active_id: ativo,
+      // active_id: ativo,  // ← REMOVED: column is INTEGER, ativo is TEXT "R_75"
       direcao: direcao,
       stake: base,
       status: 'completed',
