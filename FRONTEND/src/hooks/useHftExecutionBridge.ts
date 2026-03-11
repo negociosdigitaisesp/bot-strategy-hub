@@ -1,515 +1,520 @@
+/**
+ * useHftExecutionBridge.ts
+ * Motor de Execução Oracle Quant — WebSocket Edition.
+ * @MISSION: Fix Definitivo Oracle Quant — WebSocket Execution Engine
+ *
+ * Responsabilidades:
+ *   - Captura contract_id real do BUY response (Number())
+ *   - Fallback POC com forget de subscription após is_sold
+ *   - onSeriesEnd como ÚNICO ponto de atualização de wins/losses
+ *   - Page Visibility API com ordem: reconnect → rehydrate → accept
+ *   - Recovery via localStorage com contractId real (número)
+ *   - Limpeza obrigatória via AbortController (nunca removeEventListener)
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { hftSupabase } from '../lib/hftSupabase';
-import { HftDerivService, DerivOrderParams } from '../services/HftDerivService';
+import { derivApiService } from '../services/derivApiService';
+import type {
+  GaleLevel,
+  ContractDirection,
+  TradeContext,
+  ActiveContract,
+  SeriesOutcome,
+  GaleRecoveryState,
+} from '../types/derivExecution';
 
-// ── Mapeamento Oficial dos Bots (Arsenal Especialista) ──────────────────────
-export type BotType = 'V1' | 'V2' | 'V4' | 'V5' | 'V7';
+// ── Tipos exportados ────────────────────────────────────────────────────────
 
-export interface BotDefinition {
-  id: BotType;
-  name: string;
-  slogan: string;
-  badge: string;
-  color: string;      // cor neon primária
-  colorMuted: string; // versão 10% opacidade para background do card
+export interface OpenPosition {
+  id: string;
+  asset: string;
+  direction: 'CALL' | 'PUT';
+  stake: number;
+  gale: number;
+  openTime: number;
+  durationSecs: number;
+  bot?: string;
 }
 
-export const BOT_CATALOG: Record<BotType, BotDefinition> = {
-  V1: {
-    id: 'V1',
-    name: 'RELOJ ATÓMICO 95',
-    slogan: 'Precisión cronometrada',
-    badge: '⚡ SPEED',
-    color: '#06b6d4',
-    colorMuted: 'rgba(6,182,212,0.10)',
-  },
-  V2: {
-    id: 'V2',
-    name: 'CÓDIGO PRISMA',
-    slogan: 'ADN de las velas',
-    badge: '💎 ELITE',
-    color: '#a78bfa',
-    colorMuted: 'rgba(167,139,250,0.10)',
-  },
-  V4: {
-    id: 'V4',
-    name: 'ALGORITMO ORÁCULO',
-    slogan: 'Historia vs Realidad',
-    badge: '🔥 HOT',
-    color: '#f59e0b',
-    colorMuted: 'rgba(245,158,11,0.10)',
-  },
-  V5: {
-    id: 'V5',
-    name: 'TRINIDAD CUÁNTICA',
-    slogan: 'Triple filtro de confirmación',
-    badge: '💎 ELITE',
-    color: '#10b981',
-    colorMuted: 'rgba(16,185,129,0.10)',
-  },
-  V7: {
-    id: 'V7',
-    name: 'ESCUDO CENTINELA',
-    slogan: 'El búnker de tu capital',
-    badge: '⚡ SPEED',
-    color: '#64748b',
-    colorMuted: 'rgba(100,116,139,0.10)',
-  },
-};
-
-export const BOT_ORDER: BotType[] = ['V1', 'V2', 'V4', 'V5', 'V7'];
-
-// ── Tipagem do Payload HFT ──────────────────────────────────────────────────
-export interface HftSignalPayload {
-  id?: number;
-  ativo: string;
-  estrategia: string;
-  variacao_estrategia?: string;
-  status: 'PRE_SIGNAL' | 'CONFIRMED' | string;
-  timestamp_sinal: number; // epoch
-  sinal_dir?: string;
-  tipo?: string;
-  digito?: number;
-  payout?: number; // [LGN_AUDITOR] payout retornado pela corretora (%)
-}
-
-interface ExecutionBridgeProps {
-  activeBots: Set<BotType>;
+interface BridgeProps {
   enabled: boolean;
-  takeProfit?: number;
-  stopLoss?: number;
-  currentProfit?: number;
-  derivToken?: string | null;
-  /** [PASSO 3] Socket injetado do DerivContext — evita novas conexões na Deriv */
-  derivSocket?: WebSocket | null;
-  baseStake?: number;
+  baseStake: number;
+  activeBots: Set<string>;
+  clientId: string;
 }
 
-export interface TradeCycleState {
-  isActive: boolean;
-  galeLevel: number;
-  asset?: string;
-  lastSignalId?: number;
-  timestamp?: number;
-}
+// ── Constantes de risco ─────────────────────────────────────────────────────
+const GALE_MULTIPLIERS = [1.0, 2.2, 5.0] as const;
+const MAX_CONCURRENT_ASSETS = 3;
+const FALLBACK_DELAY_MS = 65_000; // contract_duration(60s) + 5s grace
 
-export interface LogEntry {
-  id: number;
-  message: string;
-  type: 'info' | 'warn' | 'success' | 'error';
-  ts: number;
-}
+// ── Hook ────────────────────────────────────────────────────────────────────
 
-// [SHIELD_AGENT] Whitelist estrita — motor opera APENAS Volatility Indices
-const VOLATILITY_WHITELIST = new Set(['R_10', 'R_25', 'R_50', 'R_75', 'R_100']);
+export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId }: BridgeProps) {
+  const [sessionWins, setSessionWins] = useState(0);
+  const [sessionLosses, setSessionLosses] = useState(0);
+  const [sessionProfit, setSessionProfit] = useState(0);
+  const [logs, setLogs] = useState<{ ts: string; level: 'info' | 'error' | 'ok'; msg: string }[]>([]);
+  const [isAcceptingSignals, setIsAcceptingSignals] = useState(true);
+  const [openPositions, setOpenPositions] = useState<OpenPosition[]>([]);
 
-// [LGN_AUDITOR] Payout mínimo aceitável (%)
-const MIN_PAYOUT_PCT = 80;
+  // Map de contratos ativos indexado por seriesId
+  const activeSeries = useRef<Map<string, ActiveContract>>(new Map());
+  // Set de ativos sendo executados (anti-duplo)
+  const executingAssets = useRef<Set<string>>(new Set());
+  // Acumulador de stake por série (para totalStake correto)
+  const seriesStakeAccum = useRef<Map<string, number>>(new Map());
 
-const STORAGE_KEY = '@millionbots:trade_cycle_v2';
-
-// [LGN_AUDITOR] Constantes imutáveis de risco
-const GALE_MULTIPLIERS = [1.0, 2.2, 5.0] as const; // Total: 8.2 unidades
-const GALE_TOTAL_UNITS = 8.2;  // 1.0 + 2.2 + 5.0
-const MAX_RISK_PCT = 0.20;     // 20% da banca por série (ajustado para contas pequenas)
-
-// ── Hook de Execução Mestre ─────────────────────────────────────────────────
-export function useHftExecutionBridge({
-  activeBots,
-  enabled,
-  takeProfit = 0,
-  stopLoss = 0,
-  currentProfit = 0,
-  derivToken = null,
-  derivSocket = null,
-  baseStake = 1.0,
-}: ExecutionBridgeProps) {
-
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-
-  // Anti-Loss: Persistência do Ciclo (SHIELD_AGENT)
-  const [tradeCycle, setTradeCycle] = useState<TradeCycleState>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      console.error('[SHIELD_AGENT] Erro ao ler LocalStorage');
-    }
-    return { isActive: false, galeLevel: 0 };
-  });
-
-  const logCounter = useRef(0);
-  const currentProfitRef = useRef(currentProfit);
-  const takeProfitRef = useRef(takeProfit);
-  const stopLossRef = useRef(stopLoss);
-  const tradeCycleRef = useRef(tradeCycle);
-  const activeBotsRef = useRef(activeBots);
-  const activeAssetsRef = useRef<Set<string>>(new Set());
-  const lastProcessedSignalIdRef = useRef<Set<number>>(new Set());
-  const derivTokenRef = useRef(derivToken);
-  const derivSocketRef = useRef(derivSocket); // [PASSO 3]
-  const baseStakeRef = useRef(baseStake);
-
-  useEffect(() => {
-    currentProfitRef.current = currentProfit;
-    takeProfitRef.current = takeProfit;
-    stopLossRef.current = stopLoss;
-    derivTokenRef.current = derivToken;
-    derivSocketRef.current = derivSocket; // [PASSO 3]
-    baseStakeRef.current = baseStake;
-    activeBotsRef.current = activeBots;
-  }, [currentProfit, takeProfit, stopLoss, derivToken, derivSocket, baseStake, activeBots]);
-
-  useEffect(() => {
-    tradeCycleRef.current = tradeCycle;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tradeCycle));
-  }, [tradeCycle]);
-
-  const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
-    setLogs(prev => {
-      const newLog = { id: ++logCounter.current, message, type, ts: Date.now() };
-      return [newLog, ...prev].slice(0, 60);
-    });
+  const addLog = useCallback((level: 'info' | 'error' | 'ok', msg: string) => {
+    const ts = new Date().toISOString().substring(11, 23);
+    setLogs(prev => [{ ts, level, msg }, ...prev].slice(0, 80));
   }, []);
 
-  // [SHIELD_AGENT] Ref para executeOrderChain — evita re-subscribe do canal
-  const executeOrderChainRef = useRef<((payload: HftSignalPayload) => Promise<void>) | null>(null);
+  // ── onSeriesEnd — ÚNICO ponto de atualização de wins/losses ─────────────
 
-  // Async Execução Gale progressiva
-  const executeOrderChain = useCallback(async (payload: HftSignalPayload) => {
-    if (!derivTokenRef.current) {
-      addLog('[ERROR] Token da Deriv não encontrado. Operação abortada.', 'error');
-      return;
+  const onSeriesEnd = useCallback((outcome: SeriesOutcome, asset: string, direction: string) => {
+    addLog(outcome.finalResult === 'WIN' ? 'ok' : 'error',
+      `[FIM] Serie ${outcome.seriesId.substring(0, 8)} finalizada: ${outcome.finalResult} (G${outcome.finalGaleLevel}) | P&L: $${outcome.profit.toFixed(2)}`);
+
+    // WIN = série resolvida em qualquer galeLevel (G0, G1 ou G2)
+    if (outcome.finalResult === 'WIN') {
+      setSessionWins(prev => prev + 1);
+    }
+    // LOSS = apenas quando finalResult === 'LOSS' E galeLevel === 2
+    if (outcome.finalResult === 'LOSS' && outcome.finalGaleLevel === 2) {
+      setSessionLosses(prev => prev + 1);
+    }
+    // TIMEOUT_UNKNOWN não incrementa nenhum contador
+
+    setSessionProfit(prev => prev + outcome.profit);
+
+    // Limpar estado
+    localStorage.removeItem('hft_active_recovery');
+    activeSeries.current.delete(outcome.seriesId);
+    seriesStakeAccum.current.delete(outcome.seriesId);
+    executingAssets.current.delete(asset);
+    setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
+
+    // Persistir no Supabase B (background — não bloqueia)
+    const idempotencyKey = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    hftSupabase.from('pending_trades').insert({
+      client_id: clientId,
+      signal_id: idempotencyKey,
+      idempotency_key: idempotencyKey,
+      ativo: asset,
+      direcao: direction,
+      stake: outcome.totalStake,
+      status: 'completed',
+      result: outcome.finalResult === 'WIN' ? 'win' : (outcome.finalResult === 'TIMEOUT_UNKNOWN' ? 'timeout' : 'hit'),
+      profit: outcome.profit,
+      executed_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) addLog('error', `[DB] INSERT error: ${error.message}`);
+      else addLog('ok', `[DB] Trade persistido OK | result=${outcome.finalResult}`);
+    });
+  }, [addLog, clientId]);
+
+  // ── handlePOC — Processa proposal_open_contract (recebe o msg COMPLETO) ──
+
+  const handlePOC = useCallback((msg: any, contract: ActiveContract) => {
+    const poc = msg.proposal_open_contract;
+    if (!poc) return;
+
+    // Só processar se o contrato está encerrado
+    const isSold = poc.is_sold === 1 || poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost';
+    if (!isSold) return;
+
+    // 1. Abortar listener via AbortController (nunca removeEventListener)
+    contract.abortController.abort();
+    clearTimeout(contract.fallbackTimer);
+    setOpenPositions(prev => prev.filter(p => !p.id.startsWith(contract.asset)));
+
+    // 2. OBRIGATÓRIO: forget a subscription para liberar recursos no servidor
+    const subscriptionId = msg.subscription?.id || poc.subscription?.id;
+    if (subscriptionId) {
+      derivApiService.sendRaw({ forget: subscriptionId });
     }
 
-    if (activeAssetsRef.current.has(payload.ativo)) {
-      addLog(`[ACTION] Sinal para ${payload.ativo} ignorado: ciclo já ativo neste ativo.`, 'warn');
-      return;
-    }
+    // 3. Calcular resultado com Number() cast (NUNCA confiar no tipo)
+    const profit = Number(poc.profit ?? 0);
+    const isWin = profit > 0;
 
-    activeAssetsRef.current.add(payload.ativo);
-    addLog(`[ACTION] Iniciando Ciclo Executor para ${payload.ativo} | Token Presente`, 'info');
+    // Recuperar stake acumulada da série
+    const accumStake = seriesStakeAccum.current.get(contract.seriesId) ?? contract.stake;
 
-    setTradeCycle(prev => ({
-      ...prev,
-      isActive: true,
-      asset: payload.ativo,
-      lastSignalId: payload.id,
-      galeLevel: 0,
-      timestamp: Date.now(),
-    }));
+    if (isWin) {
+      onSeriesEnd({
+        seriesId: contract.seriesId,
+        finalResult: 'WIN',
+        finalGaleLevel: contract.galeLevel,
+        totalStake: accumStake,
+        profit,
+        resolvedAt: Date.now(),
+      }, contract.asset, contract.direction);
+    } else if (contract.galeLevel < 2) {
+      // Escalar para próximo Gale
+      const nextLevel = (contract.galeLevel + 1) as GaleLevel;
+      const nextStake = Number((baseStake * GALE_MULTIPLIERS[nextLevel]).toFixed(2));
 
-    const tipoContrato = payload.sinal_dir || payload.tipo || 'CALL';
-    const params: DerivOrderParams = {
-      token: derivTokenRef.current,
-      ativo: payload.ativo,
-      tipo: tipoContrato,
-      stake: baseStakeRef.current,
-      duration: 1,
-      durationUnit: 'm',
-      digito: payload.digito,
-    };
+      addLog('info', `[LOSS] G${contract.galeLevel} ${contract.asset} | Escalando para G${nextLevel}...`);
 
-    let galeReached = 0;
-    let finalResult = 'HIT';
-    let totalProfit = 0;
-
-    const multiplicadores = GALE_MULTIPLIERS;
-
-    // [LGN_AUDITOR] Sizing Guard + Balance Check + EV Audit
-    const balance = await HftDerivService.getBalance(derivSocketRef.current);
-    if (balance > 0) {
-      const totalExposure = baseStakeRef.current * GALE_TOTAL_UNITS;
-      // Trava de risco removida a pedido do usuario
-      addLog(`[💰 LGN] Saldo: $${balance.toFixed(2)} | Exposição G2: $${totalExposure.toFixed(2)}`, 'info');
-      addLog(`[📊 EV] Série G2: $${baseStakeRef.current.toFixed(2)} × [1.0+2.2+5.0] = $${totalExposure.toFixed(2)} | Break-even: payout ≥ ${((GALE_TOTAL_UNITS / (GALE_TOTAL_UNITS + 1)) * 100).toFixed(0)}%`, 'info');
+      setTimeout(() => {
+        executeTradeRef.current({
+          reqId: Date.now(),
+          asset: contract.asset,
+          direction: contract.direction,
+          stake: nextStake,
+          galeLevel: nextLevel,
+          seriesId: contract.seriesId,
+          sentAt: Date.now(),
+        });
+      }, 1000);
     } else {
-      addLog(`[⚠️ LGN] Não foi possível ler saldo. Prosseguindo com cautela.`, 'warn');
+      // G2 perdido — série encerrada como LOSS
+      onSeriesEnd({
+        seriesId: contract.seriesId,
+        finalResult: 'LOSS',
+        finalGaleLevel: 2,
+        totalStake: accumStake,
+        profit,
+        resolvedAt: Date.now(),
+      }, contract.asset, contract.direction);
     }
+  }, [onSeriesEnd, baseStake, addLog]);
 
-    // [SHIELD_AGENT] REGRA DE OURO: try/finally garante que o ativo SEMPRE é liberado
+  // ── checkFallback — Query manual após timeout ────────────────────────────
+
+  const checkFallback = useCallback(async (contractId: number, ctx: TradeContext) => {
+    addLog('info', `[FALLBACK] Consultando POC manual para ${contractId}`);
     try {
-      for (let i = 0; i < 3; i++) {
-        galeReached = i;
-        params.stake = baseStakeRef.current * multiplicadores[i];
-
-        // [LGN_AUDITOR] Balance Check antes de cada Gale
-        if (balance > 0 && i > 0) {
-          const liveBalance = await HftDerivService.getBalance(derivSocketRef.current);
-          if (liveBalance > 0 && liveBalance < params.stake) {
-            addLog(`[🛑 LGN] Banca Insuficiente para G${i}: $${liveBalance.toFixed(2)} < $${params.stake.toFixed(2)}. ABORTANDO.`, 'error');
-            finalResult = 'CANCELLED';
-            break;
-          }
-        }
-
-        // [SHIELD_AGENT] Salva estado do Gale no LocalStorage para recuperação F5
-        setTradeCycle(prev => ({ ...prev, galeLevel: i }));
-
-        // [SHIELD_AGENT] Jitter entre ordens para não sobrecarregar a Deriv
-        if (activeAssetsRef.current.size > 1 || i > 0) {
-          const jitter = 100 + Math.floor(Math.random() * 400);
-          addLog(`[⏳ JITTER] ${payload.ativo} aguardando ${jitter}ms...`, 'info');
-          await new Promise(res => setTimeout(res, jitter));
-        }
-
-        addLog(`[DERIV] Lançando ${i === 0 ? 'ENTRADA BASE (G0)' : `GALE ${i}`}. Stake: $${params.stake.toFixed(2)}`, 'info');
-
-        const result = await HftDerivService.executeDerivOrder({ ...params, socket: derivSocketRef.current });
-
-        // [FORMA 5] Auditoria Inviolável: Envia ID do contrato para o Supabase B
-        if (result.contractId) {
-          import('../services/HftAuditService').then(({ HftAuditService }) => {
-            HftAuditService.registerTrade({
-              clientId,
-              contractId: String(result.contractId),
-              botId: 'ORACLE_QUANT',
-              ativo: payload.ativo
-            });
-          });
-        }
-
-        if (!result.success) {
-          addLog(`[DERIV ERROR] Falha no disparo: ${result.error} (código: ${result.errorCode})`, 'error');
-
-          // [LGN_AUDITOR] Ordem recusada = dinheiro NÃO foi debitado, totalProfit intacto
-          // [SHIELD_AGENT] InsufficientBalance é o ÚNICO erro que aborta o ciclo
-          if (result.errorCode === 'InsufficientBalance') {
-            addLog(`[🛑 LGN] Banca insuficiente detectada pela Deriv. Ciclo abortado.`, 'error');
-            finalResult = 'CANCELLED';
-            break;
-          }
-
-          // [LGN_AUDITOR] Resiliência: G0/G1/G2 falhou tecnicamente → espera até próxima vela
-          const nowMs = Date.now();
-          const msUntilNextMinute = 60000 - (nowMs % 60000);
-          addLog(`[⏳ RETRY] Erro técnico em G${i}. Aguardando ${(msUntilNextMinute / 1000).toFixed(1)}s até próxima vela...`, 'info');
-          await new Promise(res => setTimeout(res, msUntilNextMinute + 500)); // +500ms de margem
-          continue; // tenta próximo Gale level na nova vela
-        }
-
-        // [LGN_AUDITOR] Apenas acumula profit quando a ordem foi ACEITA pela Deriv
-        totalProfit += result.profit - (result.won ? 0 : params.stake);
-
-        if (result.won) {
-          addLog(`[RESULTADO] WIN! Lucro obtido: +$${result.profit.toFixed(2)} (Gale ${i})`, 'success');
-          finalResult = 'WIN';
-          break;
-        } else {
-          addLog(`[RESULTADO] LOSS. Prejuízo: -$${params.stake.toFixed(2)} (Gale ${i})`, 'warn');
-        }
-      }
-
-      if (finalResult === 'HIT') {
-        addLog(`[RESULTADO] HIT (Loss Triplo). Fim da linha para o ciclo.`, 'error');
-      }
-    } finally {
-      // [SHIELD_AGENT] REGRA DE OURO: Libera o ativo SEMPRE, independente de Win/Loss/Timeout/Crash
-      activeAssetsRef.current.delete(payload.ativo);
-      setTradeCycle({ isActive: false, galeLevel: 0 });
-    }
-
-    // Audit Trail
-    try {
-      await hftSupabase.from('client_logs').insert({
-        strategy_id: payload.estrategia,
-        resultado_final: finalResult,
-        payout_obtido: totalProfit,
-        gale_alcancado: galeReached,
-        ativo: payload.ativo,
-        bot_variacao: payload.variacao_estrategia,
+      const { response } = await derivApiService.send({
+        proposal_open_contract: 1,
+        contract_id: contractId,
+        subscribe: 0,  // explícito: NÃO criar subscription
       });
-      addLog(`[AUDIT] Trilha de execução registrada no Banco (Supabase)`, 'info');
-    } catch (e) {
-      console.warn('Erro ao inserir audit log:', e);
+
+      if (response.proposal_open_contract) {
+        const active = activeSeries.current.get(ctx.seriesId);
+        if (active) {
+          handlePOC(response, active);
+        }
+      } else {
+        // Contrato ainda aberto ou não encontrado — marcar como TIMEOUT_UNKNOWN
+        addLog('error', `[FALLBACK] Contrato ${contractId} sem resultado apos timeout`);
+        const accumStake = seriesStakeAccum.current.get(ctx.seriesId) ?? ctx.stake;
+        onSeriesEnd({
+          seriesId: ctx.seriesId,
+          finalResult: 'TIMEOUT_UNKNOWN',
+          finalGaleLevel: ctx.galeLevel,
+          totalStake: accumStake,
+          profit: 0,
+          resolvedAt: Date.now(),
+        }, ctx.asset, ctx.direction);
+      }
+    } catch (err) {
+      addLog('error', `[FALLBACK ERROR] Falha no check manual: ${contractId}`);
+      const accumStake = seriesStakeAccum.current.get(ctx.seriesId) ?? ctx.stake;
+      onSeriesEnd({
+        seriesId: ctx.seriesId,
+        finalResult: 'TIMEOUT_UNKNOWN',
+        finalGaleLevel: ctx.galeLevel,
+        totalStake: accumStake,
+        profit: 0,
+        resolvedAt: Date.now(),
+      }, ctx.asset, ctx.direction);
     }
-  }, [addLog]);
+  }, [handlePOC, addLog, onSeriesEnd]);
 
-  // [SHIELD_AGENT] Sync ref para evitar re-subscribe do canal Realtime
-  useEffect(() => {
-    executeOrderChainRef.current = executeOrderChain;
-  }, [executeOrderChain]);
+  // ── executeTrade — Compra + escuta resultado ─────────────────────────────
 
-  useEffect(() => {
-    if (!enabled) return;
+  const executeTrade = useCallback(async (ctx: TradeContext) => {
+    const posId = `${ctx.asset}-G${ctx.galeLevel}-${Date.now()}`;
 
-    if (tradeCycleRef.current.isActive || tradeCycleRef.current.galeLevel > 0) {
-      addLog(`[SHIELD_AGENT] Recuperando Ciclo. Gale: ${tradeCycleRef.current.galeLevel} | Ativo: ${tradeCycleRef.current.asset}`, 'warn');
-    }
+    // Acumular stake da série
+    const prevAccum = seriesStakeAccum.current.get(ctx.seriesId) ?? 0;
+    seriesStakeAccum.current.set(ctx.seriesId, prevAccum + ctx.stake);
 
-    const activeBotNames = Array.from(activeBotsRef.current)
-      .map(b => BOT_CATALOG[b]?.name ?? b)
-      .join(', ');
-    addLog(`[HFT] Iniciando escuta (Realtime) — Bots ativos: [${activeBotNames || 'Nenhum'}]`, 'info');
+    try {
+      addLog('info', `[G${ctx.galeLevel}] ${ctx.asset} ${ctx.direction} | Stake: $${ctx.stake.toFixed(2)}`);
 
-    const channel = hftSupabase
-      .channel('schema-db-changes-arsenal')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'hft_catalogo_estrategias',
+      // Registra posição aberta na UI
+      setOpenPositions(prev => [...prev, {
+        id: posId,
+        asset: ctx.asset,
+        direction: ctx.direction,
+        stake: ctx.stake,
+        gale: ctx.galeLevel,
+        openTime: Date.now(),
+        durationSecs: 60,
+      }]);
+
+      // Enviar BUY para a Deriv
+      const { response: resp } = await derivApiService.send({
+        buy: 1,
+        subscribe: 1,
+        price: ctx.stake,
+        parameters: {
+          amount: ctx.stake,
+          basis: 'stake',
+          contract_type: ctx.direction,
+          currency: 'USD',
+          duration: 1,
+          duration_unit: 'm',
+          symbol: ctx.asset,
         },
-        (payload) => {
-          console.log('[REALTIME] Payload recebido bruto:', payload);
-
-          const signal = payload.new as HftSignalPayload;
-
-          // [AUTO_DEBUG_CRON] Filtro de Duplicidade
-          if (signal.id !== undefined) {
-            if (lastProcessedSignalIdRef.current.has(signal.id)) {
-              addLog(`[DEDUP] Sinal ID ${signal.id} já processado. Descartando duplicata.`, 'warn');
-              return;
-            }
-            lastProcessedSignalIdRef.current.add(signal.id);
-            if (lastProcessedSignalIdRef.current.size > 200) {
-              const oldest = lastProcessedSignalIdRef.current.values().next().value;
-              if (oldest !== undefined) lastProcessedSignalIdRef.current.delete(oldest);
-            }
-          }
-
-          // [SHIELD_AGENT] Whitelist Estrita
-          if (!VOLATILITY_WHITELIST.has((signal.ativo || '').toUpperCase())) {
-            addLog(`[WHITELIST] ${signal.ativo} bloqueado. Motor opera apenas R_10/R_25/R_50/R_75/R_100.`, 'warn');
-            return;
-          }
-
-          // ── [TRAVA DE EXCLUSIVIDADE] variacao_estrategia deve bater EXATAMENTE ──
-          const variacao = (signal.variacao_estrategia || '').toUpperCase().trim() as BotType;
-
-          if (!variacao) {
-            addLog(`[FILTRO] Sinal sem variacao_estrategia definida. Descartado.`, 'warn');
-            return;
-          }
-
-          const currentActiveBots = activeBotsRef.current;
-          if (!currentActiveBots.has(variacao)) {
-            const botName = BOT_CATALOG[variacao]?.name ?? variacao;
-            addLog(`[TRAVA] Sinal ${variacao} (${botName}) ignorado — bot não está ativo no Arsenal.`, 'warn');
-            return;
-          }
-
-          addLog(`[✅ MATCH] ${signal.ativo} | Variação: ${variacao} (${BOT_CATALOG[variacao]?.name}) | Status: ${signal.status}`, 'success');
-
-          // [LGN_AUDITOR] Check de Payout Mínimo (80%)
-          const payout = signal.payout ?? 100;
-          if (payout < MIN_PAYOUT_PCT) {
-            addLog(`[LGN_AUDITOR] Payout ${payout}% abaixo do mínimo de ${MIN_PAYOUT_PCT}%. Entrada bloqueada.`, 'warn');
-            return;
-          }
-
-          // Check de Risco (TP/SL)
-          const _profit = currentProfitRef.current;
-          const _tp = takeProfitRef.current;
-          const _sl = stopLossRef.current;
-
-          if (_tp > 0 && _profit >= _tp) {
-            addLog(`[RISK] Meta batida (Take Profit). Sinal bloqueado.`, 'error');
-            return;
-          }
-          if (_sl > 0 && _profit <= -Math.abs(_sl)) {
-            addLog(`[RISK] Loss máximo batido (Stop Loss). Sinal bloqueado.`, 'error');
-            return;
-          }
-
-          // Gestão de Gatilho
-          if (signal.status === 'PRE_SIGNAL') {
-            addLog(`[HFT] Preparando entrada em ${signal.ativo}... (Handshake)`, 'info');
-            if (derivTokenRef.current) {
-              HftDerivService.prepareConnection(signal.ativo, derivTokenRef.current).then(success => {
-                if (success) addLog(`[HANDSHAKE] WS Aberto e Autenticado para ${signal.ativo}`, 'success');
-              });
-            }
-          } else if (signal.status === 'CONFIRMED') {
-            const now = Date.now()
-
-            // [FIX BUG 2] timestamp_sinal é SEMPRE segundos Unix no VPS
-            const signalTimeMs = signal.timestamp_sinal * 1000
-            const diff = now - signalTimeMs
-
-            // [FIX BUG 1] 10s de tolerância para Vercel CDN
-            if (diff >= 0 && diff <= 10000) {
-              const msIntoCandle = now % 60000
-              const msToSync = msIntoCandle <= 4000
-                ? 0
-                : 60000 - msIntoCandle
-
-              addLog(
-                `[✅ EXEC] ${signal.ativo} | lat=${diff}ms | sync=${msToSync}ms`,
-                'success'
-              )
-
-              // [FIX BUG 3] Sincroniza com início da próxima vela se já passou 4s
-              if (msToSync > 0 && msToSync < 56000) {
-                addLog(`[⏱ SYNC] Aguardando ${msToSync}ms para próxima vela`, 'info')
-                setTimeout(() => executeOrderChainRef.current?.(signal), msToSync)
-              } else {
-                executeOrderChainRef.current?.(signal)
-              }
-            } else {
-              addLog(
-                `[STALE] ${signal.ativo} | diff=${diff}ms | ts_ms=${signalTimeMs} | now=${now}`,
-                'warn'
-              )
-            }
-          }
-        }
-      )
-      .subscribe((status, err) => {
-        console.log('[REALTIME] Status do canal:', status, err ?? '');
-        if (status === 'SUBSCRIBED') {
-          addLog('[HFT] Conectado ao canal Realtime.', 'success');
-        } else if (status === 'CHANNEL_ERROR') {
-          addLog(`[HFT] Erro de canal: ${JSON.stringify(err)}`, 'error');
-        } else if (status === 'TIMED_OUT') {
-          addLog('[HFT] Canal Realtime com timeout.', 'error');
-        } else if (status === 'CLOSED') {
-          addLog('[HFT] Canal Realtime fechado.', 'warn');
-        } else {
-          addLog(`[HFT] Status do canal: "${status}"`, 'warn');
-        }
       });
 
-    return () => {
-      hftSupabase.removeChannel(channel);
-      addLog('[HFT] Desconectado do canal.', 'warn');
-      HftDerivService.killAllConnections();
-    };
-  // [SHIELD_AGENT] Deps estáveis — executeOrderChain removido (usa ref)
-  }, [enabled, addLog]);
+      if (resp.error) throw resp.error;
 
-  // Gestão de Throttling (Aba Zumbi)
+      // ── contract_id real: SEMPRE Number() ─────────────────────────────
+      const realContractId = Number(resp.buy.contract_id);
+      const buyPrice = Number(resp.buy.buy_price ?? ctx.stake);
+      const ac = new AbortController();
+
+      addLog('ok', `[BUY OK] ${ctx.asset} contract_id=${realContractId} | buyPrice=$${buyPrice.toFixed(2)}`);
+
+      const activeContract: ActiveContract = {
+        ...ctx,
+        contractId: realContractId,
+        abortController: ac,
+        fallbackTimer: setTimeout(() => checkFallback(realContractId, ctx), FALLBACK_DELAY_MS),
+      };
+
+      activeSeries.current.set(ctx.seriesId, activeContract);
+
+      // ── Persistir recovery (contractId REAL, nunca client_id) ─────────
+      const recovery: GaleRecoveryState = {
+        seriesId: ctx.seriesId,
+        galeLevel: ctx.galeLevel,
+        contractId: realContractId,
+        asset: ctx.asset,
+        direction: ctx.direction,
+        stake: ctx.stake,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem('hft_active_recovery', JSON.stringify(recovery));
+
+      // ── Escutar POC via globalHandler + AbortController ───────────────
+      const socket = derivApiService.getRawSocket();
+      if (socket) {
+        socket.addEventListener('message', (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (
+              msg.msg_type === 'proposal_open_contract' &&
+              Number(msg.proposal_open_contract?.contract_id) === realContractId
+            ) {
+              handlePOC(msg, activeContract);
+            }
+          } catch { /* parse error — ignorar */ }
+        }, { signal: ac.signal });
+      }
+
+    } catch (err: any) {
+      setOpenPositions(prev => prev.filter(p => p.id !== posId));
+      const errMsg = err.message || JSON.stringify(err);
+      addLog('error', `[DERIV ERROR] G${ctx.galeLevel} ${ctx.asset}: ${errMsg}`);
+
+      const accumStake = seriesStakeAccum.current.get(ctx.seriesId) ?? ctx.stake;
+
+      if (errMsg.includes('InsufficientBalance') || errMsg.includes('Insufficient balance')) {
+        addLog('error', `[STOP] Saldo insuficiente. Ciclo abortado.`);
+        onSeriesEnd({
+          seriesId: ctx.seriesId,
+          finalResult: 'TIMEOUT_UNKNOWN',
+          finalGaleLevel: ctx.galeLevel,
+          totalStake: accumStake,
+          profit: 0,
+          resolvedAt: Date.now(),
+        }, ctx.asset, ctx.direction);
+      } else if (ctx.galeLevel < 2) {
+        addLog('info', `[RETRY] Tentando G${ctx.galeLevel + 1} em 2s devido a erro tecnico...`);
+        setTimeout(() => {
+          executeTradeRef.current({
+            ...ctx,
+            reqId: Date.now(),
+            galeLevel: (ctx.galeLevel + 1) as GaleLevel,
+            stake: Number((baseStake * GALE_MULTIPLIERS[ctx.galeLevel + 1]).toFixed(2)),
+            sentAt: Date.now(),
+          });
+        }, 2000);
+      } else {
+        onSeriesEnd({
+          seriesId: ctx.seriesId,
+          finalResult: 'LOSS',
+          finalGaleLevel: 2,
+          totalStake: accumStake,
+          profit: -accumStake,
+          resolvedAt: Date.now(),
+        }, ctx.asset, ctx.direction);
+      }
+    }
+  }, [addLog, baseStake, onSeriesEnd, checkFallback, handlePOC]);
+
+  // Ref estável para evitar re-subscribe loops
+  const executeTradeRef = useRef(executeTrade);
+  useEffect(() => { executeTradeRef.current = executeTrade; }, [executeTrade]);
+
+  // ── resumePendingGale — Recovery de série interrompida ───────────────────
+
+  const resumePendingGale = useCallback(async (state: GaleRecoveryState) => {
+    addLog('info', `[RECOVERY] Retomando ciclo interrompido: ${state.asset} G${state.galeLevel}`);
+    try {
+      const { response } = await derivApiService.send({
+        proposal_open_contract: 1,
+        contract_id: state.contractId,
+        subscribe: 0,  // Query pontual, não subscription
+      });
+
+      if (response.proposal_open_contract) {
+        const ac = new AbortController();
+        const contract: ActiveContract = {
+          reqId: Date.now(),
+          asset: state.asset,
+          direction: state.direction,
+          stake: state.stake,
+          galeLevel: state.galeLevel,
+          seriesId: state.seriesId,
+          sentAt: Date.now(),   // ← FIX: campo obrigatório que estava faltando
+          contractId: state.contractId,
+          abortController: ac,
+          fallbackTimer: setTimeout(() => {}, 0), // timer dummy — já estamos fazendo query
+        };
+
+        // Inicializar acumulador da série com a stake atual
+        seriesStakeAccum.current.set(state.seriesId, state.stake);
+
+        handlePOC({ proposal_open_contract: response.proposal_open_contract }, contract);
+      } else {
+        addLog('info', `[RECOVERY] Contrato ${state.contractId} nao encontrado — limpando`);
+        localStorage.removeItem('hft_active_recovery');
+      }
+    } catch (err) {
+      addLog('error', `[RECOVERY ERROR] Falha ao resumir: ${state.contractId}`);
+      localStorage.removeItem('hft_active_recovery');
+    }
+  }, [handlePOC, addLog]);
+
+  // ── Page Visibility API ─────────────────────────────────────────────────
+
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && activeAssetsRef.current.size > 0) {
-        addLog('[SHIELD_AGENT] Navegador em background. Motor continua operando!', 'warn');
-        try {
-          const audioCtx = new (window.AudioContext || (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
-          const oscillator = audioCtx.createOscillator();
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-          oscillator.connect(audioCtx.destination);
-          oscillator.start();
-          oscillator.stop(audioCtx.currentTime + 0.1);
-        } catch (_) { /* ignore */ }
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'hidden') {
+        // Parar de aceitar novos sinais imediatamente
+        setIsAcceptingSignals(false);
+      }
+      if (document.visibilityState === 'visible') {
+        // Ordem obrigatória: (1) reconectar WS → (2) re-hidratar → (3) aceitar sinais
+        await derivApiService.ensureConnected();
+
+        const rawRecovery = localStorage.getItem('hft_active_recovery');
+        if (rawRecovery) {
+          try {
+            const state: GaleRecoveryState = JSON.parse(rawRecovery);
+            const ageMs = Date.now() - state.savedAt;
+            if (ageMs < 90_000) {
+              await resumePendingGale(state);
+            } else {
+              addLog('info', `[RECOVERY] Estado expirado (${(ageMs / 1000).toFixed(0)}s > 90s) — limpando`);
+              localStorage.removeItem('hft_active_recovery');
+            }
+          } catch { /* parse error */ }
+        }
+
+        setIsAcceptingSignals(true);
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [addLog]);
+  }, [resumePendingGale, addLog]);
 
-  const stopAll = useCallback(() => {
-    activeAssetsRef.current.clear();
-    setTradeCycle({ isActive: false, galeLevel: 0 });
-    HftDerivService.killAllConnections();
-    addLog('[PANIC] Ciclos interrompidos e WebSockets fechados!', 'error');
-  }, [addLog]);
+  // ── Realtime Signals (hft_catalogo_estrategias) ──────────────────────────
+
+  useEffect(() => {
+    if (!enabled || !isAcceptingSignals) return;
+
+    const channel = hftSupabase
+      .channel('oracle_signals_bridge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hft_catalogo_estrategias' },
+      (payload) => {
+        const signal = payload.new as Record<string, unknown>;
+        if (String(signal.status ?? '') !== 'CONFIRMED') return;
+
+        // Verificar latência do sinal
+        const tsSignal = Number(signal.timestamp_sinal ?? 0);
+        const tsNow = Date.now() / 1000;
+        const latency = tsNow - tsSignal;
+        if (latency > 10 || latency < 0) return;
+
+        // Verificar se o bot está ativo
+        const variacao = String(signal.variacao_estrategia ?? 'N/A');
+        if (!activeBots.has(variacao)) return;
+
+        const ativo = String(signal.ativo ?? '');
+
+        // Concurrency cap
+        if (executingAssets.current.size >= MAX_CONCURRENT_ASSETS) {
+          addLog('info', `[CAP] ${executingAssets.current.size}/${MAX_CONCURRENT_ASSETS} ativos em execucao. ${ativo} adiado.`);
+          return;
+        }
+
+        // Anti-duplo por ativo
+        if (executingAssets.current.has(ativo)) return;
+        executingAssets.current.add(ativo);
+
+        const direcao = String(signal.direcao || signal.sinal_dir || '') as ContractDirection;
+
+        addLog('ok', `[EXEC] Iniciando ${ativo} ${direcao} | lat=${latency.toFixed(2)}s`);
+
+        executeTradeRef.current({
+          reqId: Date.now(),
+          asset: ativo,
+          direction: direcao,
+          stake: Number(baseStake.toFixed(2)),
+          galeLevel: 0,
+          seriesId: crypto.randomUUID(),
+          sentAt: Date.now(),
+        });
+      })
+      .subscribe((st) => {
+        if (st === 'SUBSCRIBED') addLog('ok', '[SIGNAL] Canal conectado com sucesso!');
+        else if (st === 'CHANNEL_ERROR') addLog('error', `[SIGNAL] Erro no canal!`);
+        else addLog('info', `[SIGNAL] Status canal: ${st}`);
+      });
+
+    return () => { hftSupabase.removeChannel(channel); };
+  }, [enabled, isAcceptingSignals, activeBots, baseStake, addLog]);
+
+  // ── Cleanup on unmount ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      // Abortar todos os contratos ativos
+      activeSeries.current.forEach(contract => {
+        contract.abortController.abort();
+        clearTimeout(contract.fallbackTimer);
+      });
+      activeSeries.current.clear();
+      seriesStakeAccum.current.clear();
+      executingAssets.current.clear();
+    };
+  }, []);
 
   return {
+    sessionWins,
+    sessionLosses,
+    sessionProfit,
     logs,
-    tradeCycle,
-    stopAll,
+    openPositions,
+    isAcceptingSignals,
+    resetStats: () => {
+      setSessionWins(0);
+      setSessionLosses(0);
+      setSessionProfit(0);
+      setLogs([]);
+      localStorage.removeItem('@oracle:session_results');
+    },
   };
 }

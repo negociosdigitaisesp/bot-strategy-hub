@@ -481,7 +481,7 @@ const OracleQuant = () => {
           if (!poc) { resolve(null); return }
 
           if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_sold || poc.is_final_price) {
-            const profit = parseFloat(poc.profit ?? '0')
+            const profit = Number(poc.profit ?? 0)
             resolve({ won: profit > 0, profit })
           } else {
             resolve(null)
@@ -518,21 +518,28 @@ const OracleQuant = () => {
       const contractType = direcao === 'CALL' ? 'CALL' : 'PUT'
       const reqId = Math.floor(Math.random() * 900000) + 100000
 
-      let resolved = false
-      let contractId: number | null = null
-      let pollInterval: ReturnType<typeof setInterval> | null = null
-      let resultTimeout: ReturnType<typeof setTimeout> | null = null
+      let resolved = false
+      let contractId: number | null = null
+      let pollInterval: ReturnType<typeof setInterval> | null = null
+      let resultTimeout: ReturnType<typeof setTimeout> | null = null
+      let pocSubscriptionId: string | null = null
+      const ac = new AbortController()
 
-      const safeResolve = (val: { won: boolean; profit: number; contractId?: string; error?: string }) => {
-        if (resolved) return
-        resolved = true
-        // Cleanup everything
-        clearTimeout(buyTimeout)
-        if (resultTimeout) clearTimeout(resultTimeout)
-        if (pollInterval) clearInterval(pollInterval)
-        if (contractId) contractSettlements.current.delete(contractId)
-        try { ws.removeEventListener('message', buyHandler) } catch {}
-        resolve(val)
+      const safeResolve = (val: { won: boolean; profit: number; contractId?: string; error?: string }) => {
+        if (resolved) return
+        resolved = true
+        // Cleanup everything
+        clearTimeout(buyTimeout)
+        if (resultTimeout) clearTimeout(resultTimeout)
+        if (pollInterval) clearInterval(pollInterval)
+        if (contractId) contractSettlements.current.delete(contractId)
+        // AbortController limpa TODOS os addEventListener de uma vez
+        ac.abort()
+        // OBRIGATORIO: forget a subscription POC no servidor Deriv
+        if (pocSubscriptionId && ws.readyState === WebSocket.OPEN) {
+          try { ws.send(JSON.stringify({ forget: pocSubscriptionId })) } catch {}
+        }
+        resolve(val)
       }
 
       // ═══ PHASE 1: Buy (2.5s timeout) ═══════════════════════════
@@ -554,13 +561,13 @@ const OracleQuant = () => {
             clearTimeout(buyTimeout)
             ws.removeEventListener('message', buyHandler)
 
-            contractId = data.buy?.contract_id
+            contractId = Number(data.buy?.contract_id ?? 0)
             if (!contractId) {
               safeResolve({ won: false, profit: 0, error: 'no contract_id' })
               return
             }
 
-const buyPrice = parseFloat(data.buy?.buy_price ?? stake)
+const buyPrice = Number(data.buy?.buy_price ?? stake)
 
             // ═══ PHASE 2: Wait for result (95s max) ═══════════════
             resultTimeout = setTimeout(async () => {
@@ -577,30 +584,31 @@ const buyPrice = parseFloat(data.buy?.buy_price ?? stake)
 
             // STRATEGY A: Transaction stream (primary — most reliable)
             contractSettlements.current.set(contractId, (tx: any) => {
-              const sellPrice = parseFloat(tx.amount ?? '0')
+              const sellPrice = Number(tx.amount ?? 0)
               const profit = sellPrice - buyPrice
               safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
             })
 
             // STRATEGY B: proposal_open_contract subscribe (secondary)
-            const pocHandler = (pocMsg: MessageEvent) => {
-              try {
-                const pocData = JSON.parse(pocMsg.data)
-                if (
-                  pocData.msg_type === 'proposal_open_contract' &&
-                  pocData.proposal_open_contract?.contract_id === contractId
-                ) {
-                  const poc = pocData.proposal_open_contract
+            const pocHandler = (pocMsg: MessageEvent) => {
+              try {
+                const pocData = JSON.parse(pocMsg.data)
+                if (
+                  pocData.msg_type === 'proposal_open_contract' &&
+                  Number(pocData.proposal_open_contract?.contract_id) === contractId
+                ) {
+                  // Capturar subscription.id para o forget
+                  if (pocData.subscription?.id) pocSubscriptionId = pocData.subscription.id
+                  const poc = pocData.proposal_open_contract
 if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_sold || poc.is_final_price) {
-                    try { ws.removeEventListener('message', pocHandler) } catch {}
-                    const profit = parseFloat(poc.profit ?? '0')
-                    safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
-                  }
-                }
-              } catch {}
-            }
-            ws.addEventListener('message', pocHandler)
-            // Subscription primária — escuta resultado via push
+                    const profit = Number(poc.profit ?? 0)
+                    safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
+                  }
+                }
+              } catch {}
+            }
+            ws.addEventListener('message', pocHandler, { signal: ac.signal })
+            // Subscription primaria — escuta resultado via push
             ws.send(JSON.stringify({ proposal_open_contract: 1, contract_id: contractId, subscribe: 1 }))
 
 // STRATEGY C: Polling fallback every 10s (survives reconnections)
@@ -610,27 +618,28 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
               if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return
 
               const pollReqId = Math.floor(Math.random() * 900000) + 100000
+              const pollAc = new AbortController()
               const pollHandler = (pollMsg: MessageEvent) => {
                 try {
                   const pollData = JSON.parse(pollMsg.data)
                   if (pollData.req_id !== pollReqId) return
-                  currentWs.removeEventListener('message', pollHandler)
+                  pollAc.abort()
                   if (pollData.error) return
                   const poc = pollData.proposal_open_contract
                   if (poc && (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || poc.is_sold || poc.is_final_price)) {
-                    const profit = parseFloat(poc.profit ?? '0')
+                    const profit = Number(poc.profit ?? 0)
                     safeResolve({ won: profit > 0, profit, contractId: String(contractId) })
                   }
                 } catch {}
               }
-              currentWs.addEventListener('message', pollHandler)
+              currentWs.addEventListener('message', pollHandler, { signal: pollAc.signal })
               currentWs.send(JSON.stringify({ proposal_open_contract: 1, contract_id: contractId, subscribe: 0, req_id: pollReqId }))
             }, 10000)
           }
         } catch {}
       }
 
-      ws.addEventListener('message', buyHandler)
+      ws.addEventListener('message', buyHandler, { signal: ac.signal })
       ws.send(JSON.stringify({
         buy: 1, subscribe: 1, price: stake,
         req_id: reqId,

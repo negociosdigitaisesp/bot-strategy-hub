@@ -158,6 +158,8 @@ export class HftDerivService {
 
     return new Promise((resolve) => {
       let resolved = false;
+      let pocSubscriptionId: string | null = null;
+      const ac = new AbortController();
 
       // [PASSO 3] Prioridade: socket injetado do DerivContext
       const injected = params.socket;
@@ -212,8 +214,8 @@ export class HftDerivService {
             resolved = true;
             clearTimeout(timeoutId);
             if (!useInjected) { ws.close(); this.connections.delete(symbol); }
-            // [PASSO 3] Remove listener se socket injetado
-            if (useInjected) ws.removeEventListener('message', handleMessage);
+            // [PASSO 3] Abort listener via AbortController
+            ac.abort();
             resolve({ success: false, won: false, profit: 0, error: data.error.message, errorCode: data.error.code });
           }
           return;
@@ -229,6 +231,8 @@ export class HftDerivService {
 
         if (data.msg_type === 'proposal_open_contract') {
           const contract = data.proposal_open_contract;
+          // Capturar subscription.id para o forget
+          if (data.subscription?.id) pocSubscriptionId = data.subscription.id;
           if (
             contract.is_sold ||
             contract.status === 'sold' ||
@@ -238,17 +242,21 @@ export class HftDerivService {
             if (!resolved) {
               resolved = true;
               clearTimeout(timeoutId);
-              if (useInjected) ws.removeEventListener('message', handleMessage);
-              const profit = parseFloat(contract.profit);
-              resolve({ success: true, won: contract.status === 'won', profit, contractId: contract.contract_id });
+              ac.abort();
+              // OBRIGATORIO: forget subscription no servidor Deriv
+              if (pocSubscriptionId && ws.readyState === WebSocket.OPEN) {
+                try { ws.send(JSON.stringify({ forget: pocSubscriptionId })); } catch {}
+              }
+              const profit = Number(contract.profit ?? 0);
+              resolve({ success: true, won: profit > 0, profit, contractId: Number(contract.contract_id) });
             }
           }
         }
       };
 
       if (useInjected) {
-        // Usa addEventListener para não sobrescrever outros listeners no socket compartilhado
-        ws.addEventListener('message', handleMessage);
+        // Usa addEventListener com AbortController para cleanup seguro
+        ws.addEventListener('message', handleMessage, { signal: ac.signal });
         sendBuy(ws);
       } else {
         ws.onmessage = handleMessage;
