@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OracleQuant.tsx â€” Trading Command Center (Redesign Pro) v2
  * Arsenal de bots especialistas com dados do Supabase B (hft_lake)
  * 
@@ -868,7 +868,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
         // [LGN_AUDITOR] Apenas acumula profit quando a ordem foi ACEITA pela Deriv
         totalProfit += result.profit
         if (result.won) {
-          addLog('ok', `[ðŸ† WIN G${i}] ${ativo} | Lucro: +$${result.profit.toFixed(2)}`)
+          addLog('ok', `[🏆 WIN G${i}] ${ativo} | Lucro liq: +${totalProfit.toFixed(2)} (leg: +${result.profit.toFixed(2)})`)
           finalResult = 'WIN'
           finalWon = true
           break
