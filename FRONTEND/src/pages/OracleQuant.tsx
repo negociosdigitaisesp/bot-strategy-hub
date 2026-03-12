@@ -22,7 +22,8 @@ import { useDeriv } from '@/contexts/DerivContext'
 import { useClientId } from '@/hooks/useClientId'
 import { TradingBackground } from '@/components/oracle/TradingBackground'
 import { RiskManagementPanel } from '@/components/oracle/RiskManagement'
-import { OpenPositionsPanel, type OpenPosition } from '@/components/oracle/OpenPositions'
+import { OpenPositionsPanel, type OpenPosition } from '@/components/oracle/OpenPositions'
+import { queryProfitTableWithRetry } from '@/services/profitTableFallback'
 
 // â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -847,6 +848,34 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
             addLog('error', `[⚠️ LGN] TIMEOUT G${i}: resultado DESCONHECIDO. NÃO escalando Gale.`)
             addLog('error', `[⚠️ LGN] Contrato pode ter ganhado. Verifique manualmente no portal Deriv.`)
             finalResult = 'TIMEOUT_UNKNOWN'
+
+            // ─── FALLBACK profit_table: recupera resultado real em background ───
+            if (result.contractId && Number(result.contractId) > 1_000_000) {
+              const fallbackWs = derivSocketRef.current
+              if (fallbackWs && fallbackWs.readyState === WebSocket.OPEN) {
+                addLog('info', '[🔁 LGN] Iniciando fallback profit_table...')
+                queryProfitTableWithRetry(Number(result.contractId), fallbackWs, 3, 3000)
+                  .then((fallback) => {
+                    if (fallback) {
+                      addLog('ok', `[✅ LGN] profit_table confirmou: ${fallback.result} | Lucro: $${fallback.profit}`)
+                      if (fallback.result === 'WIN') {
+                        setSessionWins(prev => prev + 1)
+                        setSessionProfit(prev => prev + fallback.profit)
+                      } else {
+                        setSessionLosses(prev => prev + 1)
+                        setSessionProfit(prev => prev + fallback.profit)
+                      }
+                    } else {
+                      addLog('error', '[⚠️ LGN] profit_table: contrato não encontrado após 3 tentativas.')
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('[❌ LGN] profit_table erro inesperado:', err)
+                  })
+              }
+            }
+            // ─── FIM DO BLOCO DE FALLBACK ──────────────────────────────────
+
             break  // PARA o ciclo — nunca continua após resultado desconhecido
           }
 
