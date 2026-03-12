@@ -200,7 +200,7 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
                     path: '/bots',
                     isImportant: false,
                     requiresUpgrade: false,
-                    description: 'Bots HFT'
+                    description: 'Catálogo de Traders'
                 },
                 {
                     name: 'Copy Trading',

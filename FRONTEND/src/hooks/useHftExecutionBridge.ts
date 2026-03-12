@@ -94,15 +94,7 @@ export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId
     activeSeries.current.delete(outcome.seriesId);
     seriesStakeAccum.current.delete(outcome.seriesId);
     executingAssets.current.delete(asset);
-    
-    if (outcome.finalResult === 'WIN' || outcome.finalResult === 'LOSS') {
-      setOpenPositions(prev => prev.map(p => p.id.startsWith(asset) && !p.result ? { ...p, result: outcome.finalResult } : p));
-      setTimeout(() => {
-        setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
-      }, 4000);
-    } else {
-      setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
-    }
+    setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
 
     // Persistir no Supabase B (background — não bloqueia)
     const idempotencyKey = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -136,7 +128,7 @@ export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId
     // 1. Abortar listener via AbortController (nunca removeEventListener)
     contract.abortController.abort();
     clearTimeout(contract.fallbackTimer);
-    // (A remoção visual é tratada agora pelo onSeriesEnd com delay para exibir WIN/LOSS)
+    setOpenPositions(prev => prev.filter(p => !p.id.startsWith(contract.asset)));
 
     // 2. OBRIGATÓRIO: forget a subscription para liberar recursos no servidor
     const subscriptionId = msg.subscription?.id || poc.subscription?.id;

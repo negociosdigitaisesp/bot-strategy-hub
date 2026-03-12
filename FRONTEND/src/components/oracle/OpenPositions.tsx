@@ -16,7 +16,6 @@ export interface OpenPosition {
   openTime: number
   durationSecs: number
   bot?: string
-  result?: 'WIN' | 'LOSS'
 }
 
 // Mapeamento de símbolos Deriv → nomes legíveis
@@ -68,15 +67,13 @@ const PositionCard = React.forwardRef<HTMLDivElement, { pos: OpenPosition; onExp
   const remaining = Math.max(0, pos.durationSecs - elapsed)
   const progress = Math.min(100, (elapsed / pos.durationSecs) * 100)
 
-  // Auto-remove card when timer expires only if parent hasn't handled it
-  // But wait, the parent will remove it. So we don't *strictly* need this 
-  // if parent handles it. But we'll keep a larger fallback.
+  // Auto-remove card when timer expires (regardless of executeDerivContract state)
   useEffect(() => {
-    if (remaining === 0 && !expiredRef.current && !pos.result) {
+    if (remaining === 0 && !expiredRef.current) {
       expiredRef.current = true
-      setTimeout(() => onExpire(pos.id), 8000) // Fallback 8s
+      setTimeout(() => onExpire(pos.id), 500) // 500ms grace for exit animation
     }
-  }, [remaining, onExpire, pos.id, pos.result])
+  }, [remaining, onExpire, pos.id])
 
   const totalSecs = Math.floor(remaining)
   const hh = Math.floor(totalSecs / 3600)
@@ -123,46 +120,31 @@ const PositionCard = React.forwardRef<HTMLDivElement, { pos: OpenPosition; onExp
         </span>
       </div>
 
-      {/* Timer / Result */}
+      {/* Timer */}
       <div className="px-3 pb-1">
-        {pos.result ? (
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className={cn(
-              'text-2xl font-black tracking-widest uppercase',
-              pos.result === 'WIN' ? 'text-emerald-400' : 'text-red-400'
-            )}
-          >
-            {pos.result}
-          </motion.div>
-        ) : (
-          <motion.span
-            className={cn(
-              'text-2xl font-black font-mono tracking-widest tabular-nums',
-              isExpiring ? 'text-red-400' : 'text-white/90'
-            )}
-            animate={isExpiring ? { opacity: [1, 0.5, 1] } : { opacity: 1 }}
-            transition={{ duration: 0.8, repeat: isExpiring ? Infinity : 0 }}
-          >
-            {timeStr}
-          </motion.span>
-        )}
+        <motion.span
+          className={cn(
+            'text-2xl font-black font-mono tracking-widest tabular-nums',
+            isExpiring ? 'text-red-400' : 'text-white/90'
+          )}
+          animate={isExpiring ? { opacity: [1, 0.5, 1] } : { opacity: 1 }}
+          transition={{ duration: 0.8, repeat: isExpiring ? Infinity : 0 }}
+        >
+          {timeStr}
+        </motion.span>
       </div>
 
       {/* Progress bar */}
-      {!pos.result && (
-        <div className="mx-3 mb-3 mt-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-          <motion.div
-            className={cn(
-              'h-full rounded-full',
-              isExpiring ? 'bg-red-400' : 'bg-amber-400'
-            )}
-            style={{ width: `${progress}%` }}
-            transition={{ duration: 0.25, ease: 'linear' }}
-          />
-        </div>
-      )}
+      <div className="mx-3 mb-3 mt-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+        <motion.div
+          className={cn(
+            'h-full rounded-full',
+            isExpiring ? 'bg-red-400' : 'bg-amber-400'
+          )}
+          style={{ width: `${progress}%` }}
+          transition={{ duration: 0.25, ease: 'linear' }}
+        />
+      </div>
 
       {/* Stake info */}
       <div className="absolute bottom-2 right-3">

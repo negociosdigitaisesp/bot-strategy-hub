@@ -4,9 +4,13 @@
 # c:\Users\brend\Videos\bot-strategy-hub\million-bots-frontend
 # ============================================================
 
-$token = "REMOVED_FOR_SECURITY" # Replace with your Vercel Token
+$token = $env:VERCEL_TOKEN
 $projectId = "prj_a8nRSoK1ySPgRMsq2fvBNvsmphDZ"
 $teamId = "team_d2rHUSssNJYHsAlG89ZH9bzL"
+
+if (-not $token) {
+    throw "Missing VERCEL_TOKEN environment variable."
+}
 
 $headers = @{
     "Authorization" = "Bearer $token"
