@@ -94,7 +94,15 @@ export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId
     activeSeries.current.delete(outcome.seriesId);
     seriesStakeAccum.current.delete(outcome.seriesId);
     executingAssets.current.delete(asset);
-    setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
+    
+    if (outcome.finalResult === 'WIN' || outcome.finalResult === 'LOSS') {
+      setOpenPositions(prev => prev.map(p => p.id.startsWith(asset) && !p.result ? { ...p, result: outcome.finalResult } : p));
+      setTimeout(() => {
+        setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
+      }, 4000);
+    } else {
+      setOpenPositions(prev => prev.filter(p => !p.id.startsWith(asset)));
+    }
 
     // Persistir no Supabase B (background — não bloqueia)
     const idempotencyKey = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -128,7 +136,7 @@ export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId
     // 1. Abortar listener via AbortController (nunca removeEventListener)
     contract.abortController.abort();
     clearTimeout(contract.fallbackTimer);
-    setOpenPositions(prev => prev.filter(p => !p.id.startsWith(contract.asset)));
+    // (A remoção visual é tratada agora pelo onSeriesEnd com delay para exibir WIN/LOSS)
 
     // 2. OBRIGATÓRIO: forget a subscription para liberar recursos no servidor
     const subscriptionId = msg.subscription?.id || poc.subscription?.id;
@@ -252,7 +260,6 @@ export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId
       // Enviar BUY para a Deriv
       const { response: resp } = await derivApiService.send({
         buy: 1,
-        subscribe: 1,
         price: ctx.stake,
         parameters: {
           amount: ctx.stake,
@@ -271,6 +278,13 @@ export function useHftExecutionBridge({ enabled, baseStake, activeBots, clientId
       const realContractId = Number(resp.buy.contract_id);
       const buyPrice = Number(resp.buy.buy_price ?? ctx.stake);
       const ac = new AbortController();
+
+      // Request subscription for updates
+      derivApiService.sendRaw({
+        proposal_open_contract: 1,
+        contract_id: realContractId,
+        subscribe: 1
+      });
 
       addLog('ok', `[BUY OK] ${ctx.asset} contract_id=${realContractId} | buyPrice=$${buyPrice.toFixed(2)}`);
 

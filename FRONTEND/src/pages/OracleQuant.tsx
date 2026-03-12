@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OracleQuant.tsx â€” Trading Command Center (Redesign Pro) v2
  * Arsenal de bots especialistas com dados do Supabase B (hft_lake)
  * 
@@ -830,7 +830,12 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
         }
 
         // Remove posiÃ§Ã£o ao expirar
-        setOpenPositions(prev => prev.filter(p => p.id !== posId))
+        if (result.error) {
+          setOpenPositions(prev => prev.filter(p => p.id !== posId))
+        } else {
+          setOpenPositions(prev => prev.map(p => p.id === posId ? { ...p, result: result.won ? 'WIN' : 'LOSS' } : p))
+          setTimeout(() => setOpenPositions(prev => prev.filter(p => p.id !== posId)), 4000)
+        }
 
         if (result.error) {
           addLog('error', `[❌ DERIV] ${result.error}`)
@@ -1022,7 +1027,27 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
         updatedAt: Date.now()
       }))
     } catch {}
-  }, [sessionWins, sessionLosses, sessionProfit])
+  }, [sessionWins, sessionLosses, sessionProfit])
+
+  // [RISK_GUARD] Stop Win / Stop Loss Verification
+  useEffect(() => {
+    // Só faz a checagem se o sistema estiver rodando em "masterOn"
+    if (!masterOn) return
+
+    const { stopWin, stopLoss } = getRiskConfig()
+
+    // Bloqueia caso o limite seja ultrapassado e o valor estipulado seja válido (> 0)
+    if (stopWin > 0 && sessionProfit >= stopWin) {
+      setMasterOn(false) // DESLIGA O BOT IMEDIATAMENTE
+      addLog('ok', `[META] Stop Win atingido! Lucro: +${sessionProfit.toFixed(2)}`)
+      toast.success(`Meta alcançada! Stop Win de +${sessionProfit.toFixed(2)}`, { duration: 5000 })
+    } 
+    else if (stopLoss > 0 && sessionProfit <= -stopLoss) {
+      setMasterOn(false) // DESLIGA O BOT IMEDIATAMENTE
+      addLog('error', `[STOP] Stop Loss atingido! Perda: -${Math.abs(sessionProfit).toFixed(2)}`)
+      toast.error(`Risco máximo atingido! Stop Loss de -${Math.abs(sessionProfit).toFixed(2)}`, { duration: 5000 })
+    }
+  }, [sessionProfit, masterOn, getRiskConfig, addLog])
 
   // [BUG#3 FIX] Camada 2: Rehydrate do Supabase ao montar (source of truth para sessões longas)
   useEffect(() => {
@@ -1319,7 +1344,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Zap size={16} className="text-emerald-400" />
-                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Arsenal de Bots</h2>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Traders de Élite</h2>
                 <span className="text-[10px] text-white/20 font-mono ml-2">{activeBots.size}/{BOT_ARSENAL.length} activos</span>
               </div>
             </div>
@@ -1499,7 +1524,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
                 <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center border border-violet-500/20">
                   <Activity size={16} className="text-violet-400" />
                 </div>
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Bots Activos</h3>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Traders Activos</h3>
               </div>
               {activeBots.size === 0 ? (
                 <p className="text-xs text-white/20 text-center py-4">NingÃºn bot activado</p>

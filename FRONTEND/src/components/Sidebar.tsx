@@ -195,6 +195,14 @@ const Sidebar = ({ collapsed, toggleSidebar }: SidebarProps) => {
             label: 'ECOSISTEMA DERIV',
             items: [
                 {
+                    name: 'Bots',
+                    icon: <Bot size={20} />,
+                    path: '/bots',
+                    isImportant: false,
+                    requiresUpgrade: false,
+                    description: 'Bots HFT'
+                },
+                {
                     name: 'Copy Trading',
                     icon: <Crosshair size={20} />,
                     path: '/oracle-quant',

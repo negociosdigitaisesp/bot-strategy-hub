@@ -84,7 +84,6 @@ export const useBotOmega = () => {
                 // Send buy request for Digit Differs
                 const buyRequest = {
                     buy: 1,
-                    subscribe: 1,
                     price: 100,
                     parameters: {
                         contract_type: 'DIGITDIFF',
@@ -105,6 +104,13 @@ export const useBotOmega = () => {
 
         // Handle buy response
         if (data.msg_type === 'buy' && data.buy) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    proposal_open_contract: 1,
+                    contract_id: data.buy.contract_id,
+                    subscribe: 1
+                }));
+            }
             addLog(`✅ Contrato abierto: ID ${data.buy.contract_id}`, 'success');
         }
 

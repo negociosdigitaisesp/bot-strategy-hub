@@ -110,11 +110,10 @@ export const useBotMaquina = () => {
                     // Send buy request
                     const buyRequest = {
                         buy: 1,
-                        subscribe: 1,
-                        price: 100,
+                        price: stakeAmount,
                         parameters: {
                             contract_type: contractType,
-                            symbol: configRef.current.symbol || 'R_75',
+                            symbol: 'R_75',
                             currency: currency,
                             amount: stakeAmount,
                             basis: 'stake',
@@ -134,6 +133,13 @@ export const useBotMaquina = () => {
 
         // Handle buy response
         if (data.msg_type === 'buy' && data.buy) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    proposal_open_contract: 1,
+                    contract_id: data.buy.contract_id,
+                    subscribe: 1
+                }));
+            }
             addLog(`✅ Contrato abierto: ID ${data.buy.contract_id}`, 'success');
         }
 

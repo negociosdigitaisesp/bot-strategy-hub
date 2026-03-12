@@ -139,7 +139,6 @@ export const useBotSX = () => {
                     // Send buy request for Accumulator
                     const buyRequest = {
                         buy: 1,
-                        subscribe: 1,
                         price: 100, // Max payout
                         parameters: {
                             contract_type: 'ACCU',
@@ -162,6 +161,13 @@ export const useBotSX = () => {
 
         // Handle buy response
         if (data.msg_type === 'buy' && data.buy) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    proposal_open_contract: 1,
+                    contract_id: data.buy.contract_id,
+                    subscribe: 1
+                }));
+            }
             contractIdRef.current = data.buy.contract_id;
             addLog(`✅ Contrato abierto: ID ${data.buy.contract_id}`, 'success');
         }

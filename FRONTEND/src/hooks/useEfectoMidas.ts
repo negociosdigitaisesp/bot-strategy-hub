@@ -197,8 +197,7 @@ export const useEfectoMidas = () => {
                     // 5. Execute Trade: DIGITDIFF vs Cold Digit
                     const buyRequest = {
                         buy: 1,
-                        subscribe: 1,
-                        price: 10000,
+                        price: currentStakeRef.current,
                         parameters: {
                             contract_type: 'DIGITDIFF',
                             symbol: configRef.current.symbol || 'R_10', // Default R_10
@@ -219,6 +218,13 @@ export const useEfectoMidas = () => {
 
         // Handle buy response
         if (data.msg_type === 'buy' && data.buy) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    proposal_open_contract: 1,
+                    contract_id: data.buy.contract_id,
+                    subscribe: 1
+                }));
+            }
             addLog(`✅ Contrato aberto: ID ${data.buy.contract_id}`, 'success');
         }
 

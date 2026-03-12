@@ -62,7 +62,7 @@ const BestHours = () => {
     },
     {
       title: "Educación Continua",
-      description: "Incluso con robots automatizados, continúa aprendiendo sobre el mercado y actualizando tus estrategias.",
+      description: "Incluso con bots automatizados, continúa aprendiendo sobre el mercado y actualizando tus estrategias.",
       icon: <BookOpen className="h-6 w-6 text-primary" />
     },
     {
@@ -99,7 +99,7 @@ const BestHours = () => {
             </h1>
             <p className="text-xl mb-8 text-muted-foreground leading-relaxed max-w-2xl">
               Comprende cómo los diferentes períodos del día pueden impactar el rendimiento
-              de tus robots de trading y optimiza tus resultados.
+              de tus bots de trading y optimiza tus resultados.
             </p>
 
             <div className="bg-card/70 backdrop-blur-sm rounded-lg p-5 border border-border shadow-lg">
@@ -121,10 +121,10 @@ const BestHours = () => {
               <Info className="text-primary" size={28} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold mb-3">La Verdad Sobre Horarios y Robots de Trading</h2>
+              <h2 className="text-2xl font-bold mb-3">La Verdad Sobre Horarios y Bots de Trading</h2>
 
               <p className="text-muted-foreground mb-4 leading-relaxed">
-                <strong className="text-foreground">No existe un horario "definitivamente mejor" para operar los robots.</strong> El rendimiento de los bots
+                <strong className="text-foreground">No existe un horario "definitivamente mejor" para operar los bots.</strong> El rendimiento de los bots
                 en el mercado de índices sintéticos, como el R_100, no es predecible por horario del día, ya que estos mercados están basados
                 en algoritmos de números pseudoaleatorios que no siguen patrones temporales fijos.
               </p>

@@ -330,6 +330,15 @@ const App = () => {
                           </>
                         } />
 
+                        <Route path="/bots" element={
+                          <>
+                            <Sidebar collapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+                            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'main-content-expanded' : 'main-content'}`}>
+                              <BotSelection />
+                            </main>
+                          </>
+                        } />
+
 
 
                         <Route path="/bots/gain" element={

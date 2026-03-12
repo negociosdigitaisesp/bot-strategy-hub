@@ -660,7 +660,7 @@ const Library = () => {
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-foreground">Filtros Avanzados</h2>
-                <p className="text-sm text-muted-foreground">Encuentra los robots más exitosos</p>
+                <p className="text-sm text-muted-foreground">Encuentra los bots más exitosos</p>
               </div>
             </div>
 
@@ -788,7 +788,7 @@ const Library = () => {
                 <Users size={14} />
                 <span>
                   Mostrando <span className="font-medium text-primary">{filteredAndSortedStats.length}</span> de{' '}
-                  <span className="font-medium">{stats?.length || 0}</span> robots
+                  <span className="font-medium">{stats?.length || 0}</span> bots
                 </span>
               </div>
               {(searchTerm || performanceFilter !== 'all' || advancedFilters.showMostAssertive ||

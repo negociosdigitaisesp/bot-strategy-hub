@@ -270,6 +270,13 @@ export const useEvenOddSensor = () => {
 
         // Handle buy response
         if (response.msg_type === 'buy' && response.buy) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    proposal_open_contract: 1,
+                    contract_id: response.buy.contract_id,
+                    subscribe: 1
+                }));
+            }
             pendingContractRef.current = response.buy.contract_id;
             toast.success(`✅ Contrato abierto: ID ${response.buy.contract_id}`);
         }

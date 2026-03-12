@@ -801,8 +801,7 @@ export const useVolatilityBlitz = () => {
 
                 // Solicitar lista de contratos abertos para monitorar
                 socket.send(JSON.stringify({
-                    proposal_open_contract: 1,
-                    subscribe: 1
+                    proposal_open_contract: 1
                 }));
 
                 // Liberar lock mas marcar que há posição

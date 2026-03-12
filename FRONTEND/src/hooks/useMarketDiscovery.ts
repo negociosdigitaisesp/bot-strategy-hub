@@ -135,7 +135,6 @@ export const useMarketDiscovery = () => {
 
                 socket.send(JSON.stringify({
                     ticks: symbol,
-                    subscribe: 1,
                 }));
 
                 addLog(`🔎 Testando ${symbol}...`, 'info');
