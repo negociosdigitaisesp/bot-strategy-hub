@@ -95,7 +95,13 @@ export class HftDerivService {
         if (data.msg_type === 'authorize') {
           clearTimeout(timeoutId);
           if (data.error) { ws.close(); resolve(false); }
-          else { this.connections.set(symbol, ws); resolve(true); }
+          else { 
+            this.connections.set(symbol, ws); 
+            // Cirurgia 2: Subscrever ao transaction stream após authorize
+            ws.send(JSON.stringify({ transaction: 1, subscribe: 1 }));
+            console.log('[🔗 HFT] Transaction Stream subscrito após authorize.');
+            resolve(true); 
+          }
         }
       };
       ws.onerror = () => { clearTimeout(timeoutId); resolve(false); };

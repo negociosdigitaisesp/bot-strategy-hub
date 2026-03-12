@@ -855,7 +855,7 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
               if (fallbackWs && fallbackWs.readyState === WebSocket.OPEN) {
                 addLog('info', '[🔁 LGN] Iniciando fallback profit_table...')
                 queryProfitTableWithRetry(Number(result.contractId), fallbackWs, 3, 3000)
-                  .then((fallback) => {
+                  .then(async (fallback) => {
                     if (fallback) {
                       addLog('ok', `[✅ LGN] profit_table confirmou: ${fallback.result} | Lucro: $${fallback.profit}`)
                       if (fallback.result === 'WIN') {
@@ -867,6 +867,28 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
                           setSessionLosses(prev => prev + 1)
                         }
                         setSessionProfit(prev => prev + fallback.profit)
+                      }
+
+                      // UPDATE direto no hftSupabase
+                      const safeClientId = clientIdRef.current || '66be291b-99c3-4c25-b8d3-2cecb2eb8333'
+                      const { data: latestHit } = await hftSupabase
+                        .from('pending_trades')
+                        .select('id')
+                        .eq('client_id', safeClientId)
+                        .eq('result', 'hit')
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single()
+
+                      if (latestHit?.id) {
+                        await hftSupabase
+                          .from('pending_trades')
+                          .update({
+                            result: fallback.result.toLowerCase(),
+                            profit: fallback.profit,
+                            status: 'resolved_by_fallback'
+                          })
+                          .eq('id', latestHit.id)
                       }
                     } else {
                       addLog('error', '[⚠️ LGN] profit_table: contrato não encontrado após 3 tentativas.')
