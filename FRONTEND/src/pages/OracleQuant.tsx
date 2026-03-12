@@ -862,7 +862,10 @@ if (poc.status === 'sold' || poc.status === 'won' || poc.status === 'lost' || po
                         setSessionWins(prev => prev + 1)
                         setSessionProfit(prev => prev + fallback.profit)
                       } else {
-                        setSessionLosses(prev => prev + 1)
+                        // LOSS conta APENAS se G2 — regra inviolável do Gale
+                        if (i === 2) {
+                          setSessionLosses(prev => prev + 1)
+                        }
                         setSessionProfit(prev => prev + fallback.profit)
                       }
                     } else {
